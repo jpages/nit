@@ -44,7 +44,7 @@ end
 abstract class MOVar
 	super MOExpr
 
-	# The offset of the variable in it environment, of the position of parameter
+	# The offset of the variable in it environment, or the position of parameter
 	var offset: Int
 end
 

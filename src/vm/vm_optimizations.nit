@@ -387,6 +387,9 @@ redef class AAsCastExpr
 end
 
 redef class ASendExpr
+
+	var mocallsite: MOCallSite
+
 	redef fun numbering(v: VirtualMachine, pos: Int): Int
 	do
 		v.current_propdef.mpropdef.as(MMethodDef).add_callsite(v, callsite.as(not null))
@@ -400,6 +403,34 @@ redef class ASendExpr
 		v.current_propdef.mpropdef.as(MMethodDef).call_exprs.add(expr)
 
 		return n_expr.numbering(v, pos)
+	end
+
+	redef fun generate_basicBlocks(vm, old_block)
+	do
+		var sup = super(vm, old_block)
+
+		# self.raw_arguments: collection of arguments
+		var recv: MOExpr
+
+		if n_expr isa ASendExpr then
+			# A Callsite
+			recv = n_expr.as(ASendExpr).mocallsite
+		else if n_expr isa AVarExpr then
+			# A variable read
+			if n_expr.as(AVarExpr).variable.parameter then
+				recv = new MOParam(n_expr.as(AVarExpr).variable.position)
+			else
+				recv = new MOSSAVar(-1, new MOParam(1))
+			end
+		else
+			recv = new MOSSAVar(-1, new MOParam(1))
+		end
+
+		# TODO : get the pattern
+		mocallsite = new MOCallSite(recv, callsite.pattern)
+		# mocallsite.given_args.add_all(raw_arguments)
+
+		return sup
 	end
 end
 

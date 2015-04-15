@@ -158,6 +158,9 @@ redef class Variable
 
 	# The original Variable in case of renaming
 	var original_variable: nullable Variable = self
+
+	# If true, this variable is a parameter
+	var parameter: Bool = false
 end
 
 class PhiFunction
@@ -237,9 +240,13 @@ redef class AMethPropdef
 
 		# If the method has a signature
 		if n_signature != null then
+			var i = 0
 			for p in n_signature.n_params do
 				# Add parameters to the local variables of the method
 				variables.add(p.variable.as(not null))
+				p.variable.as(not null).parameter = true
+				p.variable.position = i
+				i += 1
 			end
 		end
 

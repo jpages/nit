@@ -78,7 +78,7 @@ end
 
 redef class Variable
 	# The position in the environment
-	var position: Int
+	var position: Int is writable
 end
 
 # Implementation of a Frame with numbered variables
