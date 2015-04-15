@@ -73,7 +73,7 @@ end
 class MONew
 	super MOExpr
 
-	# Tell if the class is loaded 
+	# Tell if the class is loaded
 	var loaded: Bool
 end
 

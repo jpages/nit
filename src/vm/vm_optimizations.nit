@@ -18,7 +18,7 @@
 module vm_optimizations
 
 import virtual_machine
-import variables_numbering
+import ssa
 import model_optimizations
 
 redef class VirtualMachine
@@ -389,7 +389,7 @@ end
 redef class ASendExpr
 	redef fun numbering(v: VirtualMachine, pos: Int): Int
 	do
-		v.current_mpropdef.as(MMethodDef).add_callsite(v, callsite.as(not null))
+		v.current_propdef.mpropdef.as(MMethodDef).add_callsite(v, callsite.as(not null))
 		for arg in raw_arguments do
 			arg.numbering(v, pos)
 		end
@@ -397,7 +397,7 @@ redef class ASendExpr
 		# test preexistence sur parametres
 		var fake_recv = new MOParam(1)
 		var expr = new MOCallSite(fake_recv, callsite.pattern)
-		v.current_mpropdef.as(MMethodDef).call_exprs.add(expr)
+		v.current_propdef.mpropdef.as(MMethodDef).call_exprs.add(expr)
 
 		return n_expr.numbering(v, pos)
 	end
@@ -660,7 +660,7 @@ redef class MOExpr
 
 			pre = pre.bin_and(expr.preexist_cache.bin_and(15))
 			deps = deps.bin_or(expr.preexist_cache.bin_and(240))
-			
+
 			preexist_cache = pre.bin_or(deps)
 		end
 
@@ -752,7 +752,7 @@ redef class MOReadSite
 						reset.add(self)
 					end
 
-					# The receiver is always at position 0 of the environment 
+					# The receiver is always at position 0 of the environment
 					set_dependency_flag(0)
 				else
 					if expr_recv.is_perennial then
@@ -770,7 +770,7 @@ redef class MOReadSite
 end
 
 redef class MOCallSite
-	# If the receiver expression of `self` depends of the preexistence of the arg at `index`, 
+	# If the receiver expression of `self` depends of the preexistence of the arg at `index`,
 	# check if `expr` depends of the preexistence of the same arg.
 	fun dep_matches(expr: MOExpr, index: Int): Bool
 	do
@@ -828,7 +828,7 @@ redef class MOCallSite
 			reset.add(self)
 		end
 
-		return preexist_cache	
+		return preexist_cache
 	end
 end
 
