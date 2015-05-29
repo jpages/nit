@@ -627,6 +627,9 @@ redef class MClass
 			# `propdef` is the most specific implementation for this MMethod
 			var propdef = m.lookup_first_definition(vm.mainmodule, self.intro.bound_mtype)
 			methods.push(propdef)
+
+			# Add this methoddef to the corresponding global property
+			if not m.living_mpropdefs.has(propdef) then m.add_propdef(propdef)
 		end
 
 		# Call a method in C to put propdefs of self methods in the vtables
@@ -865,6 +868,15 @@ end
 redef class MMethod
 	# Relative offset of this method in the virtual table (from the beginning of the block)
 	redef var offset: Int
+
+	# The array of living (loaded) MMethodDef
+	var living_mpropdefs: Array[MMethodDef] = new Array[MMethodDef]
+
+	# Add a living mpropdef to the collection `living_mpropdefs`
+	fun add_propdef(mpropdef: MMethodDef)
+	do
+		living_mpropdefs.add(mpropdef)
+	end
 end
 
 # Redef MutableInstance to improve implementation of attributes in objects
