@@ -21,3 +21,4 @@ import virtual_machine
 import vm_optimizations
 import variables_numbering
 import compilation
+import stats
