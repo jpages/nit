@@ -47,6 +47,7 @@ redef class ModelBuilder
 	fun get_stats
 	do
 		var visitor = new FinalAttributeVisitor
+		visitor.modelbuilder = self
 
 		# Statistics about immutable attributes
 		for m in model.mmodules do
@@ -58,7 +59,7 @@ redef class ModelBuilder
 					# See if attributes are initialized only in their constructors
 					if node != null and node isa APropdef then
 						# Visit all propdefs
-						visitor.propdef = node.as(APropdef)
+						visitor.propdef = node
 						node.visit_all(visitor)
 					end
 				end
@@ -84,7 +85,12 @@ redef class ModelBuilder
 		print "Number of leaves : {final_classes.length}"
 		print "Number of classes with subclasses : {classes.length}"
 
-		print "Number of classes : {final_classes.length + classes.length}"
+		print "Number of classes : {final_classes.length + classes.length}\n\n"
+
+		print "Number of mutable attributes : {mutable_attributes.length}"
+		print "Number of immutable attributes : {immutable_attributes.length}"
+
+		print "Number of attributes : {mutable_attributes.length + immutable_attributes.length}"
 	end
 end
 
@@ -93,13 +99,34 @@ class FinalAttributeVisitor
 
 	var propdef: nullable APropdef
 
+	var modelbuilder: ModelBuilder is noinit
+
 	redef fun visit(n)
 	do
 		if n isa AAttrFormExpr then
+			var mattribute = n.mproperty.as(not null)
+
+			# By default the attribute is immutable
+			if not modelbuilder.mutable_attributes.has(mattribute) then
+				modelbuilder.immutable_attributes.add(mattribute)
+			end
+
 			# If the attribute is written
 			if n isa AAttrAssignExpr or n isa AAttrReassignExpr then
 				assert n isa AAttrFormExpr
-				print "Acces to {n.mproperty.as(not null)} in {propdef.mpropdef.full_name}"
+
+				# If the Attribute is written in another class of its introduction class,
+				# it is mutable
+				if mattribute.intro_mclassdef.mclass != propdef.mpropdef.mclassdef.mclass then
+					modelbuilder.mutable_attributes.add(mattribute)
+
+					# If needed, remove it from immutable attributes
+					if modelbuilder.immutable_attributes.has(mattribute) then
+						modelbuilder.immutable_attributes.remove(mattribute)
+					end
+				else
+					#print "{mattribute} was written in {propdef.mpropdef.as(not null)} {n.location}"
+				end
 			end
 		end
 
