@@ -449,6 +449,9 @@ redef class MClass
 	# All `MMethod` this class contains
 	var mmethods = new Array[MMethod]
 
+	# The direct (loaded) subclasses of this class
+	var subclasses = new Array[MClass] is lazy
+
 	# Allocates a VTable for this class and gives it an id
 	# * `vm` The currently executed VirtualMachine
 	# * `explicit` Indicate if this class was directly instantiated (i.e. not indirectly loaded)
@@ -509,6 +512,11 @@ redef class MClass
 		# Update caches and offsets of methods and attributes for this class
 		# If the loading was explicit, the virtual table will be allocated and filled
 		set_offsets(vm, explicit)
+
+		# Indicate to the direct parents of this class that `self` is loaded
+		for superclass in self.in_hierarchy(vm.mainmodule).direct_greaters do
+			superclass.subclasses.add(self)
+		end
 
 		if not explicit then
 			# Just init the C-pointer to NULL to avoid errors
