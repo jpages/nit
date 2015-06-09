@@ -115,7 +115,7 @@ redef class AAttrFormExpr
 	redef fun compile_ast(vm: VirtualMachine, lp: MMethodDef)
 	do
 		var ignore = false
-		
+
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then
 			# Ignore litterals cases of the analysis
 			ignore = true
@@ -128,7 +128,7 @@ redef class AAttrFormExpr
 
 		if recv != null and not ignore then
 			moattrsite = make_mo(vm, recv, lp)
-			lp.mosites.add(moattrsite.as(not null))	
+			lp.mosites.add(moattrsite.as(not null))
 		end
 	end
 
@@ -342,11 +342,11 @@ redef class AIsaExpr
 		ssa.propdef.as(AMethPropdef).to_compile.add(self)
 		return ret
 	end
-	
+
 	redef fun compile_ast(vm: VirtualMachine, lp: MMethodDef)
 	do
 		var ignore = false
-		
+
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then
 			# Ignore litterals cases of the analysis
 			ignore = true
@@ -438,7 +438,7 @@ redef class AAsCastExpr
 		end
 		id = target.mclass.vtable.id
 	end
-	
+
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
 		var ret = super
@@ -449,7 +449,7 @@ redef class AAsCastExpr
 	redef fun compile_ast(vm: VirtualMachine, lp: MMethodDef)
 	do
 		var ignore = false
-		
+
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then
 			# Ignore litterals cases of the analysis
 			ignore = true
@@ -491,7 +491,7 @@ redef class Variable
 					if mo != null then movar = new MOSSAVar(node.variable.position, mo)
 				else if node.variable.dep_exprs.length > 1 then
 					var phi = new List[MOExpr]
-					for a_expr in node.variable.dep_exprs do 
+					for a_expr in node.variable.dep_exprs do
 						var mo = a_expr.ast2mo
 						if mo != null then phi.add(mo)
 					end
@@ -573,13 +573,15 @@ class AToCompile
 	fun compile_ast(vm: VirtualMachine, lp: MMethodDef) is abstract
 end
 
+redef class APropdef
+		# List of ast node to compile
+	var to_compile = new List[AToCompile]
+end
+
 redef class AMethPropdef
 	# list of return expression of the optimizing model
 	# Null if this fuction is a procedure
 	var mo_dep_exprs: nullable MOVar = null
-
-	# List of ast node to compile
-	var to_compile = new List[AToCompile]
 
 	redef fun compile(vm)
 	do
@@ -615,11 +617,11 @@ redef class ASendExpr
 
 	# Site invocation associated with this node
 	var mocallsite: nullable MOCallSite
-	
+
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
 		var sup = super
-		ssa.propdef.as(AMethPropdef).to_compile.add(self)
+		ssa.propdef.to_compile.add(self)
 		return sup
 	end
 
@@ -632,7 +634,7 @@ redef class ASendExpr
 	redef fun compile_ast(vm: VirtualMachine, lp: MMethodDef)
 	do
 		var ignore = false
-		
+
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then
 			# Ignore litterals cases of the analysis
 			ignore = true
@@ -661,7 +663,7 @@ redef class ASendExpr
 
 	# Unique LP, simple attr access, make it as a real attribute access (eg. _attr)
 	fun compile_ast_accessor(vm: VirtualMachine, lp: MMethodDef, recv: MOExpr, node_ast: ANode)
-	do	
+	do
 		var moattr: MOAttrSite
 		var params_len = callsite.as(not null).msignature.mparameters.length
 
@@ -679,7 +681,7 @@ redef class ASendExpr
 		var gp = node_ast.as(AAttrPropdef).mpropdef.mproperty
 
 		recv_class.set_site_pattern(moattr, recv_class.mclass_type, gp)
-		lp.mosites.add(moattr)	
+		lp.mosites.add(moattr)
 	end
 
 	# Real methods calls, and accessors with multiples LPs
@@ -732,15 +734,15 @@ redef abstract class MOSitePattern
 		var offset = get_offset(vm)
 
 		if not rst.get_mclass(vm).loaded then
-#			if pic_pos_unique(vm) then
-#				if can_be_static then
-#					set_static_impl
-#				else
-#					impl = new SSTImpl(true, get_pic_position(vm) + offset)
-#				end
-#			else
+			if pic_pos_unique(vm) then
+				if can_be_static then
+					set_static_impl
+				else
+					impl = new SSTImpl(true, get_pic_position(vm) + offset)
+				end
+			else
 				impl = new PHImpl(true, offset)
-#			end
+			end
 		else
 			var pos_cls = get_bloc_position(vm)
 
@@ -751,7 +753,7 @@ redef abstract class MOSitePattern
 			else if pos_cls > 0 then
 				impl = new SSTImpl(true, pos_cls + offset)
 			else
-				impl = new PHImpl(false, offset) 
+				impl = new PHImpl(false, offset)
 			end
 		end
 	end
@@ -797,7 +799,7 @@ redef abstract class MOPropSitePattern
 		var reset = not lps.has(lp)
 
 		super(lp)
-		if reset then 
+		if reset then
 			if impl != null and impl.is_mutable then impl = null
 			for site in sites do
 				if site.impl != null and site.impl.is_mutable then site.impl = null
@@ -826,7 +828,7 @@ redef abstract class MOSite
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
 		if impl != null then return impl.as(not null)
-		
+
 		if get_concretes.length == 0 then
 			var candidate_impl = pattern.get_impl(vm)
 
@@ -854,16 +856,16 @@ redef abstract class MOSite
 		var not_ph = not candidate_impl isa PHImpl
 		var multiple_pos = get_bloc_position(vm, pattern.rst.get_mclass(vm).as(not null)) < 0
 
-		return not_pre and not_ph and multiple_pos 
+		return not_pre and not_ph and multiple_pos
 	end
-	
+
 	# Compute the implementation with rst/pic, and concretes if any
 	fun compute_impl(vm: VirtualMachine)
 	do
 		var offset = get_offset(vm)
 
 		if not pattern.rst.get_mclass(vm).loaded then
-			# The PHImpl here is mutable because it can be switch to a 
+			# The PHImpl here is mutable because it can be switch to a
 			# lightweight implementation when the class will be loaded
 			impl = new PHImpl(true, offset)
 			return
@@ -883,10 +885,10 @@ redef abstract class MOSite
 			# Some receivers classes are not loaded yet, so we use a mutable implementation
 			impl = new PHImpl(true, offset)
 		else
-			impl = new PHImpl(false, offset) 
+			impl = new PHImpl(false, offset)
 		end
 	end
-	
+
 	# Each concrete receiver has unique method position
 	# -1 : some classes still unloaded
 	# 0 : no unique position
@@ -922,7 +924,7 @@ end
 
 redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
-	
+
 	redef fun get_pic(vm) do return target.get_mclass(vm).as(not null)
 
 	redef fun set_static_impl(vm)
@@ -933,7 +935,7 @@ redef class MOSubtypeSite
 			impl = new StaticImplSubtype(true, vm.inter_is_subtype_ph(
 			get_pic(vm).vtable.id,
 			pattern.rst.get_mclass(vm).vtable.mask,
-			pattern.rst.get_mclass(vm).vtable.internal_vtable))		
+			pattern.rst.get_mclass(vm).vtable.internal_vtable))
 		end
 	end
 
@@ -964,7 +966,7 @@ redef class MOCallSite
 		impl = new StaticImplProp(false, vm.method_dispatch_ph(
 		cls.vtable.internal_vtable,
 		cls.vtable.mask,
-		get_pic(vm).vtable.id, 
+		get_pic(vm).vtable.id,
 		get_offset(vm)))
 	end
 

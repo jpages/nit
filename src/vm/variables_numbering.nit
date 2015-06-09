@@ -108,6 +108,8 @@ redef class APropdef
 	do
 		# Number the variables
 		if not is_numbering then numbering_variables(vm)
+
+		is_compiled = true
 	end
 
 	# Numbering the variable inside the propdef
