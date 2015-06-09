@@ -52,7 +52,8 @@ redef class ModelBuilder
 				assert test_unique_position_methods(mclass, mclass)
 			else if mclass.position_methods < 0 then
 				# Check that the position is really invariant under this class
-				print "Multiple positions {test_multiple_positions_methods(mclass, mclass)}"
+				print "Multiple positions for {mclass}"
+				print "\t{test_multiple_positions_methods(mclass, mclass)}"
 			end
 
 			if mclass.position_attributes > 0 then
@@ -96,14 +97,21 @@ redef class ModelBuilder
 	fun test_multiple_positions_methods(test_class: MClass, mclass: MClass): Bool
 	do
 		# The position found in `mclass` HashMap
+		if not mclass.positions_methods.has_key(test_class) then
+		#	print "Not key {test_class} found in {mclass} as it should be"
+			return false
+		end
+
 		var pos_map = mclass.positions_methods[test_class]
 
 		if pos_map != test_class.positions_methods[test_class] then return true
 
 		for subclass in mclass.subclasses do
-			test_multiple_positions_methods(test_class, subclass)
+			# If we found a subclass with a different position than the original then all is good
+			if test_multiple_positions_methods(test_class, subclass) then return true
 		end
 
+		# By default return false
 		return false
 	end
 end

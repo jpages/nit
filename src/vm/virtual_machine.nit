@@ -836,6 +836,8 @@ redef class MClass
 			var pos = positions_methods[cl]
 			if pos > 0 then return pos
 			return -1
+		else
+			print "No position found in {self} for cl = {cl}"
 		end
 
 		# No invariant position at all, the caller must use a multiple inheritance implementation
