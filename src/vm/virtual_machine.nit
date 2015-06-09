@@ -167,7 +167,7 @@ class VirtualMachine super NaiveInterpreter
 
 		assert recv isa MutableInstance
 
-		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length)
+		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length+1)
 		super
 	end
 
@@ -463,7 +463,7 @@ redef class MClass
 		var nb_attributes = new Array[Int]
 
 		# Absolute offset of attribute from the beginning of the attributes table
-		var offset_attributes = 0
+		var offset_attributes = 1
 
 		# Absolute offset of method from the beginning of the methods table,
 		# is initialize to 3 because the first position is empty in the virtual table
@@ -652,7 +652,7 @@ redef class MClass
 	do
 		var deltas = new Array[Int]
 
-		var total = 0
+		var total = 1
 		for nb in nb_attributes do
 			deltas.push(total)
 			total += nb
@@ -744,6 +744,32 @@ redef class MClass
 		return res
 	end
 
+	private fun propagate_new_position_methods(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update
+		if subclass.positions_methods.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_methods[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_methods(original_class, sub, offset)
+		end
+	end
+
+	private fun propagate_new_position_attributes(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update
+		if subclass.positions_attributes.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_attributes[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_attributes(original_class, sub, offset)
+		end
+	end
+
 	# This method is called when `current_class` class is moved in virtual table of `self`
 	# *`vm` Running instance of the virtual machine
 	# *`current_class` The class which was moved in `self` structures
@@ -755,6 +781,11 @@ redef class MClass
 			# The invariant position is no longer satisfied
 			current_class.positions_methods[current_class] = current_class.position_methods
 			current_class.position_methods = - current_class.position_methods
+
+			# For each subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_methods(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_methods[current_class] = -current_class.positions_methods[current_class]
@@ -790,11 +821,17 @@ redef class MClass
 	# *`offset` The offset of block of attributes of `current_class` in `self`
 	fun moved_class_attributes(vm: VirtualMachine, current_class: MClass, offset: Int)
 	do
+		#TODO >= 0
 		# `current_class` was moved in `self` attribute table
-		if not current_class.positions_attributes.has_key(current_class) then
+		if current_class.position_attributes > 0 then
 			# The invariant position is no longer satisfied
 			current_class.positions_attributes[current_class] = current_class.position_attributes
 			current_class.position_attributes = - current_class.position_attributes
+
+			# For each subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_attributes(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_attributes[current_class] = - current_class.positions_attributes[current_class]
@@ -836,8 +873,6 @@ redef class MClass
 			var pos = positions_methods[cl]
 			if pos > 0 then return pos
 			return -1
-		else
-			print "No position found in {self} for cl = {cl}"
 		end
 
 		# No invariant position at all, the caller must use a multiple inheritance implementation
