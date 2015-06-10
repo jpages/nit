@@ -167,7 +167,7 @@ class VirtualMachine super NaiveInterpreter
 
 		assert recv isa MutableInstance
 
-		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length)
+		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length+1)
 		super
 	end
 
@@ -462,8 +462,9 @@ redef class MClass
 		var nb_methods = new Array[Int]
 		var nb_attributes = new Array[Int]
 
-		# Absolute offset of attribute from the beginning of the attributes table
-		var offset_attributes = 0
+		# Absolute offset of attribute from the beginning of the attributes table,
+		# the offset start from 1 for implementation reason, see `get_position_attributes()`
+		var offset_attributes = 1
 
 		# Absolute offset of method from the beginning of the methods table,
 		# is initialize to 3 because the first position is empty in the virtual table
@@ -652,7 +653,7 @@ redef class MClass
 	do
 		var deltas = new Array[Int]
 
-		var total = 0
+		var total = 1
 		for nb in nb_attributes do
 			deltas.push(total)
 			total += nb
@@ -791,7 +792,7 @@ redef class MClass
 	fun moved_class_attributes(vm: VirtualMachine, current_class: MClass, offset: Int)
 	do
 		# `current_class` was moved in `self` attribute table
-		if not current_class.positions_attributes.has_key(current_class) then
+		if current_class.position_attributes > 0 then
 			# The invariant position is no longer satisfied
 			current_class.positions_attributes[current_class] = current_class.position_attributes
 			current_class.position_attributes = - current_class.position_attributes
