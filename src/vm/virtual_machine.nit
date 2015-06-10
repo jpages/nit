@@ -745,6 +745,44 @@ redef class MClass
 		return res
 	end
 
+	# For each loaded subclasses of `original_class`, save `offset` in `positions_methods`,
+	# if `subclass` does not already has a saved position.
+	# *`original_class` The class which was moved
+	# *`subclass` A loaded subclass
+	# *`offset` The offset to save if needed
+	private fun propagate_new_position_methods(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update,
+		# because `offset` would not be correct
+		if subclass.positions_methods.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_methods[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_methods(original_class, sub, offset)
+		end
+	end
+
+	# For each loaded subclasses of `original_class`, save `offset` in `positions_methods`,
+	# if `subclass` does not already has a saved position.
+	# *`original_class` The class which was moved
+	# *`subclass` A loaded subclass
+	# *`offset` The offset to save if needed
+	private fun propagate_new_position_attributes(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update,
+		# because `offset` would not be correct
+		if subclass.positions_attributes.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_attributes[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_attributes(original_class, sub, offset)
+		end
+	end
+
 	# This method is called when `current_class` class is moved in virtual table of `self`
 	# *`vm` Running instance of the virtual machine
 	# *`current_class` The class which was moved in `self` structures
@@ -753,9 +791,14 @@ redef class MClass
 	do
 		# `current_class` was moved in `self` method table
 		if current_class.position_methods > 0 then
-			# The invariant position is no longer satisfied
+			# The global invariant position is no longer satisfied
 			current_class.positions_methods[current_class] = current_class.position_methods
 			current_class.position_methods = - current_class.position_methods
+
+			# For each loaded subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_methods(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_methods[current_class] = -current_class.positions_methods[current_class]
@@ -793,9 +836,14 @@ redef class MClass
 	do
 		# `current_class` was moved in `self` attribute table
 		if current_class.position_attributes > 0 then
-			# The invariant position is no longer satisfied
+			# The global invariant position is no longer satisfied
 			current_class.positions_attributes[current_class] = current_class.position_attributes
 			current_class.position_attributes = - current_class.position_attributes
+
+			# For each loaded subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_attributes(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_attributes[current_class] = - current_class.positions_attributes[current_class]
