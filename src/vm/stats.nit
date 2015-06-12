@@ -125,7 +125,11 @@ class FinalAttributeVisitor
 						modelbuilder.immutable_attributes.remove(mattribute)
 					end
 				else
-					#print "{mattribute} was written in {propdef.mpropdef.as(not null)} {n.location}"
+					# Written in a property which is not a constructor
+					if propdef.mpropdef.as(MMethodDef).initializers.is_empty then
+						modelbuilder.immutable_attributes.remove(mattribute)
+						modelbuilder.mutable_attributes.add(mattribute)
+					end
 				end
 			end
 		end
