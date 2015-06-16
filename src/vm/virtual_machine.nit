@@ -29,9 +29,16 @@ redef class ModelBuilder
 		var interpreter = new VirtualMachine(self, mainmodule, arguments)
 		interpreter.start(mainmodule)
 
+		sys.vm = interpreter
+
 		var time1 = get_time
 		self.toolcontext.info("*** NITVM STOPPING : {time1-time0} ***", 2)
 	end
+end
+
+redef class Sys
+	# The running instance of the VirtualMachine
+	var vm: VirtualMachine
 end
 
 # A virtual machine based on the naive_interpreter
