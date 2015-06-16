@@ -56,7 +56,10 @@ redef class VirtualMachine
 		var ret = send_commons(callsite.mproperty, args, mtype)
 		if ret != null then return ret
 
-		if callsite.status == 0 then callsite.optimize(recv)
+		if callsite.status == 0 or callsite.static_mpropdef == null then callsite.optimize(recv)
+
+		# Make a static call if if's possible
+		if callsite.static_mpropdef != null then return self.call(callsite.static_mpropdef.as(not null), args)
 
 		var propdef
 		if callsite.status == 1 then
@@ -193,11 +196,20 @@ redef class CallSite
 	# Identifier of the class which introduced the MMethod
 	var id: Int
 
+	# If this callsite can be static, store the apropriate local property
+	var static_mpropdef: nullable MMethodDef
+
 	# Optimize a method dispatch,
 	# If this method is always at the same position in virtual table, we can use direct access,
 	# Otherwise we must use perfect hashing
 	fun optimize(recv: Instance)
 	do
+		# If there is only one candidate to this call
+		if mproperty.mpropdefs.length == 1 then
+			static_mpropdef = mproperty.mpropdefs.first
+			return
+		end
+
 		var position = recv.mtype.as(MClassType).mclass.get_position_methods(mproperty.intro_mclassdef.mclass)
 		if position > 0 then
 			offset = position + mproperty.offset
