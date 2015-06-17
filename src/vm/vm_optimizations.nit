@@ -679,3 +679,16 @@ class StaticImplSubtype
 	# Is subtype ?
 	var is_subtype: Bool
 end
+
+# An instance of this class is related to a propdef,
+# it contains all the intermediate representation which is needed for compilation
+class IR
+	# The propdef represented by this intermediate representation
+	var propdef: APropdef
+
+	# The array of local variables inside the propdef
+	var variables: Array[Variable]
+
+	# MOSite contained in the code
+	var mosites: Array[MOSite]
+end
