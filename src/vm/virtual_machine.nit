@@ -26,12 +26,17 @@ redef class ModelBuilder
 		var time0 = get_time
 		self.toolcontext.info("*** NITVM STARTING ***", 1)
 
-		var interpreter = new VirtualMachine(self, mainmodule, arguments)
-		interpreter.start(mainmodule)
+		sys.vm = new VirtualMachine(self, mainmodule, arguments)
+		sys.vm.start(mainmodule)
 
 		var time1 = get_time
 		self.toolcontext.info("*** NITVM STOPPING : {time1-time0} ***", 2)
 	end
+end
+
+redef class Sys
+	# The running instance of the VirtualMachine
+	var vm: VirtualMachine
 end
 
 # A virtual machine based on the naive_interpreter
@@ -167,7 +172,7 @@ class VirtualMachine super NaiveInterpreter
 
 		assert recv isa MutableInstance
 
-		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length)
+		recv.internal_attributes = init_internal_attributes(initialization_value, recv.mtype.as(MClassType).mclass.mattributes.length+1)
 		super
 	end
 
@@ -446,6 +451,9 @@ redef class MClass
 	# All `MMethod` this class contains
 	var mmethods = new Array[MMethod]
 
+	# The direct (loaded) subclasses of this class
+	var subclasses = new Array[MClass] is lazy
+
 	# Allocates a VTable for this class and gives it an id
 	# * `vm` The currently executed VirtualMachine
 	# * `explicit` Indicate if this class was directly instantiated (i.e. not indirectly loaded)
@@ -460,7 +468,7 @@ redef class MClass
 		var nb_attributes = new Array[Int]
 
 		# Absolute offset of attribute from the beginning of the attributes table
-		var offset_attributes = 0
+		var offset_attributes = 1
 
 		# Absolute offset of method from the beginning of the methods table,
 		# is initialize to 3 because the first position is empty in the virtual table
@@ -506,6 +514,11 @@ redef class MClass
 		# Update caches and offsets of methods and attributes for this class
 		# If the loading was explicit, the virtual table will be allocated and filled
 		set_offsets(vm, explicit)
+
+		# Indicate to the direct parents of this class that `self` is loaded
+		for superclass in self.in_hierarchy(vm.mainmodule).direct_greaters do
+			superclass.subclasses.add(self)
+		end
 
 		if not explicit then
 			# Just init the C-pointer to NULL to avoid errors
@@ -627,6 +640,9 @@ redef class MClass
 			# `propdef` is the most specific implementation for this MMethod
 			var propdef = m.lookup_first_definition(vm.mainmodule, self.intro.bound_mtype)
 			methods.push(propdef)
+
+			# Add this methoddef to the corresponding global property
+			if not m.living_mpropdefs.has(propdef) then m.add_propdef(propdef)
 		end
 
 		# Call a method in C to put propdefs of self methods in the vtables
@@ -641,7 +657,7 @@ redef class MClass
 	do
 		var deltas = new Array[Int]
 
-		var total = 0
+		var total = 1
 		for nb in nb_attributes do
 			deltas.push(total)
 			total += nb
@@ -733,6 +749,32 @@ redef class MClass
 		return res
 	end
 
+	private fun propagate_new_position_methods(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update
+		if subclass.positions_methods.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_methods[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_methods(original_class, sub, offset)
+		end
+	end
+
+	private fun propagate_new_position_attributes(original_class: MClass, subclass: MClass, offset: Int)
+	do
+		# If `subclass` already has a position inside its map, we must not update
+		if subclass.positions_attributes.has_key(original_class) then return
+
+		# Put in the map the position of the original class
+		subclass.positions_attributes[original_class] = offset
+		for sub in subclass.subclasses do
+			# Recursively update the position in subclasses
+			propagate_new_position_attributes(original_class, sub, offset)
+		end
+	end
+
 	# This method is called when `current_class` class is moved in virtual table of `self`
 	# *`vm` Running instance of the virtual machine
 	# *`current_class` The class which was moved in `self` structures
@@ -744,6 +786,11 @@ redef class MClass
 			# The invariant position is no longer satisfied
 			current_class.positions_methods[current_class] = current_class.position_methods
 			current_class.position_methods = - current_class.position_methods
+
+			# For each subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_methods(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_methods[current_class] = -current_class.positions_methods[current_class]
@@ -779,11 +826,17 @@ redef class MClass
 	# *`offset` The offset of block of attributes of `current_class` in `self`
 	fun moved_class_attributes(vm: VirtualMachine, current_class: MClass, offset: Int)
 	do
+		#TODO >= 0
 		# `current_class` was moved in `self` attribute table
-		if not current_class.positions_attributes.has_key(current_class) then
+		if current_class.position_attributes > 0 then
 			# The invariant position is no longer satisfied
 			current_class.positions_attributes[current_class] = current_class.position_attributes
 			current_class.position_attributes = - current_class.position_attributes
+
+			# For each subclass of `current_class`, update its position
+			for subclass in current_class.subclasses do
+				propagate_new_position_attributes(current_class, subclass, -current_class.position_methods)
+			end
 		else
 			# The class has already several positions and an update is needed
 			current_class.positions_attributes[current_class] = - current_class.positions_attributes[current_class]
@@ -865,6 +918,15 @@ end
 redef class MMethod
 	# Relative offset of this method in the virtual table (from the beginning of the block)
 	redef var offset: Int
+
+	# The array of living (loaded) MMethodDef
+	var living_mpropdefs: Array[MMethodDef] = new Array[MMethodDef]
+
+	# Add a living mpropdef to the collection `living_mpropdefs`
+	fun add_propdef(mpropdef: MMethodDef)
+	do
+		living_mpropdefs.add(mpropdef)
+	end
 end
 
 # Redef MutableInstance to improve implementation of attributes in objects
