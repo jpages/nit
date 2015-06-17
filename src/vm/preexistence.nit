@@ -40,7 +40,7 @@ redef class VirtualMachine
 end
 
 redef class Int
-	# Display 8 lower bits of preexitence value
+	# Display 8 lower bits of preexistence value
 	fun preexists_bits: Array[Int]
 	do
 		var bs = bits.reversed
@@ -377,7 +377,6 @@ redef class MOPhiVar
 	end
 end
 
-
 redef class MOReadSite
 	redef fun preexist_expr
 	do
@@ -460,12 +459,12 @@ redef class MOCallSite
 				if candidate.is_intern or candidate.is_extern then
 					# WARNING
 					# If the candidate method is intern/extern, then the return is preexist immutable
-					# since the VM cannot make FFI.
+					# since the VM cannot execute FFI code.
 					set_pval_per
 					break
 				else if not candidate.preexist_analysed then
 					# The lp could be known by the model but not already compiled from ast to mo
-					# So, we must NOT check it's return_expr (it could be still null)
+					# So, we must NOT check its return_expr (it could be still null)
 					set_npre_nper
 					break
 				else if candidate.return_expr == null then

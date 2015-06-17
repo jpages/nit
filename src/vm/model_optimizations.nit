@@ -30,6 +30,19 @@ redef class ModelBuilder
 	end
 end
 
+redef class VirtualMachine
+	# The top of list is the type of the receiver that will be used after new_frame
+	var next_receivers = new List[MType]
+
+	redef fun new_frame(node, mpropdef, args)
+	do
+		next_receivers.push(args.first.mtype)
+		var ret = super(node, mpropdef, args)
+		next_receivers.pop
+		return ret
+	end
+end
+
 # Pattern of instantiation sites
 class MONewPattern
 	# Class associated to the pattern
@@ -410,9 +423,6 @@ class MOWriteSite
 	super MOAttrSite
 
 	redef type P: MOWriteSitePattern
-
-	# Value to assign to the attribute
-#	var arg: MOExpr
 end
 
 redef class MClass
@@ -483,8 +493,6 @@ redef class MClass
 			end
 
 			sites_patterns.add(pattern.as(not null))
-
-
 		end
 
 		pattern.add_site(site)
@@ -496,20 +504,6 @@ redef class MClass
 		new_pattern.newexprs.add(newsite)
 		newsite.pattern = new_pattern
 	end
-end
-
-redef class VirtualMachine
-	# The top of list is the type of the receiver that will be used after new_frame
-	var next_receivers = new List[MType]
-
-	redef fun new_frame(node, mpropdef, args)
-	do
-		next_receivers.push(args.first.mtype)
-		var ret = super(node, mpropdef, args)
-		next_receivers.pop
-		return ret
-	end
-
 end
 
 redef class MType
@@ -788,7 +782,7 @@ end
 
 # Common call to all AST node that must be compiled into MO node
 class AToCompile
-	# Compile the AST to into a MO node
+	# Compile the AST node into a MO node
 	fun compile_ast(vm: VirtualMachine, lp: MMethodDef) is abstract
 end
 
