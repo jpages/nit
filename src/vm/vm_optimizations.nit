@@ -358,6 +358,31 @@ redef class AAsCastExpr
 	end
 end
 
+redef class ASendExpr
+	# Indicate this call is inlined
+	var inlined: Bool = false
+
+	# If the call is inlined, do not execute it and continue the execution
+	# directly inside the calle
+	redef fun expr(v)
+	do
+		if mocallsite != null then
+			if mocallsite.can_be_static then
+				# If the callsite can be static (only one method for candidate)
+				#TODO inline...
+			end
+		end
+
+		var recv = v.expr(self.n_expr)
+		if recv == null then return null
+		var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
+		if args == null then return null
+
+		var res = v.callsite(callsite, args)
+		return res
+	end
+end
+
 redef class MPropDef
 	redef fun compile(vm)
 	do
@@ -688,7 +713,4 @@ class IR
 
 	# The array of local variables inside the propdef
 	var variables: Array[Variable]
-
-	# MOSite contained in the code
-	var mosites: Array[MOSite]
 end
