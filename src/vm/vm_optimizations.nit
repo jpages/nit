@@ -369,8 +369,10 @@ redef class ASendExpr
 		if mocallsite != null then
 			if mocallsite.can_be_static then
 				# If the callsite can be static (only one method for candidate)
-				#TODO inline...
+				inlined = true
 			end
+		else
+			# Check if self is an attribute access or a call on a primitive receiver
 		end
 
 		var recv = v.expr(self.n_expr)
