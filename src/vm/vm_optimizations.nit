@@ -362,14 +362,25 @@ redef class ASendExpr
 	# Indicate this call is inlined
 	var inlined: Bool = false
 
+	# The inlined code instead of this send
+	var inlined_code: nullable AExpr is noinit
+
 	# If the call is inlined, do not execute it and continue the execution
 	# directly inside the calle
 	redef fun expr(v)
 	do
 		if mocallsite != null then
-			if mocallsite.can_be_static then
-				# If the callsite can be static (only one method for candidate)
+			if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
+				# If the callsite can be static (only one method for candidate), then inline
 				inlined = true
+				var local_property = v.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
+
+				if local_property isa AMethPropdef and local_property.n_block != null then
+					inlined_code = local_property.n_block
+
+					# Clone variables of the inlined method
+					print "Caller {sys.vm.current_propdef}"
+				end
 			end
 		else
 			# Check if self is an attribute access or a call on a primitive receiver
