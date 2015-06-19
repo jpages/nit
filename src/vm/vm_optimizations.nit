@@ -362,24 +362,29 @@ redef class ASendExpr
 	# Indicate this call is inlined
 	var inlined: Bool = false
 
-	# The inlined code instead of this send
-	var inlined_code: nullable AExpr is noinit
-
 	# If the call is inlined, do not execute it and continue the execution
 	# directly inside the calle
 	redef fun expr(v)
 	do
+		# Inline the call if possible
 		if mocallsite != null then
 			if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
 				# If the callsite can be static (only one method for candidate), then inline
-				inlined = true
-				var local_property = v.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
+				var callee = vm.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
+				var caller = sys.vm.current_propdef.mpropdef
 
-				if local_property isa AMethPropdef and local_property.n_block != null then
-					inlined_code = local_property.n_block
+				# Inline the callee inside the caller (just the model, not the code)
 
-					# Clone variables of the inlined method
-					print "Caller {sys.vm.current_propdef}"
+				if callee isa APropdef then
+					# Create the two objects of intermediate representation
+					caller.create_ir
+					callee.mpropdef.create_ir
+
+					caller.inline(callee.mpropdef.as(not null))
+					inlined = true
+
+					# Recompute the preexistence of the caller
+					caller.as(MMethodDef).preexist_all(sys.vm)
 				end
 			end
 		else
@@ -396,19 +401,100 @@ redef class ASendExpr
 	end
 end
 
+# TODO: De-optimize the inlining if needed
 redef class MPropDef
-	redef fun compile(vm)
-	do
-		super
+	# The intermediate representation
+	var ir: nullable IR is noinit
 
-		if self isa MMethodDef then
-			for site in self.mosites do site.get_impl(vm)
+	# If true, the mpropdef contains at least one inlined callsite
+	var contains_inlining: Bool = false
+
+	# Create the intermediate representation of this mpropdef
+	fun create_ir
+	do
+		# Do not generate twice the IR for the same MPropDef
+		if ir != null then return
+
+		# Collect all patterns to save them
+		var patterns = new List[MOSitePattern]
+		for site in mosites do
+			patterns.add(site.pattern)
 		end
+
+		ir = new IR(self, mosites, monews, patterns)
+	end
+
+	# Inline the `inlined` IR in self,
+	# The `inlined` IR will be cloned inside self
+	fun inline(inlined: MPropDef)
+	do
+		# Add the object sites of the inlined to self
+		ir.callsites.add_all(inlined.mosites)
+		ir.news.add_all(inlined.monews)
+
+		# TODO: change the dependances of the inlined method's expressions
+
+		#TODO Delete the inlined site inside the caller
+		contains_inlining = true
+	end
+end
+
+redef class MMethodDef
+
+	redef fun preexist_all(vm: VirtualMachine): Bool
+	do
+		if preexist_analysed or is_intern or is_extern then return false
+		preexist_analysed = true
+
+		# Generate the IR if not already done
+		if ir == null then create_ir
+
+		trace("\npreexist_all of {self}")
+		var preexist: Int
+
+		if not disable_preexistence_extensions then
+			for newexpr in ir.news do
+				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
+
+				preexist = newexpr.preexist_expr
+				fill_nper(newexpr)
+				trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
+			end
+		end
+
+
+		for site in ir.callsites do
+			assert not site.pattern.rst.is_primitive_type
+
+			preexist = site.preexist_site
+			var buff = "\tpreexist of "
+
+			fill_nper(site.expr_recv)
+
+			if site isa MOAttrSite then
+				buff += "attr {site.pattern.rst}.{site.pattern.gp}"
+			else if site isa MOSubtypeSite then
+				buff += "cast {site.pattern.rst} isa {site.target}"
+			else if site isa MOCallSite then
+				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
+			else
+				abort
+			end
+
+			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
+			trace(buff)
+			trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
+		end
+
+		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
+		if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
+
+		return true
 	end
 end
 
 redef abstract class MOSitePattern
-	# Implementation of the pattern (used if site as not concerte receivers list)
+	# Implementation of the pattern (used if site as not concrete receivers list)
 	var impl: nullable Implementation is noinit
 
 	# Get implementation, compute it if not exists
@@ -722,8 +808,14 @@ end
 # it contains all the intermediate representation which is needed for compilation
 class IR
 	# The propdef represented by this intermediate representation
-	var propdef: APropdef
+	var mpropdef: MPropDef
 
-	# The array of local variables inside the propdef
-	var variables: Array[Variable]
+	# The object mechanisms sites of the IR
+	var callsites: List[MOSite]
+
+	# List of instantiations sites in this local property
+	var news: List[MONew]
+
+	# The patterns related to `callsites`
+	var patterns: List[MOSitePattern]
 end
