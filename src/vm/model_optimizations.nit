@@ -205,6 +205,15 @@ redef class MPropDef
 	# List of patterns who use this local property
 	var callers = new List[P]
 
+	# Return expression of the method (null if procedure)
+	var return_expr: nullable MOExpr is writable
+
+	# List of instantiations sites in this local property
+	var monews = new List[MONew]
+
+	# List of object sites in this local property
+	var mosites = new List[MOSite]
+
 	# Compile the property
 	fun compile(vm: VirtualMachine)
 	do
@@ -237,15 +246,6 @@ end
 
 redef class MMethodDef
 	redef type P: MOCallSitePattern
-
-	# Return expression of the method (null if procedure)
-	var return_expr: nullable MOExpr is writable
-
-	# List of instantiations sites in this local property
-	var monews = new List[MONew]
-
-	# List of object sites in this local property
-	var mosites = new List[MOSite]
 end
 
 # Root hierarchy of expressions
