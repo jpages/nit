@@ -46,10 +46,10 @@ redef class ModelBuilder
 	redef fun run_virtual_machine(mainmodule, arguments)
 	do
 		sys.print_site_state = toolcontext.print_site_state.value
-		
+
 		super(mainmodule, arguments)
-		
-		if toolcontext.stats_on.value then 
+
+		if toolcontext.stats_on.value then
 			print(pstats.pretty)
 			pstats.overview
 			post_exec(mainmodule)
@@ -149,7 +149,7 @@ redef class ASendExpr
 		super(vm, lp, recv, node_ast, is_attribute)
 
 		# It's an accessors (with redefs) dispatch
-		if is_attribute and not node_ast.as(AAttrPropdef).attr_redef_taken_into then 
+		if is_attribute and not node_ast.as(AAttrPropdef).attr_redef_taken_into then
 			pstats.inc("attr_redef")
 			node_ast.as(AAttrPropdef).attr_redef_taken_into = true
 		end
@@ -188,7 +188,7 @@ redef class AIsaExpr
 	redef fun compile_ast(vm, lp)
 	do
 		super(vm, lp)
-		
+
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then
 			pstats.inc("lits")
 		else if n_expr.mtype.as(not null).get_mclass(vm).as(not null).mclass_type.is_primitive_type then
@@ -226,7 +226,7 @@ class MOStats
 		map[el] -= 1
 		assert map[el] >= 0
 	end
-       
+
 	# Get a value
 	fun get(el: String): Int do return map[el]
 
@@ -244,10 +244,10 @@ class MOStats
 	fun overview
 	do
 		var buf: String
-		var file = new FileWriter.open("mo-stats-{lbl}.csv")	
+		var file = new FileWriter.open("mo-stats-{lbl}.csv")
 
 		file.write(", method, attribute, cast, total, rst null\n")
-	
+
 		var self_meth = map["method_self"]
 		var self_attr = map["attribute_self"]
 		var self_cast = map["cast_self"]
@@ -354,11 +354,11 @@ class MOStats
 		file.write("\n\n")
 
 		# from new
-		
+
 		file.write("from new,{map["method_sites_from_new"]}, {map["attribute_sites_from_new"]},{map["cast_sites_from_new"]},{map["sites_from_new"]}\n")
-		
+
 		# from method return
-		
+
 		buf = "{map["method_sites_from_meth_return"]},"
 		buf += "{map["attribute_sites_from_meth_return"]},"
 		buf += "{map["cast_sites_from_meth_return"]},"
@@ -408,7 +408,7 @@ class MOStats
 			if propdef.callers.length > 0 then
 				if propdef.callers.first.cuc == 0 then
 					cuc_null += 1
-				else 
+				else
 					cuc_pos += 1
 				end
 			end
@@ -423,7 +423,7 @@ class MOStats
 	# Pretty format
 	fun pretty: String
 	do
-		var ret = "" 
+		var ret = ""
 
 		ret += "\n------------------ MO STATS {lbl} ------------------\n"
 		ret += dump("\t")
@@ -460,7 +460,7 @@ class MOStats
 
 		# incr when compile a instantiation site
 		map["ast_new"] = 0
-			
+
 		# incr when the site depends at least of one return expression
 		map["sites_from_meth_return"] = 0
 		map["sites_from_meth_return_cuc_pos"] = 0
@@ -492,7 +492,7 @@ class MOStats
 
 		# incr when the site is on leaf gp on global model
 		map["sites_final"] = 0
-		
+
 		# incr when site is on integer, char, string (not added into the MO)
 		map["primitive_sites"] = 0
 
@@ -640,7 +640,7 @@ redef class MOSite
 	fun pattern2str: String is abstract
 
 	#
-	fun incr_preexist(vm: VirtualMachine) do 
+	fun incr_preexist(vm: VirtualMachine) do
 		var pre = expr_recv.is_pre
 
 		incr_specific_counters(pre, "preexist", "npreexist")
@@ -721,7 +721,7 @@ redef class MOSite
 	#
 	fun incr_self
 	do
-		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then 
+		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
 			pstats.inc("self")
 			pstats.inc("{site_type}_self")
 		end
@@ -748,7 +748,7 @@ redef class MOSite
 			else if impl isa NullImpl then
 				pstats.inc("rst_unloaded_null")
 				incr_specific_counters(pre, "rst_unloaded_null_pre", "rst_unloaded_null_npre")
-			else 
+			else
 				abort
 			end
 		end
@@ -804,7 +804,7 @@ class DependencyTrace
 	# the expression to trace
 	var expr: MOExpr
 
-	# trace the dependencies (entry point) 
+	# trace the dependencies (entry point)
 	fun trace do trace_internal(expr)
 
 	# trace the dependencies (internal function)
