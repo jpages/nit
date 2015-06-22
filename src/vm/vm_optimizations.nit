@@ -366,6 +366,11 @@ redef class ASendExpr
 	# directly inside the calle
 	redef fun expr(v)
 	do
+		var recv = v.expr(self.n_expr)
+		if recv == null then return null
+		var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
+		if args == null then return null
+
 		# Inline the call if possible
 		if mocallsite != null then
 			if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
@@ -380,7 +385,7 @@ redef class ASendExpr
 					caller.create_ir
 					callee.mpropdef.create_ir
 
-					caller.inline(callee.mpropdef.as(not null))
+					caller.inline(callee, self)
 					inlined = true
 
 					# Recompute the preexistence of the caller
@@ -390,11 +395,6 @@ redef class ASendExpr
 		else
 			# Check if self is an attribute access or a call on a primitive receiver
 		end
-
-		var recv = v.expr(self.n_expr)
-		if recv == null then return null
-		var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
-		if args == null then return null
 
 		var res = v.callsite(callsite, args)
 		return res
@@ -426,16 +426,47 @@ redef class MPropDef
 
 	# Inline the `inlined` IR in self,
 	# The `inlined` IR will be cloned inside self
-	fun inline(inlined: MPropDef)
+	# `send` The expression of the call
+	fun inline(inlined: APropdef, send: ASendExpr)
 	do
 		# Add the object sites of the inlined to self
-		ir.callsites.add_all(inlined.mosites)
-		ir.news.add_all(inlined.monews)
+		ir.callsites.add_all(inlined.mpropdef.mosites)
+		ir.news.add_all(inlined.mpropdef.monews)
 
-		# TODO: change the dependances of the inlined method's expressions
+		print "\n"
+		# TODO: change the dependences of the inlined method's variables
+		for variable in inlined.variables do
+			# If the variable of the callee is a parameter, change its dependence
+			print "ASend expression + {send.raw_arguments}"
+
+			var i = 0
+
+			# TODO: returnvar
+			if variable.parameter then
+				var new_var = clone_variable(variable)
+				new_var.dep_exprs.add(send.raw_arguments[i])
+
+				ir.variables.add(new_var)
+				i += 1
+			else
+				ir.variables.add(variable)
+			end
+		end
+
+		#TODO: ast2mo for each objects-sites
 
 		#TODO Delete the inlined site inside the caller
 		contains_inlining = true
+	end
+
+	fun clone_variable(variable: Variable): Variable
+	do
+		var res = new Variable(variable.name)
+
+		res.location = variable.location
+		res.position = variable.position
+
+		return res
 	end
 end
 
@@ -818,4 +849,7 @@ class IR
 
 	# The patterns related to `callsites`
 	var patterns: List[MOSitePattern]
+
+	# The local variables
+	var variables: Array[Variable] = new Array[Variable] is lazy
 end
