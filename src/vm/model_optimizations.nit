@@ -272,6 +272,7 @@ class MOVar
 		end
 		return true
 	end
+
 	#
 	fun valid_and_add_dep(dep: MOExpr, concretes: List[MClass]): Bool
 	do
@@ -308,7 +309,7 @@ class MOLit
 end
 
 # Root hierarchy of objets sites
-abstract class MOSite
+class MOSite
 	# The AST node where this site comes from
 	var ast: AExpr
 
@@ -346,6 +347,19 @@ abstract class MOSite
 			compute_concretes
 		end
 		return concretes_receivers.as(not null)
+	end
+
+	fun clone: MOSite
+	do
+		var copy = new MOSite(ast, expr_recv, lp)
+		copy.pattern = pattern
+
+		if concretes_receivers != null then
+			copy.concretes_receivers = new List[MClass]
+			copy.concretes_receivers.add_all(concretes_receivers.as(not null))
+		end
+
+		return copy
 	end
 end
 
