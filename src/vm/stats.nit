@@ -817,9 +817,7 @@ class DependencyTrace
 			if expr.pattern.cuc > 0 then cuc_null = false
 		else if expr isa MOReadSite then
 			from_read = true
-		else if expr isa MOSSAVar then
-			trace_internal(expr.dependency)
-		else if expr isa MOPhiVar then
+		else if expr isa MOVar then
 			for dep in expr.dependencies do trace_internal(dep)
 		end
 	end

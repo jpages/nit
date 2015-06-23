@@ -253,15 +253,25 @@ abstract class MOExpr
 end
 
 # MO of variables
-abstract class MOVar
+class MOVar
 	super MOExpr
 
-	# The offset of the variable in it environment, or the position of parameter
+	# The original variable
+	var variable: Variable
+
 	var offset: Int
 
-	# Compute concrete receivers (see MOCallSite / MOSite)
-	fun compute_concretes(concretes: List[MClass]): Bool is abstract
+	# List of expressions that variable depends
+	var dependencies = new List[MOExpr] is lazy
 
+	# Compute concrete receivers (see MOCallSite / MOSite)
+	fun compute_concretes(concretes: List[MClass]): Bool
+	do
+		for dep in dependencies do
+			if not valid_and_add_dep(dep, concretes) then return false
+		end
+		return true
+	end
 	#
 	fun valid_and_add_dep(dep: MOExpr, concretes: List[MClass]): Bool
 	do
@@ -271,32 +281,6 @@ abstract class MOVar
 			return true
 		end
 		return false
-	end
-end
-
-# MO of variables with only one dependency
-class MOSSAVar
-	super MOVar
-
-	# the expression that variable depends
-	var dependency: MOExpr
-
-	redef fun compute_concretes(concretes) do return valid_and_add_dep(dependency, concretes)
-end
-
-# MO of variable with multiples dependencies
-class MOPhiVar
-	super MOVar
-
-	# List of expressions that variable depends
-	var dependencies: List[MOExpr]
-
-	redef fun compute_concretes(concretes)
-	do
-		for dep in dependencies do
-			if not valid_and_add_dep(dep, concretes) then return false
-		end
-		return true
 	end
 end
 
@@ -694,27 +678,22 @@ redef class Variable
 	do
 		if movar == null then
 			if node isa ASelfExpr then
-				movar = new MOParam(0)
+				movar = new MOParam(node.variable.as(not null), 0)
 			else if node isa AVarExpr then
 				# A variable read
 				if node.variable.parameter then
-					movar = new MOParam(node.variable.position)
-				else if node.variable.dep_exprs.length == 1 then
-					var mo = node.variable.dep_exprs.first.ast2mo
-					if mo != null then movar = new MOSSAVar(node.variable.position, mo)
-				else if node.variable.dep_exprs.length > 1 then
+					movar = new MOParam(node.variable.as(not null), node.variable.position)
+				else if node.variable.dep_exprs.length > 0 then
 					var phi = new List[MOExpr]
 					for a_expr in node.variable.dep_exprs do
 						var mo = a_expr.ast2mo
 						if mo != null then phi.add(mo)
 					end
 
-					if phi.length == 1 then
-						movar = new MOSSAVar(node.variable.position, phi.first)
-					else if phi.length > 1 then
-						movar = new MOPhiVar(node.variable.position, phi)
-						trace("MOPhiVar AST phi len: {phi.length} | node.variable.dep_exprs: {node.variable.dep_exprs}")
-					end
+					movar = new MOVar(node.variable.as(not null), node.variable.position)
+					movar.dependencies = phi
+
+					trace("MOPhiVar AST phi len: {phi.length} | node.variable.dep_exprs: {node.variable.dep_exprs}")
 				end
 			end
 		end
@@ -801,24 +780,18 @@ redef class APropdef
 
 		if self isa AMethPropdef then
 			# Generate MO for return of the propdef
-			if returnvar.dep_exprs.length == 1 then
-				var moexpr = returnvar.dep_exprs.first.ast2mo
-				if moexpr != null then mo_dep_exprs = new MOSSAVar(returnvar.position, moexpr)
-			else if returnvar.dep_exprs.length > 1 then
-				var deps = new List[MOExpr]
-				for a_expr in returnvar.dep_exprs do
-					var moexpr = a_expr.ast2mo
-					if moexpr != null then deps.add(moexpr)
-				end
+			var movar = new MOVar(returnvar, returnvar.position)
 
-				if deps.length == 1 then
-					mo_dep_exprs = new MOSSAVar(returnvar.position, deps.first)
-				else if deps.length > 1 then
-					mo_dep_exprs = new MOPhiVar(returnvar.position, deps)
-				end
+			# Add the dependences for the return
+			var deps = new List[MOExpr]
+			for a_expr in returnvar.dep_exprs do
+				var moexpr = a_expr.ast2mo
+				if moexpr != null then deps.add(moexpr)
 			end
 
-			mpropdef.as(MMethodDef).return_expr = mo_dep_exprs
+			movar.dependencies = deps
+
+			mpropdef.as(MMethodDef).return_expr = movar
 
 			# Generate MO for sites inside the propdef
 			for expr in to_compile do expr.compile_ast(vm, mpropdef.as(MMethodDef))

@@ -351,15 +351,7 @@ redef class MONew
 	end
 end
 
-redef class MOSSAVar
-	redef fun preexist_expr
-	do
-		if is_pre_unknown then preexist_expr_value = dependency.preexist_expr
-		return preexist_expr_value
-	end
-end
-
-redef class MOPhiVar
+redef class MOVar
 	redef fun preexist_expr
 	do
 		if is_pre_unknown then
