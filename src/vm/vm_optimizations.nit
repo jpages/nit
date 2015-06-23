@@ -430,12 +430,16 @@ redef class MPropDef
 	fun inline(inlined: APropdef, send: ASendExpr)
 	do
 		# Add the object sites of the inlined to self
-		ir.callsites.add_all(inlined.mpropdef.mosites)
+		for callsite in inlined.mpropdef.mosites do
+			ir.callsites.add(callsite.clone)
+		end
+
+		for variable in inlined.mpropdef.va
 		ir.news.add_all(inlined.mpropdef.monews)
 
 		print "\n"
 		# TODO: change the dependences of the inlined method's variables
-		for variable in inlined.variables do
+		for variable in ir.variables do
 			# If the variable of the callee is a parameter, change its dependence
 			print "ASend expression + {send.raw_arguments}"
 
@@ -444,12 +448,7 @@ redef class MPropDef
 			# TODO: returnvar
 			if variable.parameter then
 				var new_var = clone_variable(variable)
-				new_var.dep_exprs.add(send.raw_arguments[i])
-
-				ir.variables.add(new_var)
-				i += 1
-			else
-				ir.variables.add(variable)
+				# new_var.dep_exprs.add(send.raw_arguments[i])
 			end
 		end
 
@@ -644,7 +643,7 @@ redef class MOCallSitePattern
 	redef fun can_be_static do return callees.length == 1
 end
 
-redef abstract class MOSite
+redef class MOSite
 	# Implementation of the site (null if can't determine concretes receivers.
 	# We always must use get_impl to read this value
 	var impl: nullable Implementation is writable, noinit
@@ -850,6 +849,6 @@ class IR
 	# The patterns related to `callsites`
 	var patterns: List[MOSitePattern]
 
-	# The local variables
-	var variables: Array[Variable] = new Array[Variable] is lazy
+	# The local variables in the model form
+	var variables: Array[MOVar] = new Array[MOVar] is lazy
 end
