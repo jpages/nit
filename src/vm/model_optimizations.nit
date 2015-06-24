@@ -317,7 +317,7 @@ class MOSite
 	type P: MOSitePattern
 
 	# The expression of the receiver
-	var expr_recv: MOExpr
+	var expr_recv: MOExpr is writable
 
 	# The local property containing this expression
 	var lp: MPropDef
