@@ -434,25 +434,38 @@ redef class MPropDef
 			ir.callsites.add(callsite.clone)
 		end
 
-		for variable in inlined.mpropdef.va
 		ir.news.add_all(inlined.mpropdef.monews)
+		var params = new HashMap[MOParam, MOVar]
 
-		print "\n"
 		# TODO: change the dependences of the inlined method's variables
-		for variable in ir.variables do
-			# If the variable of the callee is a parameter, change its dependence
-			print "ASend expression + {send.raw_arguments}"
-
-			var i = 0
+		var i = 0
+		for site in ir.callsites do
 
 			# TODO: returnvar
-			if variable.parameter then
-				var new_var = clone_variable(variable)
-				# new_var.dep_exprs.add(send.raw_arguments[i])
-			end
-		end
+			print "Receiver expression = {site.expr_recv}"
+			if site.expr_recv isa MOParam then
+				# Change the dependences, the receiver should be a MOVar
+				if not params.has_key(site.expr_recv) then
+					# Create a new MOVar and set its dependences
+					var movar = new MOVar(new Variable("param"), 0)
 
-		#TODO: ast2mo for each objects-sites
+					var moexpr = send.raw_arguments[i].ast2mo.as(not null)
+					if moexpr == null then
+						print "Problem with {send.raw_arguments[i]}"
+					else
+						print "New moexpr {moexpr}"
+						movar.dependencies.add(moexpr)
+					end
+
+					params[site.expr_recv.as(MOParam)] = movar
+				end
+
+				# Replace into the site the MOParam by the corresponding MOVar
+				site.expr_recv = params[site.expr_recv]
+			end
+
+			# new_var.dep_exprs.add(send.raw_arguments[i])
+		end
 
 		#TODO Delete the inlined site inside the caller
 		contains_inlining = true
