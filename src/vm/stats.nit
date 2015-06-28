@@ -26,11 +26,15 @@ redef class ToolContext
 	# Enable print site state
 	var print_site_state = new OptionBool("Display state of a MOSite (preexistence, impl)", "--site-state")
 
+	# Enable print location of preexists sites
+	var print_location_preexist = new OptionBool("Dump the location of preexist site", "--location-preexist")
+
 	redef init
 	do
 		super
 		option_context.add_option(stats_on)
 		option_context.add_option(print_site_state)
+		option_context.add_option(print_location_preexist)
 	end
 end
 
@@ -40,12 +44,19 @@ redef class Sys
 
 	# Access to print_site_state from anywhere
 	var print_site_state: Bool = false
+
+	# Access to location-preexist information from anywhere
+	var print_location_preexist: Bool = false
+
+	# Used to put location of preexist sites
+	var dump_location: nullable FileWriter = null
 end
 
 redef class ModelBuilder
 	redef fun run_virtual_machine(mainmodule, arguments)
 	do
 		sys.print_site_state = toolcontext.print_site_state.value
+		sys.print_location_preexist = toolcontext.print_location_preexist.value
 
 		super(mainmodule, arguments)
 
@@ -66,8 +77,12 @@ redef class ModelBuilder
 		# We don't need pstats counters with lower bound anymore, so we override it
 
 		var old_counters = sys.pstats
-		pstats = new MOStats("last")
-		pstats.copy_data(old_counters)
+		sys.pstats = new MOStats("last")
+		sys.pstats.copy_data(old_counters)
+
+		if sys.print_location_preexist then
+			dump_location = new FileWriter.open("mo-stats-location")
+		end
 
 		for site in pstats.analysed_sites do
 			# WARN: this cast is always true for now, but we need to put preexist_analysed on MPropDef when we'll analysed attribute with body.
@@ -76,6 +91,12 @@ redef class ModelBuilder
 			site.impl = null
 			site.get_impl(sys.vm)
 			site.stats(sys.vm)
+		end
+
+		for method in sys.pstats.compiled_methods do sys.pstats.get_method_return_origin(method)
+
+		if sys.print_location_preexist then
+			dump_location.as(not null).close
 		end
 
 		print(pstats.pretty)
@@ -106,25 +127,12 @@ redef class VirtualMachine
 	end
 end
 
-redef class ANewExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+redef class APropdef
+	#
+	redef fun compile(vm)
 	do
-		var sup = super
-		pstats.inc("ast_new")
-		return sup
-	end
-end
-
-redef class ANode
-	redef fun ast2mo
-	do
-		if is_primitive_node then
-			pstats.inc("primitive_sites")
-		else
-			pstats.inc("nyi")
-		end
-
-		return super
+		super
+		sys.pstats.map["ast_sites"] = sys.pstats.map["ast_sites"] + object_sites.length
 	end
 end
 
@@ -134,75 +142,17 @@ redef class AAttrPropdef
 end
 
 redef class ASendExpr
-	redef fun compile_ast(vm, lp)
+	redef fun ast2mo_method(mpropdef, called_node_ast, is_attribute)
 	do
-		super(vm, lp)
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then
-			pstats.inc("lits")
-		else if n_expr.mtype.as(not null).is_primitive_type then
-			pstats.inc("primitive_sites")
-		end
-	end
-
-	redef fun compile_ast_method(vm, lp, recv, node_ast, is_attribute)
-	do
-		super(vm, lp, recv, node_ast, is_attribute)
+		var sup = super
 
 		# It's an accessors (with redefs) dispatch
-		if is_attribute and not node_ast.as(AAttrPropdef).attr_redef_taken_into then
+		if is_attribute and not called_node_ast.as(AAttrPropdef).attr_redef_taken_into then
 			pstats.inc("attr_redef")
-			node_ast.as(AAttrPropdef).attr_redef_taken_into = true
+			called_node_ast.as(AAttrPropdef).attr_redef_taken_into = true
 		end
-	end
-end
 
-redef class AAsCastExpr
-	redef fun compile_ast(vm, lp)
-	do
-		super(vm, lp)
-
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then
-			pstats.inc("lits")
-		else if n_expr.mtype.as(not null).is_primitive_type then
-			pstats.inc("primitive_sites")
-		else if n_type.mtype.as(not null).get_mclass(vm).as(not null).mclass_type.is_primitive_type then
-			pstats.inc("primitive_sites")
-		end
-	end
-end
-
-redef class AAttrFormExpr
-	redef fun compile_ast(vm, lp)
-	do
-		super(vm, lp)
-
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then
-			pstats.inc("lits")
-		else if n_expr.mtype.as(not null).is_primitive_type then
-			pstats.inc("primitive_sites")
-		end
-	end
-end
-
-redef class AIsaExpr
-	redef fun compile_ast(vm, lp)
-	do
-		super(vm, lp)
-
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then
-			pstats.inc("lits")
-		else if n_expr.mtype.as(not null).get_mclass(vm).as(not null).mclass_type.is_primitive_type then
-			pstats.inc("primitive_sites")
-		end
-	end
-end
-
-redef class ABinopExpr
-	# If a binary operation on primitives types return something (or test of equality), it's primitive
-	# TODO: what about obj1 + obj2 ?
-	redef fun ast2mo do
-		pstats.inc("primitive_sites")
-		return super
+		return sup
 	end
 end
 
@@ -210,6 +160,12 @@ end
 class MOStats
 	# List of analysed sites
 	var analysed_sites = new List[MOSite]
+
+	# List of compiled methods
+	var compiled_methods = new List[MMethodDef]
+
+	# List of new site compiled
+	var compiled_new = new List[MONew]
 
 	# Label to display on dump
 	var lbl: String
@@ -256,6 +212,7 @@ class MOStats
 		file.write("self, {self_meth}, {self_attr}, {self_cast}, {self_sum}, \n")
 
 		file.write("preexist, {map["method_preexist"]}, {map["attribute_preexist"]}, {map["cast_preexist"]}, {map["preexist"]}, \n")
+		file.write("preexist_primitive, {map["method_preexist_primitive"]}, {map["attribute_preexist_primitive"]}, {map["cast_preexist_primitive"]}, {map["preexist_primitive"]}\n")
 		file.write("npreexist, {map["method_npreexist"]}, {map["attribute_npreexist"]}, {map["cast_npreexist"]}, {map["npreexist"]}, \n")
 
 		buf = "{map["method_concretes"]},"
@@ -357,6 +314,18 @@ class MOStats
 
 		file.write("from new,{map["method_sites_from_new"]}, {map["attribute_sites_from_new"]},{map["cast_sites_from_new"]},{map["sites_from_new"]}\n")
 
+		buf = "{map["method_sites_from_new_pre"]},"
+		buf += "{map["attribute_sites_from_new_pre"]},"
+		buf += "{map["cast_sites_from_new_pre"]},"
+		buf += "{map["sites_from_new_pre"]}"
+		file.write("from new preexist,{buf}\n")
+
+		buf = "{map["method_sites_from_new_npre"]},"
+		buf += "{map["attribute_sites_from_new_npre"]},"
+		buf += "{map["cast_sites_from_new_npre"]},"
+		buf += "{map["sites_from_new_npre"]}"
+		file.write("from new no preexist,{buf}\n")
+
 		# from method return
 
 		buf = "{map["method_sites_from_meth_return"]},"
@@ -370,6 +339,18 @@ class MOStats
 		buf += "{map["cast_sites_from_meth_return_cuc_null"]},"
 		buf += "{map["sites_from_meth_return_cuc_null"]}"
 		file.write("from return cuc null,{buf}\n")
+
+		buf = "{map["method_sites_from_meth_return_cuc_null_pre"]},"
+		buf += "{map["attribute_sites_from_meth_return_cuc_null_pre"]},"
+		buf += "{map["cast_sites_from_meth_return_cuc_null_pre"]},"
+		buf += "{map["sites_from_meth_return_cuc_null_pre"]}"
+		file.write("from return cuc null preexist,{buf}\n")
+
+		buf = "{map["method_sites_from_meth_return_cuc_null_npre"]},"
+		buf += "{map["attribute_sites_from_meth_return_cuc_null_npre"]},"
+		buf += "{map["cast_sites_from_meth_return_cuc_null_npre"]},"
+		buf += "{map["sites_from_meth_return_cuc_null_npre"]}"
+		file.write("from return cuc null no preexist,{buf}\n")
 
 		buf = "{map["method_sites_from_meth_return_cuc_pos"]},"
 		buf += "{map["attribute_sites_from_meth_return_cuc_pos"]},"
@@ -417,6 +398,24 @@ class MOStats
 		file.write("callers cuc pos, {cuc_pos}\n")
 		file.write("callers cuc null, {cuc_null}\n")
 
+		# return from new with inter-procedural analysis
+		file.write("\n")
+		file.write("inter procedural return from new, {map["inter_return_from_new"]}\n")
+		file.write("inter procedural return from other, {map["inter_return_from_other"]}\n")
+		file.write("from primitive/lit, {map["return_from_not_object"]}\n")
+		file.write("procedure, {map["procedure"]}\n")
+
+		# compiled "new" of unloaded class at the end of execution
+		file.write("\n")
+		var compiled_new_unloaded = 0
+		for newsite in compiled_new do if not newsite.pattern.cls.abstract_loaded then compiled_new_unloaded += 1
+		file.write("compiled new of unloaded classes, {compiled_new_unloaded}")
+
+		file.write("\n")
+		file.write("ast sites, {map["ast_sites"]}\n")
+		file.write("new sites, {map["new_sites"]}\n")
+		file.write("object sites, {map["object_sites"]}\n")
+
 		file.close
 	end
 
@@ -438,13 +437,13 @@ class MOStats
 		map["loaded_classes_explicits"] = counters.get("loaded_classes_explicits")
 		map["loaded_classes_implicits"] = counters.get("loaded_classes_implicits")
 		map["loaded_classes_abstracts"] = counters.get("loaded_classes_abstracts")
-		map["primitive_sites"] = counters.get("primitive_sites")
-		map["nyi"] = counters.get("nyi")
-		map["lits"] = counters.get("lits")
-		map["ast_new"] = counters.get("ast_new")
 		map["attr_redef"] = counters.get("attr_redef")
 		map["sites_final"] = counters.get("sites_final")
 		analysed_sites.add_all(counters.analysed_sites)
+		compiled_methods.add_all(counters.compiled_methods)
+		compiled_new.add_all(counters.compiled_new)
+		map["ast_sites"] = counters.get("ast_sites")
+		map["new_sites"] = counters.get("new_sites")
 	end
 
 	init
@@ -458,28 +457,46 @@ class MOStats
 		# incr when a class is abstract and loaded as super-class
 		map["loaded_classes_abstracts"] = 0
 
-		# incr when compile a instantiation site
-		map["ast_new"] = 0
-
 		# incr when the site depends at least of one return expression
 		map["sites_from_meth_return"] = 0
 		map["sites_from_meth_return_cuc_pos"] = 0
 		map["sites_from_meth_return_cuc_null"] = 0
+		map["sites_from_meth_return_cuc_null_pre"] = 0
+		map["sites_from_meth_return_cuc_null_npre"] = 0
+
 		map["method_sites_from_meth_return"] = 0
 		map["method_sites_from_meth_return_cuc_pos"] = 0
 		map["method_sites_from_meth_return_cuc_null"] = 0
+		map["method_sites_from_meth_return_cuc_null_pre"] = 0
+		map["method_sites_from_meth_return_cuc_null_npre"] = 0
+
 		map["attribute_sites_from_meth_return"] = 0
 		map["attribute_sites_from_meth_return_cuc_pos"] = 0
 		map["attribute_sites_from_meth_return_cuc_null"] = 0
+		map["attribute_sites_from_meth_return_cuc_null_pre"] = 0
+		map["attribute_sites_from_meth_return_cuc_null_npre"] = 0
+
 		map["cast_sites_from_meth_return"] = 0
 		map["cast_sites_from_meth_return_cuc_pos"] = 0
 		map["cast_sites_from_meth_return_cuc_null"] = 0
+		map["cast_sites_from_meth_return_cuc_null_pre"] = 0
+		map["cast_sites_from_meth_return_cuc_null_npre"] = 0
 
 		# incr when the site depends at least of one new expression
 		map["sites_from_new"] = 0
 		map["method_sites_from_new"] = 0
 		map["attribute_sites_from_new"] = 0
 		map["cast_sites_from_new"] = 0
+
+		map["sites_from_new_pre"] = 0
+		map["method_sites_from_new_pre"] = 0
+		map["attribute_sites_from_new_pre"] = 0
+		map["cast_sites_from_new_pre"] = 0
+
+		map["sites_from_new_npre"] = 0
+		map["method_sites_from_new_npre"] = 0
+		map["attribute_sites_from_new_npre"] = 0
+		map["cast_sites_from_new_npre"] = 0
 
 		# incr when the site depends at least of one attr read expression
 		map["sites_from_read"] = 0
@@ -493,17 +510,11 @@ class MOStats
 		# incr when the site is on leaf gp on global model
 		map["sites_final"] = 0
 
-		# incr when site is on integer, char, string (not added into the MO)
-		map["primitive_sites"] = 0
-
-		# incr when the ast site is an unkown case (not added into the MO)
-		map["nyi"] = 0
-
-		# never use. Maybe usefull for enum if Nit add it (this cass should not be added into the MO)
-		map["lits"] = 0
-
 		# incr if a site is preexist
 		map["preexist"] = 0
+
+		# incr if a site is a primitive (and so, preexists)
+		map["preexist_primitive"] = 0
 
 		# incr if a site isn't preexist
 		map["npreexist"] = 0
@@ -548,6 +559,7 @@ class MOStats
 
 		map["method"] = 0
 		map["method_preexist"] = 0
+		map["method_preexist_primitive"] = 0
 		map["method_npreexist"] = 0
 		map["method_self"] = 0
 		map["method_concretes"] = 0
@@ -568,6 +580,7 @@ class MOStats
 
 		map["attribute"] = 0
 		map["attribute_preexist"] = 0
+		map["attribute_preexist_primitive"] = 0
 		map["attribute_npreexist"] = 0
 		map["attribute_self"] = 0
 		map["attribute_concretes"] = 0
@@ -588,6 +601,7 @@ class MOStats
 
 		map["cast"] = 0
 		map["cast_preexist"] = 0
+		map["cast_preexist_primitive"] = 0
 		map["cast_npreexist"] = 0
 		map["cast_self"] = 0
 		map["cast_concretes"] = 0
@@ -608,6 +622,28 @@ class MOStats
 
 		map["call_with_cuc_pos"] = 0
 		map["call_with_cuc_null"] = 0
+
+		map["inter_return_from_new"] = 0
+		map["inter_return_from_other"] = 0
+		map["return_from_not_object"] = 0
+		map["procedure"] = 0
+
+		map["ast_sites"] = 0
+		map["new_sites"] = 0
+		map["object_sites"] = 0
+	end
+
+	# Tell where the return of method is come from
+	fun get_method_return_origin(method: MMethodDef)
+	do
+		if method.return_expr_is_object then
+			# If the method return an object, it's return_expr is a MOVar
+			method.return_expr.as(MOVar).return_stats(method.mproperty)
+		else if method.return_expr != null then
+			sys.pstats.inc("return_from_not_object")
+		else
+			sys.pstats.inc("procedure")
+		end
 	end
 end
 
@@ -615,36 +651,73 @@ redef class MOSite
 	# Type of the site (method, attribute or cast)
 	var site_type: String is noinit
 
+	# Non-recursive origin of the dependency
+	var origin: DependencyTrace is noinit
+
 	# Count the implementation of the site
 	fun stats(vm: VirtualMachine)
 	do
+		origin = new DependencyTrace(expr_recv)
+		origin.trace
 		incr_preexist(vm)
-		incr_from_site
-		incr_concrete_site(vm)
-		incr_self
-		incr_rst_unloaded(vm)
-		incr_type_impl(vm)
 
-		if print_site_state then
-			var buf = "site {self}\n"
-			buf += "\tpattern: {pattern2str}\n"
-			buf += "\tlp: {lp.mclassdef.name}::{lp.name}\n"
-			buf += "\tlocation: {ast.location}\n"
-			buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.is_nper}\n"
-			buf += "\timpl: {get_impl(vm)}\n"
-			print(buf)
+		if not origin.from_primitive then
+			incr_from_site
+			incr_concrete_site(vm)
+			incr_self
+			incr_rst_unloaded(vm)
+			incr_type_impl(vm)
+
+
+			if print_site_state then
+				var buf = "site {self}\n"
+				buf += "\tpattern: {pattern2str}\n"
+				buf += "\tlp: {lp.mclassdef.name}::{lp.name}\n"
+				buf += "\tlocation: {ast.location}\n"
+				buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.is_nper}\n"
+				buf += "\timpl: {get_impl(vm)}\n"
+				print(buf)
+			end
+
+			sys.pstats.inc("object_sites")
 		end
+
+		if print_location_preexist then dump_location_site
 	end
 
 	# Print the pattern (RST/GP or target class for subtype test)
 	fun pattern2str: String is abstract
 
+	# Print location of a site
+	fun dump_location_site do
+		# dump_location is null of first compilation, and set for last compilation
+		if expr_recv.is_pre and dump_location != null then
+			var from2str = ""
+			if origin.from_new then from2str += " from-new "
+			if origin.from_param then from2str += " from-param "
+			if origin.from_return then from2str += " from-return "
+			if origin.from_primitive then from2str += " from-primitive "
+			if origin.from_literal then from2str += " from-literal "
+			if origin.from_super then from2str += " from-super "
+
+			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
+		end
+	end
+
 	#
 	fun incr_preexist(vm: VirtualMachine) do
 		var pre = expr_recv.is_pre
 
-		incr_specific_counters(pre, "preexist", "npreexist")
-		incr_specific_counters(pre, "{site_type}_preexist", "{site_type}_npreexist")
+		if pre and origin.from_primitive then
+			sys.pstats.inc("preexist_primitive")
+			sys.pstats.inc("{site_type}_preexist_primitive")
+		else if pre then
+			sys.pstats.inc("preexist")
+			sys.pstats.inc("{site_type}_preexist")
+		else
+			sys.pstats.inc("npreexist")
+			sys.pstats.inc("{site_type}_npreexist")
+		end
 	end
 
 	#
@@ -683,23 +756,36 @@ redef class MOSite
 	# WARN : this partition is not exclusive
 	fun incr_from_site
 	do
-		var dep_trace = new DependencyTrace(expr_recv)
-
-		dep_trace.trace
-
-		if dep_trace.from_new then
+		if origin.from_new then
 			pstats.inc("sites_from_new")
 			pstats.inc("{site_type}_sites_from_new")
+
+			incr_specific_counters(expr_recv.is_pre, "sites_from_new_pre", "sites_from_new_npre")
+			incr_specific_counters(expr_recv.is_pre, "{site_type}_sites_from_new_pre", "{site_type}_sites_from_new_npre")
 		end
 
-		if dep_trace.from_return then
+		if origin.from_return then
 			pstats.inc("sites_from_meth_return")
 			pstats.inc("{site_type}_sites_from_meth_return")
-			incr_specific_counters(dep_trace.cuc_null, "{site_type}_sites_from_meth_return_cuc_null", "{site_type}_sites_from_meth_return_cuc_pos")
-			incr_specific_counters(dep_trace.cuc_null, "sites_from_meth_return_cuc_null", "sites_from_meth_return_cuc_pos")
+
+			incr_specific_counters(origin.cuc_null,
+			"{site_type}_sites_from_meth_return_cuc_null",
+			"{site_type}_sites_from_meth_return_cuc_pos")
+
+			incr_specific_counters(origin.cuc_null, "sites_from_meth_return_cuc_null", "sites_from_meth_return_cuc_pos")
+
+			if origin.cuc_null then
+				incr_specific_counters(expr_recv.is_pre,
+				"{site_type}_sites_from_meth_return_cuc_null_pre",
+				"{site_type}_sites_from_meth_return_cuc_null_npre")
+
+				incr_specific_counters(expr_recv.is_pre,
+				"sites_from_meth_return_cuc_null_pre",
+				"sites_from_meth_return_cuc_null_npre")
+			end
 		end
 
-		if dep_trace.from_read then
+		if origin.from_read then
 			pstats.inc("sites_from_read")
 			pstats.inc("{site_type}_sites_from_read")
 		end
@@ -774,15 +860,59 @@ redef class MOSubtypeSite
 end
 
 redef class MPropDef
-	redef fun compile(vm)
+	redef fun compile_mo
 	do
 		super
 
 		if self isa MMethodDef then
 			for site in self.mosites do
 				site.stats(vm)
-				pstats.analysed_sites.add(site)
+				sys.pstats.analysed_sites.add(site)
 			end
+
+			for newexpr in self.monews do sys.pstats.inc("new_sites")
+			sys.pstats.compiled_methods.add(self)
+			sys.pstats.get_method_return_origin(self)
+		end
+	end
+end
+
+redef class MOVar
+	# Get the origin of return variable (tell if it comes from a new expression), with inter-procedural analysis
+	fun return_stats(mproperty: MProperty)
+	do
+		var callees = new List[MProperty]
+		callees.add(mproperty)
+		if trace_origin(self, callees) then
+			sys.pstats.inc("inter_return_from_new")
+		else
+			sys.pstats.inc("inter_return_from_other")
+		end
+	end
+
+	# Recurse while one of the dependency is not a new or callsite.
+	# True if its come from only new expressions
+	fun trace_origin(expr: MOExpr, callees: List[MProperty]): Bool
+	do
+		if expr isa MONew then
+			return true
+		else if expr isa MOCallSite and not callees.has(expr.pattern.gp) then
+			# Recurse on all living local properties
+			callees.add(expr.pattern.gp)
+			for mpropdef in expr.pattern.gp.living_mpropdefs do
+				if mpropdef.return_expr == null then return false
+				if not trace_origin(mpropdef.return_expr.as(not null), callees) then return false
+			end
+			return true
+		else if expr isa MOSSAVar then
+			return trace_origin(expr.dependency, callees)
+		else if expr isa MOPhiVar then
+			for dep in expr.dependencies do
+				if not trace_origin(dep, callees) then return false
+			end
+			return true
+		else
+			return false
 		end
 	end
 end
@@ -797,6 +927,18 @@ class DependencyTrace
 
 	# from a read attribute expression
 	var from_read = false
+
+	# from a parameter
+	var from_param = false
+
+	# from a literal
+	var from_literal = false
+
+	# from a primitive
+	var from_primitive = false
+
+	# from super
+	var from_super = false
 
 	# cuc is null ? usefull only when it comes from a method
 	var cuc_null = true
@@ -817,7 +959,17 @@ class DependencyTrace
 			if expr.pattern.cuc > 0 then cuc_null = false
 		else if expr isa MOReadSite then
 			from_read = true
-		else if expr isa MOVar then
+		else if expr isa MOParam then
+			from_param = true
+		else if expr isa MOLit then
+			from_literal = true
+		else if expr isa MOPrimitive or expr isa MOIsaSubtypeSite then
+			from_primitive = true
+		else if expr isa MOSuper then
+			from_super = true
+		else if expr isa MOSSAVar then
+			trace_internal(expr.dependency)
+		else if expr isa MOPhiVar then
 			for dep in expr.dependencies do trace_internal(dep)
 		end
 	end
