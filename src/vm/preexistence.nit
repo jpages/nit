@@ -10,22 +10,30 @@ redef class ToolContext
 	# Disable inter-procedural analysis and 'new' cases
 	var disable_preexistence_extensions = new OptionBool("Disable preexistence extensions", "--no-preexist-ext")
 
+	# Disable inter-procedural analysis
+	var disable_method_return = new OptionBool("Disable preexistence extensions on method call", "--disable-meth-return")
+
 	redef init
 	do
 		super
 		option_context.add_option(disable_preexistence_extensions)
+		option_context.add_option(disable_method_return)
 	end
 end
 
 redef class Sys
 	# Tell if preexistence extensions are disabled
-	var disable_preexistence_extensions: Bool
+	var disable_preexistence_extensions: Bool is noinit
+
+	# Tell if inter-procedural analysis is disabled
+	var disable_method_return: Bool is noinit
 end
 
 redef class ModelBuilder
-	redef fun run_virtual_machine(mainmodule: MModule, arguments: Array[String])
+	redef fun run_virtual_machine(mainmodule, arguments)
 	do
 		sys.disable_preexistence_extensions = toolcontext.disable_preexistence_extensions.value
+		sys.disable_method_return = toolcontext.disable_method_return.value
 		super(mainmodule, arguments)
 	end
 end
@@ -40,7 +48,7 @@ redef class VirtualMachine
 end
 
 redef class Int
-	# Display 8 lower bits of preexistence value
+	# Display 8 lower bits of preexitence value
 	fun preexists_bits: Array[Int]
 	do
 		var bs = bits.reversed
@@ -65,13 +73,13 @@ redef class MPropDef
 	do
 		var flag = false
 		if self isa MMethodDef then
-			if return_expr != null then flag = return_expr.is_pre_nper
+			if return_expr_is_object then flag = return_expr.as(not null).is_pre_nper
 		end
 
 		for expr in exprs_preexist_mut do expr.init_preexist
 		exprs_preexist_mut.clear
 
-		if flag then for p in callers do p.as(MOExprSitePattern).propage_preexist
+		if flag and not disable_method_return then for p in callers do p.as(MOExprSitePattern).propage_preexist
 	end
 
 	# Drop exprs_npreesit_mut and set unknown state to all expression inside
@@ -80,13 +88,13 @@ redef class MPropDef
 	do
 		var flag = false
 		if self isa MMethodDef then
-			if return_expr != null then flag = return_expr.is_npre_nper
+			if return_expr_is_object then flag = return_expr.as(not null).is_npre_nper
 		end
 
 		for expr in exprs_npreexist_mut do expr.init_preexist
 		exprs_npreexist_mut.clear
 
-		if flag then for p in callers do p.as(MOExprSitePattern).propage_npreexist
+		if flag and not disable_method_return then for p in callers do p.as(MOExprSitePattern).propage_npreexist
 	end
 
 	# Fill the correct list if the analysed preexistence if unperennial
@@ -102,7 +110,7 @@ redef class MPropDef
 	end
 
 	# TODO: make preexistence analysis on attributes with body too
-	redef fun compile(vm)
+	redef fun compile_mo
 	do
 		super
 
@@ -114,14 +122,17 @@ redef class MMethodDef
 	# Compute the preexistence of the return of the method expression
 	fun preexist_return: Int
 	do
+		# preexist_return is called only when return_expr is not null
+		var expr = return_expr.as(not null)
+
 		if not preexist_analysed then
-			return_expr.set_npre_nper
-			return return_expr.preexist_expr_value
-		else if not return_expr.is_pre_unknown then
-			return return_expr.preexist_expr_value
+			expr.set_npre_nper
+			return expr.preexist_expr_value
+		else if not expr.is_pre_unknown then
+			return expr.preexist_expr_value
 		else
-			return_expr.set_recursive
-			return return_expr.preexist_expr_value
+			expr.set_recursive
+			return expr.preexist_expr_value
 		end
 	end
 
@@ -151,8 +162,6 @@ redef class MMethodDef
 		end
 
 		for site in mosites do
-			assert not site.pattern.rst.is_primitive_type
-
 			preexist = site.preexist_site
 			var buff = "\tpreexist of "
 
@@ -316,12 +325,28 @@ redef class MOExpr
 	end
 end
 
+redef class MOSuper
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
+
 redef class MOLit
-	redef var preexist_expr_value = pmask_PVAL_PER
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
 
-	redef fun init_preexist do end
-
-	redef fun preexist_expr do return preexist_expr_value
+redef class MOIsaSubtypeSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
 end
 
 redef class MOParam
@@ -351,7 +376,32 @@ redef class MONew
 	end
 end
 
-redef class MOVar
+redef class MONull
+	redef var preexist_expr_value = pmask_PVAL_PER
+
+	redef fun init_preexist do end
+
+	redef fun preexist_expr do return preexist_expr_value
+
+end
+
+redef class MOPrimitive
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
+
+redef class MOSSAVar
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then preexist_expr_value = dependency.preexist_expr
+		return preexist_expr_value
+	end
+end
+
+redef class MOPhiVar
 	redef fun preexist_expr
 	do
 		if is_pre_unknown then
@@ -368,6 +418,7 @@ redef class MOVar
 		return preexist_expr_value
 	end
 end
+
 
 redef class MOReadSite
 	redef fun preexist_expr
@@ -434,7 +485,7 @@ redef class MOCallSite
 
 	redef fun preexist_expr
 	do
-		if disable_preexistence_extensions then
+		if disable_preexistence_extensions or disable_method_return then
 			preexist_expr_value = pmask_NPRE_PER
 		else if pattern.cuc > 0 then
 			preexist_expr_value = pmask_NPRE_NPER
@@ -451,15 +502,15 @@ redef class MOCallSite
 				if candidate.is_intern or candidate.is_extern then
 					# WARNING
 					# If the candidate method is intern/extern, then the return is preexist immutable
-					# since the VM cannot execute FFI code.
+					# since the VM cannot make FFI.
 					set_pval_per
 					break
 				else if not candidate.preexist_analysed then
 					# The lp could be known by the model but not already compiled from ast to mo
-					# So, we must NOT check its return_expr (it could be still null)
+					# So, we must NOT check it's return_expr (it could be still null)
 					set_npre_nper
 					break
-				else if candidate.return_expr == null then
+				else if not candidate.return_expr_is_object then
 					# Lazy attribute not yet initialized
 					# WARNING
 					# Be sure that it can't be anything else that lazy attributes here

@@ -21,9 +21,9 @@ import preexistence
 
 redef class VirtualMachine
 	# Add optimization of the method dispatch
-	redef fun callsite(callsite: nullable CallSite, arguments: Array[Instance]): nullable Instance
+	redef fun callsite(callsite, arguments)
 	do
-		var initializers = callsite.mpropdef.initializers
+		var initializers = callsite.as(not null).mpropdef.initializers
 		if initializers.is_empty then return send_optimize(callsite.as(not null), arguments)
 
 		var recv = arguments.first
@@ -31,7 +31,7 @@ redef class VirtualMachine
 		for p in initializers do
 			if p isa MMethod then
 				var args = [recv]
-				for x in p.intro.msignature.mparameters do
+				for x in p.intro.msignature.as(not null).mparameters do
 					args.add arguments[i]
 					i += 1
 				end
@@ -55,16 +55,13 @@ redef class VirtualMachine
 		var ret = send_commons(callsite.mproperty, args, mtype)
 		if ret != null then return ret
 
-		if callsite.status == 0 or callsite.static_mpropdef == null then callsite.optimize(recv)
-
-		# Make a static call if if's possible
-		if callsite.static_mpropdef != null then return self.call(callsite.static_mpropdef.as(not null), args)
+		if callsite.status == 0 then callsite.optimize(recv)
 
 		var propdef
 		if callsite.status == 1 then
-			propdef = method_dispatch_sst(recv.vtable.internal_vtable, callsite.offset)
+			propdef = method_dispatch_sst(recv.vtable.as(not null).internal_vtable, callsite.offset)
 		else
-			propdef = method_dispatch_ph(recv.vtable.internal_vtable, recv.vtable.mask,
+			propdef = method_dispatch_ph(recv.vtable.as(not null).internal_vtable, recv.vtable.as(not null).mask,
 				callsite.id, callsite.offset)
 		end
 
@@ -79,7 +76,7 @@ redef class AAttrFormExpr
 	#
 	# The relative position of this attribute if perfect hashing is used,
 	# The absolute position of this attribute if SST is used
-	var offset: Int
+	var offset: Int is noinit
 
 	# Indicate the status of the optimization for this node
 	#
@@ -89,7 +86,7 @@ redef class AAttrFormExpr
 	var status: Int = 0
 
 	# Identifier of the class which introduced the attribute
-	var id: Int
+	var id: Int is noinit
 
 	# Optimize this attribute access
 	# * `mproperty` The attribute which is accessed
@@ -103,7 +100,7 @@ redef class AAttrFormExpr
 			status = 1
 		else
 			# Otherwise, perfect hashing must be used
-			id = mproperty.intro_mclassdef.mclass.vtable.id
+			id = mproperty.intro_mclassdef.mclass.vtable.as(not null).id
 			offset = mproperty.offset
 			status = 2
 		end
@@ -130,7 +127,7 @@ redef class AAttrExpr
 			i = v.read_attribute_sst(recv.internal_attributes, offset)
 		else
 			# PH
-			i = v.read_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
+			i = v.read_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable, recv.vtable.as(not null).mask, id, offset)
 		end
 
 		# If we get a `MInit` value, throw an error
@@ -168,8 +165,8 @@ redef class AAttrAssignExpr
 		if status == 1 then
 			v.write_attribute_sst(recv.internal_attributes, offset, i)
 		else
-			v.write_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable,
-					recv.vtable.mask, id, offset, i)
+			v.write_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable,
+					recv.vtable.as(not null).mask, id, offset, i)
 		end
 
 		#TODO : we need recompilations here
@@ -183,7 +180,7 @@ redef class CallSite
 	#
 	# The relative position of this MMethod if perfect hashing is used,
 	# The absolute position of this MMethod if SST is used
-	var offset: Int
+	var offset: Int is noinit
 
 	# Indicate the status of the optimization for this node
 	#
@@ -193,22 +190,13 @@ redef class CallSite
 	var status: Int = 0
 
 	# Identifier of the class which introduced the MMethod
-	var id: Int
-
-	# If this callsite can be static, store the apropriate local property
-	var static_mpropdef: nullable MMethodDef
+	var id: Int is noinit
 
 	# Optimize a method dispatch,
 	# If this method is always at the same position in virtual table, we can use direct access,
 	# Otherwise we must use perfect hashing
 	fun optimize(recv: Instance)
 	do
-		# If there is only one candidate to this call
-		if mproperty.mpropdefs.length == 1 then
-			static_mpropdef = mproperty.mpropdefs.first
-			return
-		end
-
 		var position = recv.mtype.as(MClassType).mclass.get_position_methods(mproperty.intro_mclassdef.mclass)
 		if position > 0 then
 			offset = position + mproperty.offset
@@ -217,16 +205,16 @@ redef class CallSite
 			offset = mproperty.offset
 			status = 2
 		end
-		id = mproperty.intro_mclassdef.mclass.vtable.id
+		id = mproperty.intro_mclassdef.mclass.vtable.as(not null).id
 	end
 end
 
 redef class AIsaExpr
 	# Identifier of the target class type
-	var id: Int
+	var id: Int is noinit
 
 	# If the Cohen test is used, the position of the target id in vtable
-	var position: Int
+	var position: Int is noinit
 
 	# Indicate the status of the optimization for this node
 	#
@@ -249,10 +237,10 @@ redef class AIsaExpr
 		# If this test can be optimized, directly call appropriate subtyping methods
 		if status == 1 and recv.mtype isa MClassType then
 			# Direct access
-			return v.bool_instance(v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.internal_vtable))
+			return v.bool_instance(v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable))
 		else if status == 2 and recv.mtype isa MClassType then
 			# Perfect hashing
-			return v.bool_instance(v.inter_is_subtype_ph(id, recv.vtable.mask, recv.mtype.as(MClassType).mclass.vtable.internal_vtable))
+			return v.bool_instance(v.inter_is_subtype_ph(id, recv.vtable.as(not null).mask, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable))
 		else
 			# Use the slow path (default)
 			return v.bool_instance(v.is_subtype(recv.mtype, mtype))
@@ -282,16 +270,16 @@ redef class AIsaExpr
 			# We use perfect hashing
 			status = 2
 		end
-		id = target.mclass.vtable.id
+		id = target.mclass.vtable.as(not null).id
 	end
 end
 
 redef class AAsCastExpr
 	# Identifier of the target class type
-	var id: Int
+	var id: Int is noinit
 
 	# If the Cohen test is used, the position of the target id in vtable
-	var position: Int
+	var position: Int is noinit
 
 	# Indicate the status of the optimization for this node
 	#
@@ -316,10 +304,10 @@ redef class AAsCastExpr
 		var res: Bool
 		if status == 1 and recv.mtype isa MClassType then
 			# Direct access
-			res = v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.internal_vtable)
+			res = v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
 		else if status == 2 and recv.mtype isa MClassType then
 			# Perfect hashing
-			res = v.inter_is_subtype_ph(id, recv.vtable.mask, recv.mtype.as(MClassType).mclass.vtable.internal_vtable)
+			res = v.inter_is_subtype_ph(id, recv.vtable.as(not null).mask, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
 		else
 			# Use the slow path (default)
 			res = v.is_subtype(recv.mtype, amtype)
@@ -354,7 +342,7 @@ redef class AAsCastExpr
 			# We use perfect hashing
 			status = 2
 		end
-		id = target.mclass.vtable.id
+		id = target.mclass.vtable.as(not null).id
 	end
 end
 
@@ -370,6 +358,9 @@ redef class ASendExpr
 		if recv == null then return null
 		var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
 		if args == null then return null
+
+		# TODO: verify this hack works
+		var mocallsite = get_mo_from_clone_table.as(nullable MOSite)
 
 		# Inline the call if possible
 		if mocallsite != null then
@@ -387,9 +378,6 @@ redef class ASendExpr
 
 					caller.inline(callee, self)
 					inlined = true
-
-					# Recompute the preexistence of the caller
-					caller.as(MMethodDef).preexist_all(sys.vm)
 				end
 			end
 		else
@@ -408,6 +396,15 @@ redef class MPropDef
 
 	# If true, the mpropdef contains at least one inlined callsite
 	var contains_inlining: Bool = false
+
+	redef fun compile_mo
+	do
+		super
+
+		if self isa MMethodDef then
+			for site in self.mosites do site.get_impl(vm)
+		end
+	end
 
 	# Create the intermediate representation of this mpropdef
 	fun create_ir
@@ -447,15 +444,10 @@ redef class MPropDef
 				# Change the dependences, the receiver should be a MOVar
 				if not params.has_key(site.expr_recv) then
 					# Create a new MOVar and set its dependences
-					var movar = new MOVar(new Variable("param"), 0)
+					var movar = new MOSSAVar(new Variable("param"), 0)
 
-					var moexpr = send.raw_arguments[i].ast2mo.as(not null)
-					if moexpr == null then
-						print "Problem with {send.raw_arguments[i]}"
-					else
-						print "New moexpr {moexpr}"
-						movar.dependencies.add(moexpr)
-					end
+					var moexpr = send.raw_arguments[i].ast2mo(self)
+					movar.dependency = moexpr.as(MOExpr)
 
 					params[site.expr_recv.as(MOParam)] = movar
 				end
@@ -483,17 +475,15 @@ redef class MPropDef
 end
 
 redef class MMethodDef
-
 	redef fun preexist_all(vm: VirtualMachine): Bool
 	do
 		if preexist_analysed or is_intern or is_extern then return false
 		preexist_analysed = true
 
-		# Generate the IR if not already done
-		if ir == null then create_ir
-
 		trace("\npreexist_all of {self}")
 		var preexist: Int
+
+		if ir == null then create_ir
 
 		if not disable_preexistence_extensions then
 			for newexpr in ir.news do
@@ -505,10 +495,7 @@ redef class MMethodDef
 			end
 		end
 
-
 		for site in ir.callsites do
-			assert not site.pattern.rst.is_primitive_type
-
 			preexist = site.preexist_site
 			var buff = "\tpreexist of "
 
@@ -537,7 +524,7 @@ redef class MMethodDef
 end
 
 redef abstract class MOSitePattern
-	# Implementation of the pattern (used if site as not concrete receivers list)
+	# Implementation of the pattern (used if site as not concerte receivers list)
 	var impl: nullable Implementation is noinit
 
 	# Get implementation, compute it if not exists
@@ -656,8 +643,8 @@ redef class MOCallSitePattern
 	redef fun can_be_static do return callees.length == 1
 end
 
-redef class MOSite
-	# Implementation of the site (null if can't determine concretes receivers.
+redef abstract class MOSite
+	# Implementation of the site (null if can't determine concretes receivers)
 	# We always must use get_impl to read this value
 	var impl: nullable Implementation is writable, noinit
 
@@ -755,6 +742,12 @@ redef class MOSite
 
 	# Set a null implementation (eg. PIC null)
 	fun set_null_impl do impl = new NullImpl(true)
+
+	fun clone: MOSite
+	do
+		print "NYI {self}"
+		return self
+	end
 end
 
 redef class MOSubtypeSite
@@ -796,6 +789,36 @@ redef class MOCallSite
 		var pic_id = get_pic(vm).vtable.as(not null).id
 		var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
 		impl = new StaticImplProp(mutable, method)
+	end
+
+	# Clone a MOSite
+	redef fun clone: MOSite
+	do
+		var copy = new MOCallSite(ast, lp)
+		copy.pattern = pattern
+
+		if concretes_receivers != null then
+			copy.concretes_receivers = new List[MClass]
+			copy.concretes_receivers.add_all(concretes_receivers.as(not null))
+		end
+
+		return copy
+	end
+end
+
+redef class MOReadSite
+	# Clone a MOSite
+	redef fun clone: MOSite
+	do
+		var copy = new MOReadSite(ast, lp)
+		copy.pattern = pattern
+
+		if concretes_receivers != null then
+			copy.concretes_receivers = new List[MClass]
+			copy.concretes_receivers.add_all(concretes_receivers.as(not null))
+		end
+
+		return copy
 	end
 end
 
