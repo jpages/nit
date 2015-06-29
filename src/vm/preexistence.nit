@@ -341,6 +341,14 @@ redef class MOLit
 	end
 end
 
+redef class MOAsSubtypeSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
+
 redef class MOIsaSubtypeSite
 	redef fun preexist_expr
 	do

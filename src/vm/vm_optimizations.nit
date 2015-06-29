@@ -352,41 +352,41 @@ redef class ASendExpr
 
 	# If the call is inlined, do not execute it and continue the execution
 	# directly inside the calle
-	redef fun expr(v)
-	do
-		var recv = v.expr(self.n_expr)
-		if recv == null then return null
-		var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
-		if args == null then return null
+	# redef fun expr(v)
+	# do
+	# 	var recv = v.expr(self.n_expr)
+	# 	if recv == null then return null
+	# 	var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
+	# 	if args == null then return null
 
-		# TODO: verify this hack works
-		var mocallsite = get_mo_from_clone_table.as(nullable MOSite)
+	# 	# TODO: verify this hack works
+	# 	var mocallsite = get_mo_from_clone_table.as(nullable MOSite)
 
-		# Inline the call if possible
-		if mocallsite != null then
-			if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
-				# If the callsite can be static (only one method for candidate), then inline
-				var callee = vm.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
-				var caller = sys.vm.current_propdef.mpropdef
+	# 	# Inline the call if possible
+	# 	if mocallsite != null then
+	# 		if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
+	# 			# If the callsite can be static (only one method for candidate), then inline
+	# 			var callee = vm.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
+	# 			var caller = sys.vm.current_propdef.mpropdef
 
-				# Inline the callee inside the caller (just the model, not the code)
+	# 			# Inline the callee inside the caller (just the model, not the code)
 
-				if callee isa APropdef then
-					# Create the two objects of intermediate representation
-					caller.create_ir
-					callee.mpropdef.create_ir
+	# 			if callee isa APropdef then
+	# 				# Create the two objects of intermediate representation
+	# 				caller.create_ir
+	# 				callee.mpropdef.create_ir
 
-					caller.inline(callee, self)
-					inlined = true
-				end
-			end
-		else
-			# Check if self is an attribute access or a call on a primitive receiver
-		end
+	# 				caller.inline(callee, self)
+	# 				inlined = true
+	# 			end
+	# 		end
+	# 	else
+	# 		# Check if self is an attribute access or a call on a primitive receiver
+	# 	end
 
-		var res = v.callsite(callsite, args)
-		return res
-	end
+	# 	var res = v.callsite(callsite, args)
+	# 	return res
+	# end
 end
 
 # TODO: De-optimize the inlining if needed
