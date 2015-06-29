@@ -427,6 +427,7 @@ end
 # MO of .as(Type) expr
 class MOAsSubtypeSite
 	super MOSubtypeSite
+	super MOExpr
 end
 
 # MO of isa expr
@@ -629,20 +630,7 @@ redef class MType
 end
 
 redef class ANode
-	# In the case of attr.as(AType).foo, the receiver of foo() is a MOSubtypeSite.
-	# That's a nonsence, we want the receiver "attr".
-	# This is why this mess...
-	fun get_receiver(mpropdef: MPropDef, node: AExpr): MOExpr
-	do
-		var raw_expr = node.ast2mo(mpropdef)
-
-		# Just if stupid case of attr.as(AType1).as(AType2)
-		while raw_expr isa MOAsSubtypeSite do
-			raw_expr = raw_expr.ast.as(AAsCastExpr).n_expr.ast2mo(mpropdef)
-		end
-
-		return raw_expr.as(MOExpr)
-	end
+	fun get_receiver: AExpr is abstract
 end
 
 redef class AExpr
@@ -680,119 +668,149 @@ redef class AExpr
 		end
 		return null
 	end
+
+	fun copy_site(mpropdef: MPropDef): MOEntity is abstract
 end
 
-redef class AAttrExpr
+redef class AAttrFormExpr
+	# Return the MOEntity if it's already in the clone table
+	redef fun get_mo_from_clone_table: nullable MOEntity
+	do
+		var mo_entity = super
+
+		if mo_entity != null then return mo_entity
+		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+
+		return null
+	end
+
+	redef fun get_receiver
+	do
+		return n_expr
+	end
+
 	redef fun ast2mo(mpropdef)
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		var attr_site = new MOReadSite(self, mpropdef)
+		var attr_site = copy_site(mpropdef).as(MOAttrSite)
 
 		sys.ast2mo_clone_table[self] = attr_site
-		attr_site.expr_recv = get_receiver(mpropdef, n_expr)
+		var recv = get_receiver
+		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
+		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
 		recv_class.set_site_pattern(attr_site, recv_class.mclass_type, mproperty.as(not null))
 
 		return attr_site
+	end
+end
+
+redef class AAttrExpr
+	redef fun copy_site(mpropdef: MPropDef): MOReadSite
+	do
+		return new MOReadSite(self, mpropdef)
 	end
 end
 
 redef class AIssetAttrExpr
-	redef fun ast2mo(mpropdef)
+	redef fun copy_site(mpropdef: MPropDef): MOReadSite
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
-
-		var attr_site = new MOReadSite(self, mpropdef)
-
-		sys.ast2mo_clone_table[self] = attr_site
-		attr_site.expr_recv = get_receiver(mpropdef, n_expr)
-
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(attr_site, recv_class.mclass_type, mproperty.as(not null))
-
-		return attr_site
+		return new MOReadSite(self, mpropdef)
 	end
 end
 
 redef class AAttrAssignExpr
-	redef fun ast2mo(mpropdef)
+	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
-
-		var attr_site = new MOWriteSite(self, mpropdef)
-
-		sys.ast2mo_clone_table[self] = attr_site
-		attr_site.expr_recv = get_receiver(mpropdef, n_expr)
-
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(attr_site, recv_class.mclass_type, mproperty.as(not null))
-
-		return attr_site
+		return new MOWriteSite(self, mpropdef)
 	end
 end
 
 redef class AAttrReassignExpr
+	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
+	do
+		return new MOWriteSite(self, mpropdef)
+	end
+end
+
+class ASubtypeExpr
+	super AExpr
+
 	redef fun ast2mo(mpropdef)
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		var attr_site = new MOWriteSite(self, mpropdef)
+		var recv = get_receiver
+		if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
 
-		sys.ast2mo_clone_table[self] = attr_site
-		attr_site.expr_recv = get_receiver(mpropdef, n_expr)
+		# TODO: be sure that cast_type is never null here
+		var cast_site = copy_site(mpropdef).as(MOSubtypeSite)
+		sys.ast2mo_clone_table[self] = cast_site
+		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(attr_site, recv_class.mclass_type, mproperty.as(not null))
+		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
+		recv_class.set_subtype_pattern(cast_site, recv_class.mclass_type)
 
-		return attr_site
+		return cast_site
 	end
 end
 
 redef class AIsaExpr
-	redef fun ast2mo(mpropdef)
+	super ASubtypeExpr
+
+	redef fun get_receiver
 	do
-		var mo_entity = get_mo_from_clone_table
+		return n_expr
+	end
+
+	# Copy from AAttrFormExpr
+	redef fun get_mo_from_clone_table: nullable MOEntity
+	do
+		var mo_entity = super
+
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+		var recv = get_receiver
+		if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
 
-		# TODO: be sure that cast_type is never null here
-		var cast_site = new MOIsaSubtypeSite(self, mpropdef, cast_type.as(not null))
-		sys.ast2mo_clone_table[self] = cast_site
-		cast_site.expr_recv = get_receiver(mpropdef, n_expr)
+		return null
+	end
 
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_subtype_pattern(cast_site, recv_class.mclass_type)
+	redef fun copy_site(mpropdef: MPropDef): MOIsaSubtypeSite
+	do
+		return new MOIsaSubtypeSite(self, mpropdef, cast_type.as(not null))
+	end
+end
 
-		return cast_site
+redef class AAsCastForm
+	super ASubtypeExpr
+
+	redef fun get_receiver
+	do
+		return n_expr
 	end
 end
 
 redef class AAsCastExpr
+	redef fun copy_site(mpropdef: MPropDef): MOAsSubtypeSite
+	do
+		return new MOAsSubtypeSite(self, mpropdef, n_type.mtype.as(not null))
+	end
+end
+
+#TODO: cast to null
+redef class AAsNotnullExpr
 	redef fun ast2mo(mpropdef)
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
 		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		# TODO: be sure that n_type.mtype is never null here
-		var cast_site = new MOAsSubtypeSite(self, mpropdef, n_type.mtype.as(not null))
-		sys.ast2mo_clone_table[self] = cast_site
-		cast_site.expr_recv = get_receiver(mpropdef, n_expr)
-
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_subtype_pattern(cast_site, recv_class.mclass_type)
-
-		return cast_site
+		var moexpr = n_expr.ast2mo(mpropdef)
+		sys.ast2mo_clone_table[self] = moexpr
+		return moexpr
 	end
 end
 
@@ -807,17 +825,21 @@ redef class Variable
 		else if dep_exprs.length == 1 or dep_exprs.length == 0 then
 			var mossa = new MOSSAVar(self, position)
 			sys.ast2mo_clone_table[node] = mossa
+
 			if dep_exprs.length == 0 then
 				mossa.dependency = sys.monull
 			else
-				mossa.dependency = node.get_receiver(mpropdef, dep_exprs.first)
+				mossa.dependency = dep_exprs.first.ast2mo(mpropdef).as(MOExpr)
 			end
+
 			return mossa
 		else
 			assert dep_exprs.length > 1
 			var mophi = new MOPhiVar(self, position)
 			sys.ast2mo_clone_table[node] = mophi
-			for dep in dep_exprs do mophi.dependencies.add(node.get_receiver(mpropdef, dep))
+
+			for dep in dep_exprs do mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
+
 			return mophi
 		end
 	end
@@ -880,29 +902,8 @@ redef class APropdef
 end
 
 redef class ASendExpr
-	redef fun ast2mo(mpropdef)
-	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		var cs = callsite.as(not null)
-
-		# Static dispatch with global model to known if we handle method call of attribute access
-		var has_redef = cs.mproperty.mpropdefs.length > 1
-		var called_node_ast = vm.modelbuilder.mpropdef2node(cs.mpropdef)
-		var is_attribute = called_node_ast isa AAttrPropdef
-
-		# ast2mo_accessor and ast2mo_method will add the node on the ast2mo_clone_table
-		if is_attribute and not has_redef then
-			return ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
-		else
-			return ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
-		end
-	end
-
-	# Attribute access (with method call simulation: "foo.attr" instead on "foo._attr")
-	fun ast2mo_accessor(mpropdef: MPropDef, called_node_ast: AAttrPropdef): MOEntity
+	fun copy_site_accessor(mpropdef: MPropDef, called_node_ast: AAttrPropdef): MOAttrSite
 	do
 		var moattr: MOAttrSite
 		var params_len = callsite.as(not null).msignature.mparameters.length
@@ -916,13 +917,50 @@ redef class ASendExpr
 			moattr = new MOWriteSite(self, mpropdef)
 		end
 
-		sys.ast2mo_clone_table[self] = moattr
-		moattr.expr_recv = get_receiver(mpropdef, n_expr)
-
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		var gp = called_node_ast.mpropdef.as(not null).mproperty
+		recv_class.set_site_pattern(moattr, recv_class.mclass_type, called_node_ast.mpropdef.as(not null).mproperty)
 
-		recv_class.set_site_pattern(moattr, recv_class.mclass_type, gp)
+		return moattr
+	end
+
+	fun copy_site_method(mpropdef: MPropDef): MOCallSite
+	do
+		var cs = callsite.as(not null)
+		var recv_class = cs.recv.get_mclass(vm).as(not null)
+		var mocallsite = new MOCallSite(self, mpropdef)
+
+		recv_class.set_site_pattern(mocallsite, recv_class.mclass_type, cs.mproperty)
+
+		return mocallsite
+	end
+
+	redef fun ast2mo(mpropdef)
+	do
+		var mo_entity = get_mo_from_clone_table
+		if mo_entity != null then return mo_entity
+		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+
+		var cs = callsite.as(not null)
+
+		# Static dispatch with global model to known if we handle method call of attribute access
+		var called_node_ast = vm.modelbuilder.mpropdef2node(cs.mpropdef)
+		var is_attribute = called_node_ast isa AAttrPropdef
+
+		# ast2mo_accessor and ast2mo_method will add the node on the ast2mo_clone_table
+		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
+			return ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
+		else
+			return ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
+		end
+	end
+
+	# Attribute access (with method call simulation: "foo.attr" instead on "foo._attr")
+	fun ast2mo_accessor(mpropdef: MPropDef, called_node_ast: AAttrPropdef): MOEntity
+	do
+		var moattr = copy_site_accessor(mpropdef, called_node_ast)
+
+		sys.ast2mo_clone_table[self] = moattr
+		moattr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
 		return moattr
 	end
@@ -931,18 +969,15 @@ redef class ASendExpr
 	# is_attribute is used only for stats (to kwon if it's a method call because of a redefinition of a attribute)
 	fun ast2mo_method(mpropdef: MPropDef, called_node_ast: ANode, is_attribute: Bool): MOEntity
 	do
-		var cs = callsite.as(not null)
-		var recv_class = cs.recv.get_mclass(vm).as(not null)
-		var mocallsite = new MOCallSite(self, mpropdef)
+		var mocallsite = copy_site_method(mpropdef)
 
 		sys.ast2mo_clone_table[self] = mocallsite
-		recv_class.set_site_pattern(mocallsite, recv_class.mclass_type, cs.mproperty)
 
-		mocallsite.expr_recv = get_receiver(mpropdef, n_expr)
+		mocallsite.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
 		# Expressions arguments given to the method called
 		for arg in raw_arguments do
-			mocallsite.given_args.add(get_receiver(mpropdef, arg))
+			mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
 		end
 
 		return mocallsite
@@ -950,19 +985,6 @@ redef class ASendExpr
 end
 
 redef class AParExpr
-	redef fun ast2mo(mpropdef)
-	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
-
-		var moexpr = n_expr.ast2mo(mpropdef)
-		sys.ast2mo_clone_table[self] = moexpr
-		return moexpr
-	end
-end
-
-redef class AAsNotnullExpr
 	redef fun ast2mo(mpropdef)
 	do
 		var mo_entity = get_mo_from_clone_table
