@@ -893,7 +893,8 @@ redef class MOSite
 	do
 		file.write("preexistence of {self} [is pre = {expr_recv.is_pre}]")
 		if expr_recv isa MOVar then
-			file.write("receiver {expr_recv.as(MOVar).variable.name}")
+			file.write("receiver MOVAR {expr_recv.as(MOVar).variable.name}")
+			if expr_recv isa MOSSAVar then file.write(" with dep {expr_recv.as(MOSSAVar).dependency}")
 		else
 			file.write("receiver {expr_recv}")
 		end
