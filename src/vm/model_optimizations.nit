@@ -26,6 +26,8 @@ redef class Sys
 	# and get_movar needs to use this table to put the generated MOExpr.
 	var ast2mo_clone_table = new HashMap[ANode, MOEntity]
 
+	var var2mo_clone_table = new HashMap[Variable, MOVar]
+
 	# Singleton of MONull
 	var monull = new MONull is lazy
 
@@ -254,6 +256,9 @@ end
 
 # Root hierarchy of MO entities
 abstract class MOEntity
+	fun pretty_print(file: FileWriter)
+	do
+	end
 end
 
 # Root hierarchy of expressions
@@ -284,6 +289,11 @@ abstract class MOVar
 		end
 		return false
 	end
+
+	redef fun pretty_print(file: FileWriter)
+	do
+		file.write("{variable.name} ")
+	end
 end
 
 # MO of variables with only one dependency
@@ -294,6 +304,12 @@ class MOSSAVar
 	var dependency: MOExpr is noinit, writable
 
 	redef fun compute_concretes(concretes) do return valid_and_add_dep(dependency, concretes)
+
+	redef fun pretty_print(file: FileWriter)
+	do
+		super
+		file.write("dep = {dependency}\n")
+	end
 end
 
 # MO of variable with multiples dependencies
@@ -309,6 +325,20 @@ class MOPhiVar
 			if not valid_and_add_dep(dep, concretes) then return false
 		end
 		return true
+	end
+
+	redef fun pretty_print(file: FileWriter)
+	do
+		super
+		file.write("deps = ")
+		for dep in dependencies do
+			if dep isa MOVar then
+				file.write("{dep.variable.name}")
+			else
+				file.write("{dep.to_s}")
+			end
+		end
+		file.write("\n")
 	end
 end
 
@@ -416,11 +446,16 @@ abstract class MOSubtypeSite
 	# Static type on which the test is applied
 	var target: MType
 
-	# TODO: remove the cast to MMethodDef
 	init(ast: AExpr, mpropdef: MPropDef, target: MType)
 	do
 		super
 		self.target = target
+	end
+
+	redef fun pretty_print(file)
+	do
+		super
+		file.write("MOSubtypeSite target {target}")
 	end
 end
 
@@ -466,6 +501,19 @@ class MOCallSite
 
 	# Values of each arguments
 	var given_args = new List[MOExpr]
+
+	redef fun pretty_print(file)
+	do
+		super
+		file.write(" MOCallSite given_args = ")
+		for arg in given_args do
+			if arg isa MOVar then
+				file.write("{arg.variable.name} ")
+			else
+				file.write("{arg} ")
+			end
+		end
+	end
 end
 
 # MO of read attribute
@@ -818,13 +866,15 @@ redef class Variable
 	# Create the movar corresponding to AST node, and return it
 	fun get_movar(mpropdef: MPropDef, node: ANode): MOVar
 	do
+		if sys.var2mo_clone_table.has_key(self) then return sys.var2mo_clone_table[self]
+
 		if dep_exprs.length == 0 and parameter then
 			var moparam = new MOParam(self, position)
-			sys.ast2mo_clone_table[node] = moparam
+			sys.var2mo_clone_table[self] = moparam
 			return moparam
 		else if dep_exprs.length == 1 or dep_exprs.length == 0 then
 			var mossa = new MOSSAVar(self, position)
-			sys.ast2mo_clone_table[node] = mossa
+			sys.var2mo_clone_table[self] = mossa
 
 			if dep_exprs.length == 0 then
 				mossa.dependency = sys.monull
@@ -836,7 +886,7 @@ redef class Variable
 		else
 			assert dep_exprs.length > 1
 			var mophi = new MOPhiVar(self, position)
-			sys.ast2mo_clone_table[node] = mophi
+			sys.var2mo_clone_table[self] = mophi
 
 			for dep in dep_exprs do mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
 
@@ -874,10 +924,6 @@ end
 redef class AVarExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-
-		# get_movar will register this AST node inside ast2mo_clone_table
 		return variable.as(not null).get_movar(mpropdef, self)
 	end
 end

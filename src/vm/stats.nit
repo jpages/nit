@@ -86,7 +86,7 @@ redef class ModelBuilder
 
 		for site in pstats.analysed_sites do
 			# WARN: this cast is always true for now, but we need to put preexist_analysed on MPropDef when we'll analysed attribute with body.
-			site.lp.as(MMethodDef).preexist_analysed = false
+			site.lp.preexist_analysed = false
 			site.preexist_site
 			site.impl = null
 			site.get_impl(sys.vm)
@@ -385,6 +385,9 @@ class MOStats
 		var cuc_pos = 0
 		var cuc_null = 0
 
+		var trace_file = new FileWriter.open("trace_file.txt")
+		var trace_model = new FileWriter.open("trace_model.txt")
+
 		for propdef in living_propdefs do
 			if propdef.callers.length > 0 then
 				if propdef.callers.first.cuc == 0 then
@@ -393,7 +396,49 @@ class MOStats
 					cuc_pos += 1
 				end
 			end
+
+			# if propdef.name == "pop" or propdef.name == "action" then
+				# Trace of Julien's model
+				trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
+
+				if propdef.return_expr != null then
+					trace_file.write("preexistence {propdef.preexist_return}\n")
+				end
+
+				var node = sys.vm.modelbuilder.mpropdef2node(propdef)
+				if node isa APropdef then
+					trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
+
+					for v in node.variables do
+						trace_file.write("\t")
+
+						v.pretty_print(trace_file)
+						trace_file.write("\n")
+					end
+					trace_file.write("\n")
+
+					# trace of Colin's model
+					trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
+
+					if propdef.return_expr != null then
+						trace_model.write("preexistence {propdef.preexist_return}\n")
+					end
+
+					trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
+
+					for site in propdef.mosites do
+						trace_model.write("\t")
+
+						site.pretty_print(trace_model)
+						trace_model.write("\n")
+					end
+					trace_model.write("\n")
+				end
+			# end
 		end
+
+		trace_file.close
+		trace_model.close
 
 		file.write("callers cuc pos, {cuc_pos}\n")
 		file.write("callers cuc null, {cuc_null}\n")
@@ -691,14 +736,18 @@ redef class MOSite
 	# Print location of a site
 	fun dump_location_site do
 		# dump_location is null of first compilation, and set for last compilation
-		if expr_recv.is_pre and dump_location != null then
+		if dump_location != null and (site_type == "cast" or (site_type == "method" and pattern.as(MOPropSitePattern).gp.name == "pop"))then
 			var from2str = ""
-			if origin.from_new then from2str += " from-new "
-			if origin.from_param then from2str += " from-param "
-			if origin.from_return then from2str += " from-return "
-			if origin.from_primitive then from2str += " from-primitive "
-			if origin.from_literal then from2str += " from-literal "
-			if origin.from_super then from2str += " from-super "
+			if expr_recv.is_pre then
+				if origin.from_new then from2str += " from-new "
+				if origin.from_param then from2str += " from-param "
+				if origin.from_return then from2str += " from-return "
+				if origin.from_primitive then from2str += " from-primitive "
+				if origin.from_literal then from2str += " from-literal "
+				if origin.from_super then from2str += " from-super "
+			else
+				from2str += "non-preexist"
+			end
 
 			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
 		end
@@ -838,6 +887,48 @@ redef class MOSite
 				abort
 			end
 		end
+	end
+
+	redef fun pretty_print(file)
+	do
+		file.write("preexistence of {self} [is pre = {expr_recv.is_pre}]")
+		if expr_recv isa MOVar then
+			file.write("receiver {expr_recv.as(MOVar).variable.name}")
+		else
+			file.write("receiver {expr_recv}")
+		end
+	end
+end
+
+redef class AExpr
+	fun pretty_print(file: FileWriter)
+	do
+		var d = new ASTDump
+		d.enter_visit(self)
+		d.write_to(file)
+	end
+end
+
+redef class Variable
+	fun pretty_print(file: FileWriter)
+	do
+		file.write(name)
+
+		for dep in dep_exprs do
+			file.write(" ")
+			if dep isa AVarFormExpr then
+				file.write(dep.variable.name)
+			else
+				dep.pretty_print(file)
+			end
+		end
+	end
+end
+
+redef class AVarFormExpr
+	redef fun pretty_print(file)
+	do
+		variable.pretty_print(file)
 	end
 end
 
