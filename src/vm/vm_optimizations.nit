@@ -475,52 +475,52 @@ redef class MPropDef
 end
 
 redef class MMethodDef
-	redef fun preexist_all(vm: VirtualMachine): Bool
-	do
-		if preexist_analysed or is_intern or is_extern then return false
-		preexist_analysed = true
+	# redef fun preexist_all(vm: VirtualMachine): Bool
+	# do
+	# 	if preexist_analysed or is_intern or is_extern then return false
+	# 	preexist_analysed = true
 
-		trace("\npreexist_all of {self}")
-		var preexist: Int
+	# 	trace("\npreexist_all of {self}")
+	# 	var preexist: Int
 
-		if ir == null then create_ir
+	# 	if ir == null then create_ir
 
-		if not disable_preexistence_extensions then
-			for newexpr in ir.news do
-				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
+	# 	if not disable_preexistence_extensions then
+	# 		for newexpr in ir.news do
+	# 			assert not newexpr.pattern.cls.mclass_type.is_primitive_type
 
-				preexist = newexpr.preexist_expr
-				fill_nper(newexpr)
-				trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
-			end
-		end
+	# 			preexist = newexpr.preexist_expr
+	# 			fill_nper(newexpr)
+	# 			trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
+	# 		end
+	# 	end
 
-		for site in ir.callsites do
-			preexist = site.preexist_site
-			var buff = "\tpreexist of "
+	# 	for site in ir.callsites do
+	# 		preexist = site.preexist_site
+	# 		var buff = "\tpreexist of "
 
-			fill_nper(site.expr_recv)
+	# 		fill_nper(site.expr_recv)
 
-			if site isa MOAttrSite then
-				buff += "attr {site.pattern.rst}.{site.pattern.gp}"
-			else if site isa MOSubtypeSite then
-				buff += "cast {site.pattern.rst} isa {site.target}"
-			else if site isa MOCallSite then
-				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
-			else
-				abort
-			end
+	# 		if site isa MOAttrSite then
+	# 			buff += "attr {site.pattern.rst}.{site.pattern.gp}"
+	# 		else if site isa MOSubtypeSite then
+	# 			buff += "cast {site.pattern.rst} isa {site.target}"
+	# 		else if site isa MOCallSite then
+	# 			buff += "meth {site.pattern.rst}.{site.pattern.gp}"
+	# 		else
+	# 			abort
+	# 		end
 
-			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
-			trace(buff)
-			trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
-		end
+	# 		buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
+	# 		trace(buff)
+	# 		trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
+	# 	end
 
-		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
-		if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
+	# 	if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
+	# 	if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
 
-		return true
-	end
+	# 	return true
+	# end
 end
 
 redef abstract class MOSitePattern
@@ -608,6 +608,12 @@ redef class MOSubtypeSitePattern
 	redef fun get_offset(vm) do return get_pic(vm).color
 
 	redef fun get_pic(vm) do return target.get_mclass(vm).as(not null)
+end
+
+redef class MOAsNotNullPattern
+	redef fun get_offset(vm) do return 0
+
+	redef fun get_pic(vm) do return rst.get_mclass(vm).as(not null)
 end
 
 redef abstract class MOPropSitePattern
@@ -754,6 +760,24 @@ redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
 
 	redef fun get_pic(vm) do return target.get_mclass(vm).as(not null)
+
+	redef fun set_static_impl(vm, mutable)
+	do
+		if not get_pic(vm).loaded then
+			impl = new StaticImplSubtype(mutable, false)
+		else
+			var target_id = get_pic(vm).vtable.as(not null).id
+			var source_vt = pattern.rst.get_mclass(vm).as(not null).vtable.as(not null)
+			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
+			impl = new StaticImplSubtype(mutable, cast_value)
+		end
+	end
+end
+
+redef class MOAsNotNullSite
+	redef fun get_offset(vm) do return 0
+
+	redef fun get_pic(vm) do return pattern.rst.get_mclass(vm).as(not null)
 
 	redef fun set_static_impl(vm, mutable)
 	do

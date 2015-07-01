@@ -73,24 +73,29 @@ abstract class MOSitePattern
 	var sites = new List[S]
 
 	# Add a site
-	fun add_site(site: S) is abstract
-end
-
-# Pattern of subtype test sites
-class MOSubtypeSitePattern
-	super MOSitePattern
-
-	redef type S: MOSubtypeSite
-
-	# Static type of the target
-	var target: MType
-
-	redef fun add_site(site) do
+	fun add_site(site: S)
+	do
 		assert not sites.has(site)
 
 		sites.add(site)
 		site.pattern = self
 	end
+end
+
+# Pattern of subtype test sites
+class MOSubtypeSitePattern
+	super MOExprSitePattern
+
+	redef type S: MOSubtypeSite
+
+	# Static type of the target
+	var target: MType
+end
+
+class MOAsNotNullPattern
+	super MOExprSitePattern
+
+	redef type S: MOAsNotNullSite
 end
 
 # Pattern of properties sites (method call / attribute access)
@@ -111,14 +116,6 @@ abstract class MOPropSitePattern
 	# Candidates local properties owning by the GP
 	var callees = new List[LP]
 
-	redef fun add_site(site)
-	do
-		assert not sites.has(site)
-
-		sites.add(site)
-		site.pattern = self
-	end
-
 	# Number of calls on uncompiled methods
 	var cuc = 0
 
@@ -129,11 +126,13 @@ abstract class MOPropSitePattern
 		mpropdef.callers.add(self)
 		cuc += 1
 	end
+
+	fun compatible_site(site: MOPropSite): Bool is abstract
 end
 
 # Pattern of expression sites (method call / read attribute)
 abstract class MOExprSitePattern
-	super MOPropSitePattern
+	super MOSitePattern
 
 	redef type S: MOExprSite
 end
@@ -141,6 +140,7 @@ end
 # Pattern of method call
 class MOCallSitePattern
 	super MOExprSitePattern
+	super MOPropSitePattern
 
 	redef type GP: MMethod
 
@@ -164,6 +164,11 @@ class MOCallSitePattern
 			end
 		end
 	end
+
+	redef fun compatible_site(site: MOPropSite)
+	do
+		return site isa MOCallSite
+	end
 end
 
 # Common subpattern of all attributes (read/write)
@@ -181,6 +186,11 @@ class MOReadSitePattern
 	super MOAttrPattern
 
 	redef type S: MOReadSite
+
+	redef fun compatible_site(site: MOPropSite)
+	do
+		return site isa MOReadSite
+	end
 end
 
 # Pattern of write attribute
@@ -188,6 +198,11 @@ class MOWriteSitePattern
 	super MOAttrPattern
 
 	redef type S: MOWriteSite
+
+	redef fun compatible_site(site: MOPropSite)
+	do
+		return site isa MOWriteSite
+	end
 end
 
 redef class MProperty
@@ -408,6 +423,8 @@ abstract class MOSite
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
 	var concretes_receivers: nullable List[MClass] is noinit, writable
 
+	fun pattern_factory(rst: MType, gp: MProperty): P is abstract
+
 	# Compute the concretes receivers.
 	# If return null, drop the list (all receivers can't be statically and with intra-procedural analysis determined)
 	private fun compute_concretes
@@ -439,7 +456,7 @@ end
 
 # MO of a subtype test site
 abstract class MOSubtypeSite
-	super MOSite
+	super MOExprSite
 
 	redef type P: MOSubtypeSitePattern
 
@@ -455,20 +472,8 @@ abstract class MOSubtypeSite
 	redef fun pretty_print(file)
 	do
 		super
-		file.write("MOSubtypeSite target {target}")
+		file.write("target {target}")
 	end
-end
-
-# MO of .as(Type) expr
-class MOAsSubtypeSite
-	super MOSubtypeSite
-	super MOExpr
-end
-
-# MO of isa expr
-class MOIsaSubtypeSite
-	super MOSubtypeSite
-	super MOExpr
 end
 
 # MO of global properties sites
@@ -480,10 +485,27 @@ end
 
 # MO of object expression
 abstract class MOExprSite
-	super MOPropSite
+	# super MOPropSite
+	super MOSite
 	super MOExpr
 
 	redef type P: MOExprSitePattern
+end
+
+class MOAsNotNullSite
+	super MOExprSite
+
+	redef type P: MOAsNotNullPattern
+end
+
+# MO of .as(Type) expr
+class MOAsSubtypeSite
+	super MOSubtypeSite
+end
+
+# MO of isa expr
+class MOIsaSubtypeSite
+	super MOSubtypeSite
 end
 
 # MO of attribute access
@@ -495,12 +517,18 @@ end
 
 # MO of method call
 class MOCallSite
+	super MOPropSite
 	super MOExprSite
 
 	redef type P: MOCallSitePattern
 
 	# Values of each arguments
 	var given_args = new List[MOExpr]
+
+	redef fun pattern_factory(rst, gp)
+	do
+		return new MOCallSitePattern(rst, gp.as(MMethod))
+	end
 
 	redef fun pretty_print(file)
 	do
@@ -523,6 +551,11 @@ class MOReadSite
 
 	redef type P: MOReadSitePattern
 
+	redef fun pattern_factory(rst, gp)
+	do
+		return new MOReadSitePattern(rst, gp.as(MAttribute))
+	end
+
 	# Tell if the attribute is immutable, useless at the moment
 	var immutable = false
 end
@@ -532,6 +565,11 @@ class MOWriteSite
 	super MOAttrSite
 
 	redef type P: MOWriteSitePattern
+
+	redef fun pattern_factory(rst, gp)
+	do
+		return new MOWriteSitePattern(rst, gp.as(MAttribute))
+	end
 end
 
 # MO of null
@@ -549,6 +587,9 @@ redef class MClass
 	# List of patterns of subtypes test
 	var subtype_pattern = new List[MOSubtypeSitePattern]
 
+	# The only asnotnull pattern
+	var asnotnull_pattern: nullable MOAsNotNullPattern
+
 	# `self` is an instance of object
 	fun is_instance_of_object(vm:VirtualMachine): Bool
 	do
@@ -556,19 +597,29 @@ redef class MClass
 	end
 
 	# Create (if not exists) and set a pattern for object subtype sites
-	fun set_subtype_pattern(site: MOSubtypeSite, rst: MType)
+	fun set_asnotnull_pattern(site: MOAsNotNullSite): MOAsNotNullPattern
+	do
+		if asnotnull_pattern == null then
+			asnotnull_pattern = new MOAsNotNullPattern(mclass_type)
+		end
+
+		site.pattern = asnotnull_pattern.as(not null)
+		return asnotnull_pattern.as(not null)
+	end
+
+	fun set_subtype_pattern(site: MOSubtypeSite)
 	do
 		var pattern: nullable MOSubtypeSitePattern = null
 
 		for p in subtype_pattern do
-			if p.rst == rst and p.target == site.target then
+			if p.rst == mclass_type and p.target == site.target then
 				pattern = p
 				break
 			end
 		end
 
 		if pattern == null then
-			pattern = new MOSubtypeSitePattern(rst, site.target)
+			pattern = new MOSubtypeSitePattern(mclass_type, site.target)
 			subtype_pattern.add(pattern)
 		end
 
@@ -576,37 +627,20 @@ redef class MClass
 	end
 
 	# Create (if not exists) and set a pattern for objet prop sites
-	fun set_site_pattern(site: MOPropSite, rst: MType, gp: MProperty)
+	fun set_site_pattern(site: MOPropSite, gp: MProperty)
 	do
 		var pattern: nullable MOPropSitePattern = null
 
 		for p in sites_patterns do
-			if p isa MOCallSitePattern and not site isa MOCallSite then
-				continue
-			else if p isa MOReadSitePattern and not site isa MOReadSite then
-				continue
-			else if p isa MOWriteSitePattern and not site isa MOWriteSite then
-				continue
-			end
-
-			if p.gp == gp and p.rst == rst then
+			if p.gp == gp and p.rst == mclass_type and p.compatible_site(site) then
 				pattern = p
 				break
 			end
 		end
 
 		if pattern == null then
-			if site isa MOCallSite then
-				pattern = new MOCallSitePattern(rst, gp.as(MMethod))
-			else if site isa MOReadSite then
-				pattern = new MOReadSitePattern(rst, gp.as(MAttribute))
-			else if site isa MOWriteSite then
-				pattern = new MOWriteSitePattern(rst, gp.as(MAttribute))
-			else
-				abort
-			end
-
-			sites_patterns.add(pattern.as(not null))
+			pattern = site.pattern_factory(mclass_type, gp)
+			sites_patterns.add(pattern)
 		end
 
 		pattern.add_site(site)
@@ -722,15 +756,15 @@ end
 
 redef class AAttrFormExpr
 	# Return the MOEntity if it's already in the clone table
-	redef fun get_mo_from_clone_table: nullable MOEntity
-	do
-		var mo_entity = super
+	# redef fun get_mo_from_clone_table: nullable MOEntity
+	# do
+	# 	var mo_entity = super
 
-		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+	# 	if mo_entity != null then return mo_entity
+	# 	if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		return null
-	end
+	# 	return null
+	# end
 
 	redef fun get_receiver
 	do
@@ -749,7 +783,7 @@ redef class AAttrFormExpr
 		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(attr_site, recv_class.mclass_type, mproperty.as(not null))
+		recv_class.set_site_pattern(attr_site, mproperty.as(not null))
 
 		return attr_site
 	end
@@ -792,7 +826,7 @@ class ASubtypeExpr
 		if mo_entity != null then return mo_entity
 
 		var recv = get_receiver
-		if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
+		# if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
 
 		# TODO: be sure that cast_type is never null here
 		var cast_site = copy_site(mpropdef).as(MOSubtypeSite)
@@ -800,7 +834,7 @@ class ASubtypeExpr
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_subtype_pattern(cast_site, recv_class.mclass_type)
+		recv_class.set_subtype_pattern(cast_site)
 
 		return cast_site
 	end
@@ -815,16 +849,16 @@ redef class AIsaExpr
 	end
 
 	# Copy from AAttrFormExpr
-	redef fun get_mo_from_clone_table: nullable MOEntity
-	do
-		var mo_entity = super
+	# redef fun get_mo_from_clone_table: nullable MOEntity
+	# do
+	# 	var mo_entity = super
 
-		if mo_entity != null then return mo_entity
-		var recv = get_receiver
-		if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
+	# 	if mo_entity != null then return mo_entity
+	# 	# var recv = get_receiver
+	# 	# if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
 
-		return null
-	end
+	# 	return null
+	# end
 
 	redef fun copy_site(mpropdef: MPropDef): MOIsaSubtypeSite
 	do
@@ -848,16 +882,25 @@ redef class AAsCastExpr
 	end
 end
 
-#TODO: cast to null
 redef class AAsNotnullExpr
+	redef fun copy_site(mpropdef: MPropDef): MOAsNotNullSite
+	do
+		return new MOAsNotNullSite(self, mpropdef)
+	end
+
 	redef fun ast2mo(mpropdef)
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
-		var moexpr = n_expr.ast2mo(mpropdef)
+		var moexpr = copy_site(mpropdef)
 		sys.ast2mo_clone_table[self] = moexpr
+
+		moexpr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
+
+		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
+		recv_class.set_asnotnull_pattern(moexpr)
+
 		return moexpr
 	end
 end
@@ -964,7 +1007,7 @@ redef class ASendExpr
 		end
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(moattr, recv_class.mclass_type, called_node_ast.mpropdef.as(not null).mproperty)
+		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty)
 
 		return moattr
 	end
@@ -975,7 +1018,7 @@ redef class ASendExpr
 		var recv_class = cs.recv.get_mclass(vm).as(not null)
 		var mocallsite = new MOCallSite(self, mpropdef)
 
-		recv_class.set_site_pattern(mocallsite, recv_class.mclass_type, cs.mproperty)
+		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
 		return mocallsite
 	end
@@ -984,7 +1027,7 @@ redef class ASendExpr
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+		# if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
 		var cs = callsite.as(not null)
 
@@ -1035,7 +1078,7 @@ redef class AParExpr
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+		# if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
 		var moexpr = n_expr.ast2mo(mpropdef)
 		sys.ast2mo_clone_table[self] = moexpr
@@ -1048,7 +1091,7 @@ redef class AOnceExpr
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
+		# if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
 		var moexpr = n_expr.ast2mo(mpropdef)
 		sys.ast2mo_clone_table[self] = moexpr
