@@ -79,7 +79,7 @@ redef class MPropDef
 		for expr in exprs_preexist_mut do expr.init_preexist
 		exprs_preexist_mut.clear
 
-		if flag and not disable_method_return then for p in callers do p.as(MOExprSitePattern).propage_preexist
+		if flag and not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_preexist
 	end
 
 	# Drop exprs_npreesit_mut and set unknown state to all expression inside
@@ -94,7 +94,7 @@ redef class MPropDef
 		for expr in exprs_npreexist_mut do expr.init_preexist
 		exprs_npreexist_mut.clear
 
-		if flag and not disable_method_return then for p in callers do p.as(MOExprSitePattern).propage_npreexist
+		if flag and not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_npreexist
 	end
 
 	# Fill the correct list if the analysed preexistence if unperennial
@@ -127,13 +127,16 @@ redef class MMethodDef
 
 		if not preexist_analysed then
 			expr.set_npre_nper
-			return expr.preexist_expr_value
-		else if not expr.is_pre_unknown then
-			return expr.preexist_expr_value
-		else
+		else if expr.is_pre_unknown then
 			expr.set_recursive
-			return expr.preexist_expr_value
+			expr.preexist_expr
+
+			if expr.is_rec then
+				expr.set_pval_nper
+			end
 		end
+
+		return expr.preexist_expr_value
 	end
 
 	# Compute the preexistence of all invocation sites of the method
@@ -173,6 +176,8 @@ redef class MMethodDef
 				buff += "cast {site.pattern.rst} isa {site.target}"
 			else if site isa MOCallSite then
 				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
+			else if site isa MOAsNotNullSite then
+				buff += "cast not null {site.pattern.rst}"
 			else
 				abort
 			end
@@ -281,7 +286,8 @@ redef class MOExpr
 	fun is_rec: Bool do return preexist_expr_value == 0
 
 	# Return true if the expression preexists (recursive case is interpreted as preexistent)
-	fun is_pre: Bool do return preexist_expr_value.bin_and(1) == 1 or preexist_expr_value == 0
+	fun is_pre: Bool do return preexist_expr_value > 0 and preexist_expr_value.bin_and(1) == 1
+	#or preexist_expr_value == 0
 
 	# True true if the expression non preexists
 	fun is_npre: Bool do return not is_pre
@@ -307,6 +313,7 @@ redef class MOExpr
 	# Merge dependecies and preexistence state
 	fun merge_preexistence(expr: MOExpr): Int
 	do
+		# TODO: Si c'est npre_nper on retourne non_pre
 		if expr.is_npre_per then
 			set_npre_per
 		else if expr.is_rec then
@@ -344,7 +351,7 @@ end
 redef class MOAsSubtypeSite
 	redef fun preexist_expr
 	do
-		if is_pre_unknown then set_pval_per
+		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
 		return preexist_expr_value
 	end
 end
@@ -352,7 +359,15 @@ end
 redef class MOIsaSubtypeSite
 	redef fun preexist_expr
 	do
-		if is_pre_unknown then set_pval_per
+		if is_pre_unknown then set_npre_per
+		return preexist_expr_value
+	end
+end
+
+redef class MOAsNotNullSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
 		return preexist_expr_value
 	end
 end
@@ -505,7 +520,7 @@ redef class MOCallSite
 		else if pattern.callees.length == 0 then
 			set_npre_nper
 		else
-			preexist_expr_value = pmask_PVAL_PER
+			preexist_expr_value = pmask_UNKNOWN
 			for candidate in pattern.callees do
 				if candidate.is_intern or candidate.is_extern then
 					# WARNING
@@ -516,6 +531,7 @@ redef class MOCallSite
 				else if not candidate.preexist_analysed then
 					# The lp could be known by the model but not already compiled from ast to mo
 					# So, we must NOT check it's return_expr (it could be still null)
+					trace("WARNING, this should not happen")
 					set_npre_nper
 					break
 				else if not candidate.return_expr_is_object then
@@ -528,7 +544,13 @@ redef class MOCallSite
 				end
 
 				candidate.preexist_return
-				merge_preexistence(candidate.return_expr.as(not null))
+
+				if preexist_expr_value == pmask_UNKNOWN then
+					preexist_expr_value = candidate.return_expr.preexist_expr_value
+				else
+					merge_preexistence(candidate.return_expr.as(not null))
+				end
+
 				if is_npre_per then
 					break
 				else
@@ -552,7 +574,7 @@ redef class MOSite
 	end
 end
 
-redef class MOExprSitePattern
+redef class MOCallSitePattern
 	# If a LP no preexists and it's perexistence is perennial (unused while cuc > 0)
 	var perennial_status = false
 
@@ -583,7 +605,6 @@ redef class MOExprSitePattern
 				site.lp.preexist_analysed = false
 			end
 		end
-
 	end
 end
 

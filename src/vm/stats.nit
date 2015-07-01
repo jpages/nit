@@ -665,6 +665,11 @@ class MOStats
 		map["cast_preexist_null"] = 0
 		map["cast_npreexist_null"] = 0
 
+		map["asnotnull"] = 0
+		map["asnotnull_preexist"] = 0
+		map["asnotnull_preexist_primitive"] = 0
+		map["asnotnull_npreexist"] = 0
+
 		map["call_with_cuc_pos"] = 0
 		map["call_with_cuc_null"] = 0
 
@@ -692,6 +697,33 @@ class MOStats
 	end
 end
 
+redef class MOExpr
+	fun pretty_print_expr(file: FileWriter)
+	do
+		file.write("{self} Preexistence expr {preexist_expr_value} is pre = {is_pre}, is_rec = {is_rec}\n")
+	end
+end
+
+redef class MOSSAVar
+	redef fun pretty_print_expr(file)
+	do
+		super
+		file.write(" {self.variable.name} with dep ")
+		dependency.pretty_print(file)
+	end
+end
+
+redef class MOPhiVar
+	redef fun pretty_print_expr(file)
+	do
+		super
+		file.write(" {self.variable.name} with deps ")
+		for dep in dependencies do
+			dep.pretty_print_expr(file)
+		end
+	end
+end
+
 redef class MOSite
 	# Type of the site (method, attribute or cast)
 	var site_type: String is noinit
@@ -712,7 +744,6 @@ redef class MOSite
 			incr_self
 			incr_rst_unloaded(vm)
 			incr_type_impl(vm)
-
 
 			if print_site_state then
 				var buf = "site {self}\n"
@@ -754,7 +785,10 @@ redef class MOSite
 	end
 
 	#
-	fun incr_preexist(vm: VirtualMachine) do
+	fun incr_preexist(vm: VirtualMachine)
+	do
+		expr_recv.preexist_expr
+
 		var pre = expr_recv.is_pre
 
 		if pre and origin.from_primitive then
@@ -891,14 +925,25 @@ redef class MOSite
 
 	redef fun pretty_print(file)
 	do
-		file.write("preexistence of {self} [is pre = {expr_recv.is_pre}]")
-		if expr_recv isa MOVar then
-			file.write("receiver MOVAR {expr_recv.as(MOVar).variable.name}")
-			if expr_recv isa MOSSAVar then file.write(" with dep {expr_recv.as(MOSSAVar).dependency}")
-		else
-			file.write("receiver {expr_recv}")
-		end
+		file.write(self.to_s)
+		file.write(" receiver \{\{")
+		expr_recv.pretty_print_expr(file)
+		file.write("\}\}")
 	end
+end
+
+redef class MOExprSite
+	redef fun pretty_print(file)
+	do
+		super
+		file.write(" return [[")
+		pretty_print_expr(file)
+		file.write("]]")
+	end
+end
+
+redef class MOCallSite
+	redef var site_type = "method"
 end
 
 redef class AExpr
@@ -937,10 +982,6 @@ redef class MOPropSite
 	redef fun pattern2str do return "{pattern.rst}::{pattern.gp}"
 end
 
-redef class MOCallSite
-	redef var site_type = "method"
-end
-
 redef class MOAttrSite
 	redef var site_type = "attribute"
 end
@@ -949,6 +990,30 @@ redef class MOSubtypeSite
 	redef fun pattern2str do return "{pattern.rst}->{pattern.target}"
 
 	redef var site_type = "cast"
+end
+
+redef class MOAsNotNullSite
+	redef fun pattern2str do return "{pattern.rst}->not null"
+
+	redef var site_type = "asnotnull"
+
+	redef fun incr_type_impl(vm: VirtualMachine)
+	do
+	end
+
+	redef fun incr_from_site do	end
+
+	redef fun incr_concrete_site(vm: VirtualMachine)
+	do
+	end
+
+	redef fun incr_self
+	do
+	end
+
+	redef fun incr_rst_unloaded(vm: VirtualMachine)
+	do
+	end
 end
 
 redef class MPropDef
