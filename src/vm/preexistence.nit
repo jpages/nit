@@ -270,9 +270,6 @@ redef class MOExpr
 	fun is_rec: Bool do return preexist_expr_value == 0
 
 	# Return true if the expression preexists (recursive case is interpreted as preexistent)
-	#fun is_pre: Bool do return preexist_expr_value > 0 and preexist_expr_value.bin_and(1) == 1
-	#or preexist_expr_value == 0
-
 	fun is_pre: Bool do return expr_preexist.bit_pre
 
 	# True true if the expression non preexists
@@ -443,6 +440,11 @@ end
 redef class MOCallSite
 	redef fun compute_preexist
 	do
+		# If the preexistence extension is deactivated, the callsite is not preexistant
+		if disable_preexistence_extensions or disable_method_return then
+			return 8
+		end
+
 		if pattern.cuc > 0 then return 8
 
 		var callees: nullable List[MPropDef]
