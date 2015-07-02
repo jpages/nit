@@ -818,6 +818,8 @@ end
 redef class AAsNotnullExpr
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
+		ssa.propdef.object_sites.add(self)
+
 		return self.n_expr.generate_basic_blocks(ssa, old_block)
 	end
 end
@@ -871,6 +873,8 @@ redef class ASuperExpr
 		# Recursively goes into arguments to find variables if any
 		for arg in self.n_args.n_exprs do arg.generate_basic_blocks(ssa, old_block)
 
+		ssa.propdef.object_sites.add(self)
+
 		return old_block
 	end
 end
@@ -899,6 +903,7 @@ redef class AAttrAssignExpr
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
 		ssa.propdef.object_sites.add(self)
+		self.n_value.generate_basic_blocks(ssa, old_block)
 
 		return self.n_expr.generate_basic_blocks(ssa, old_block)
 	end
@@ -908,6 +913,7 @@ redef class AAttrReassignExpr
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
 		ssa.propdef.object_sites.add(self)
+		self.n_value.generate_basic_blocks(ssa, old_block)
 
 		return self.n_expr.generate_basic_blocks(ssa, old_block)
 	end
@@ -916,6 +922,8 @@ end
 redef class AIssetAttrExpr
 	redef fun generate_basic_blocks(ssa, old_block)
 	do
+		ssa.propdef.object_sites.add(self)
+
 		return self.n_expr.generate_basic_blocks(ssa, old_block)
 	end
 end

@@ -29,13 +29,13 @@ redef class Sys
 	var var2mo_clone_table = new HashMap[Variable, MOVar]
 
 	# Singleton of MONull
-	var monull = new MONull is lazy
+	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
 	# Singleton of MOPrimitive
-	var moprimitive = new MOPrimitive is lazy
+	var moprimitive = new MOPrimitive(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
 	# Singleton of MOLiteral
-	var moliteral = new MOLit is lazy
+	var moliteral = new MOLit(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 end
 
 redef class ModelBuilder
@@ -226,13 +226,15 @@ redef class MPropDef
 	# Compile the property
 	fun compile_mo
 	do
+		sys.vm.compiled_mproperties.add(self)
+
 		for pattern in callers do
 			pattern.cuc -= 1
 		end
 	end
 
 	# Return expression of the propdef (null if procedure)
-	var return_expr: nullable MOExpr is noinit, writable
+	var return_expr: nullable MOVar is noinit, writable
 
 	# An object is never return if return_expr is not a MOVar
 	fun return_expr_is_object: Bool do return return_expr isa MOVar
@@ -274,6 +276,10 @@ end
 
 # Root hierarchy of MO entities
 abstract class MOEntity
+
+	# The local property containing this expression
+	var lp: MPropDef
+
 	fun pretty_print(file: FileWriter)
 	do
 	end
@@ -282,6 +288,11 @@ end
 # Root hierarchy of expressions
 abstract class MOExpr
 	super MOEntity
+
+	init
+	do
+		sys.vm.all_moexprs.add(self)
+	end
 end
 
 # MO of variables
@@ -368,11 +379,9 @@ class MOParam
 end
 
 # MO of instantiation sites
+#TODO: compute_concretes à définir ici
 class MONew
 	super MOExpr
-
-	# The local property containing this site
-	var lp: MPropDef
 
 	# The pattern of this site
 	var pattern: MONewPattern is writable, noinit
@@ -417,9 +426,6 @@ abstract class MOSite
 	# The expression of the receiver
 	var expr_recv: MOExpr is noinit, writable
 
-	# The local property containing this expression
-	var lp: MPropDef
-
 	# The pattern using by this expression site
 	var pattern: P is writable, noinit
 
@@ -433,6 +439,7 @@ abstract class MOSite
 	private fun compute_concretes
 	do
 		if expr_recv isa MOVar then
+			# TODO
 			if not expr_recv.as(MOVar).compute_concretes(concretes_receivers.as(not null)) then
 				concretes_receivers.as(not null).clear
 			end
@@ -451,6 +458,7 @@ abstract class MOSite
 
 	init(ast: AExpr, mpropdef: MPropDef)
 	do
+		super(mpropdef)
 		self.ast = ast
 		lp = mpropdef
 		lp.mosites.add(self)
@@ -661,6 +669,11 @@ redef class VirtualMachine
 	# The top of list is the type of the receiver that will be used after new_frame
 	var next_receivers = new List[MType]
 
+	# All living MPropDef
+	var compiled_mproperties = new List[MPropDef]
+
+	var all_moexprs = new List[MOExpr]
+
 	redef fun new_frame(node, mpropdef, args)
 	do
 		next_receivers.push(args.first.mtype)
@@ -668,7 +681,6 @@ redef class VirtualMachine
 		next_receivers.pop
 		return ret
 	end
-
 end
 
 redef class MType
@@ -758,17 +770,6 @@ redef class AExpr
 end
 
 redef class AAttrFormExpr
-	# Return the MOEntity if it's already in the clone table
-	# redef fun get_mo_from_clone_table: nullable MOEntity
-	# do
-	# 	var mo_entity = super
-
-	# 	if mo_entity != null then return mo_entity
-	# 	if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
-
-	# 	return null
-	# end
-
 	redef fun get_receiver
 	do
 		return n_expr
@@ -915,11 +916,11 @@ redef class Variable
 		if sys.var2mo_clone_table.has_key(self) then return sys.var2mo_clone_table[self]
 
 		if dep_exprs.length == 0 and parameter then
-			var moparam = new MOParam(self, position)
+			var moparam = new MOParam(mpropdef, self, position)
 			sys.var2mo_clone_table[self] = moparam
 			return moparam
 		else if dep_exprs.length == 1 or dep_exprs.length == 0 then
-			var mossa = new MOSSAVar(self, position)
+			var mossa = new MOSSAVar(mpropdef, self, position)
 			sys.var2mo_clone_table[self] = mossa
 
 			if dep_exprs.length == 0 then
@@ -931,7 +932,7 @@ redef class Variable
 			return mossa
 		else
 			assert dep_exprs.length > 1
-			var mophi = new MOPhiVar(self, position)
+			var mophi = new MOPhiVar(mpropdef, self, position)
 			sys.var2mo_clone_table[self] = mophi
 
 			for dep in dep_exprs do mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
@@ -961,7 +962,7 @@ redef class ASelfExpr
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
 
-		var movar = new MOParam(variable.as(not null), 0)
+		var movar = new MOParam(mpropdef, variable.as(not null), 0)
 		sys.ast2mo_clone_table[self] = movar
 		return movar
 	end
@@ -1116,7 +1117,7 @@ redef class ASuperExpr
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
 
-		var mosuper = new MOSuper
+		var mosuper = new MOSuper(mpropdef)
 		sys.ast2mo_clone_table[self] = mosuper
 		return mosuper
 	end

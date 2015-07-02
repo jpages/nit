@@ -444,7 +444,7 @@ redef class MPropDef
 				# Change the dependences, the receiver should be a MOVar
 				if not params.has_key(site.expr_recv) then
 					# Create a new MOVar and set its dependences
-					var movar = new MOSSAVar(new Variable("param"), 0)
+					var movar = new MOSSAVar(self, new Variable("param"), 0)
 
 					var moexpr = send.raw_arguments[i].ast2mo(self)
 					movar.dependency = moexpr.as(MOExpr)

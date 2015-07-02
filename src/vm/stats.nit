@@ -84,9 +84,15 @@ redef class ModelBuilder
 			dump_location = new FileWriter.open("mo-stats-location")
 		end
 
-		for site in pstats.analysed_sites do
+		for expr in sys.vm.all_moexprs do expr.preexist_init
+
+		for site in pstats.analysed_sites
+		do
 			site.lp.preexist_analysed = false
 			site.preexist_site
+
+			site.site_preexist
+
 			site.impl = null
 			site.get_impl(sys.vm)
 			site.stats(sys.vm)
@@ -387,7 +393,8 @@ class MOStats
 		var trace_file = new FileWriter.open("trace_file.txt")
 		var trace_model = new FileWriter.open("trace_model.txt")
 
-		for propdef in living_propdefs do
+		for propdef in sys.vm.compiled_mproperties do
+			assert propdef isa MMethodDef
 			if propdef.callers.length > 0 then
 				if propdef.callers.first.cuc == 0 then
 					cuc_null += 1
@@ -400,7 +407,7 @@ class MOStats
 			trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
 
 			if propdef.return_expr != null then
-				trace_file.write("preexistence {propdef.preexist_return}\n")
+				trace_file.write("preexistence {propdef.return_expr.return_preexist}\n")
 			end
 
 			var node = sys.vm.modelbuilder.mpropdef2node(propdef)
@@ -419,7 +426,7 @@ class MOStats
 				trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
 
 				if propdef.return_expr != null then
-					trace_model.write("preexistence {propdef.preexist_return}\n")
+					trace_model.write("preexistence {propdef.return_expr.return_preexist}\n")
 				end
 
 				trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
@@ -716,7 +723,7 @@ end
 redef class MOExpr
 	fun pretty_print_expr(file: FileWriter)
 	do
-		file.write("{self} Preexistence expr {preexist_expr_value} is pre = {is_pre}, is_rec = {is_rec}\n")
+		file.write("{self} Preexistence expr {expr_preexist} is pre = {is_pre}\n")
 	end
 end
 
