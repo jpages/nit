@@ -393,6 +393,11 @@ class MOStats
 		var trace_file = new FileWriter.open("trace_file.txt")
 		var trace_model = new FileWriter.open("trace_model.txt")
 
+		# Statistics on method returns
+		var nb_method_return = 0 # A method with a return
+		var nb_method_return_pre = 0 # A method with a preexisting return
+		var nb_method_return_npre = 0 # A method with a non-preexisting return
+
 		for propdef in sys.vm.compiled_mproperties do
 			assert propdef isa MMethodDef
 			if propdef.callers.length > 0 then
@@ -403,59 +408,16 @@ class MOStats
 				end
 			end
 
-			# Trace of Julien's model
-			trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
-
+			# Debug the two model
+			debug_model(propdef, trace_file, trace_model)
 			if propdef.return_expr != null then
-				trace_file.write("preexistence {propdef.return_expr.return_preexist}\n")
-			end
+				nb_method_return += 1
 
-			var node = sys.vm.modelbuilder.mpropdef2node(propdef)
-			if node isa APropdef then
-				trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
-
-				for v in node.variables do
-					trace_file.write("\t")
-
-					v.pretty_print(trace_file)
-					trace_file.write("\n")
-				end
-				trace_file.write("\n")
-
-				# trace of Colin's model
-				trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
-
-				if propdef.return_expr != null then
-					trace_model.write("preexistence {propdef.return_expr.return_preexist}\n")
-				end
-
-				trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
-
-				for site in propdef.mosites do
-					trace_model.write("\t")
-
-					site.pretty_print(trace_model)
-					trace_model.write("\n")
-				end
-				trace_model.write("\n")
-
-
-				# Verify variables of the two models
-				var i = 0
-				if propdef.variables.length != node.variables.length then
-					print "Problem in {propdef} {node.location}"
-					print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
+				# If the propdef has a preexisting returns
+				if propdef.return_expr.return_preexist.bit_pre and propdef.callers.cuc == 0 then
+					nb_method_return_pre += 1
 				else
-					for variable in node.variables do
-						trace_model.write("MOVAR"+i.to_s+"\n\t")
-						propdef.variables[i].pretty_print_expr(trace_model)
-						trace_model.write("\n")
-
-						trace_model.write("Variable"+i.to_s+"\n\t")
-						variable.pretty_print(trace_model)
-						trace_model.write("\n")
-						i += 1
-					end
+					nb_method_return_npre += 1
 				end
 			end
 		end
@@ -484,6 +446,11 @@ class MOStats
 		file.write("new sites, {map["new_sites"]}\n")
 		file.write("object sites, {map["object_sites"]}\n")
 
+		file.write("\n")
+		file.write("methods with a return, {nb_method_return}\n")
+		file.write("methods with a preexisting return, {nb_method_return_pre}\n")
+		file.write("methods with a non-preexisting return, {nb_method_return_npre}\n")
+
 		file.close
 	end
 
@@ -497,6 +464,66 @@ class MOStats
 		ret += "--------------------------------------------------------\n"
 
 		return ret
+	end
+
+	fun debug_model(propdef: MPropDef, trace_file: FileWriter, trace_model: FileWriter)
+	do
+		# Trace of Julien's model
+		trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
+
+		if propdef.return_expr != null then
+			trace_file.write("preexistence {propdef.return_expr.return_preexist}\n")
+		end
+
+		# Get the corresponding APropdef
+		var node = sys.vm.modelbuilder.mpropdef2node(propdef)
+		if node isa APropdef then
+			trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
+
+			for v in node.variables do
+				trace_file.write("\t")
+
+				v.pretty_print(trace_file)
+				trace_file.write("\n")
+			end
+			trace_file.write("\n")
+
+			# trace of Colin's model
+			trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
+
+			if propdef.return_expr != null then
+				trace_model.write("preexistence {propdef.return_expr.return_preexist}\n")
+			end
+
+			trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
+
+			for site in propdef.mosites do
+				trace_model.write("\t")
+
+				site.pretty_print(trace_model)
+				trace_model.write("\n")
+			end
+			trace_model.write("\n")
+
+
+			# Verify variables of the two models
+			var i = 0
+			if propdef.variables.length != node.variables.length then
+				print "Problem in {propdef} {node.location}"
+				print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
+			else
+				for variable in node.variables do
+					trace_model.write("MOVAR"+i.to_s+"\n\t")
+					propdef.variables[i].pretty_print_expr(trace_model)
+					trace_model.write("\n")
+
+					trace_model.write("Variable"+i.to_s+"\n\t")
+					variable.pretty_print(trace_model)
+					trace_model.write("\n")
+					i += 1
+				end
+			end
+		end
 	end
 
 	# Copy counters who not depends of the world state
@@ -788,7 +815,8 @@ redef class MOSite
 	fun pattern2str: String is abstract
 
 	# Print location of a site
-	fun dump_location_site do
+	fun dump_location_site
+	do
 		# dump_location is null of first compilation, and set for last compilation
 		if dump_location != null and (site_type == "cast" or (site_type == "method" and pattern.as(MOPropSitePattern).gp.name == "pop"))then
 			var from2str = ""
