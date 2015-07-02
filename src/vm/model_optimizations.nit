@@ -242,6 +242,9 @@ redef class MPropDef
 
 	# List of object sites in this local property
 	var mosites = new List[MOSite]
+
+	# All MOVar inside the mpropdef, including self and returnvar
+	var variables: Array[MOVar] = new Array[MOVar]
 end
 
 redef class MMethod
@@ -907,7 +910,7 @@ end
 
 redef class Variable
 	# Create the movar corresponding to AST node, and return it
-	fun get_movar(mpropdef: MPropDef, node: ANode): MOVar
+	fun get_movar(mpropdef: MPropDef): MOVar
 	do
 		if sys.var2mo_clone_table.has_key(self) then return sys.var2mo_clone_table[self]
 
@@ -967,7 +970,7 @@ end
 redef class AVarExpr
 	redef fun ast2mo(mpropdef)
 	do
-		return variable.as(not null).get_movar(mpropdef, self)
+		return variable.as(not null).get_movar(mpropdef)
 	end
 end
 
@@ -979,11 +982,19 @@ redef class APropdef
 
 		if self isa AMethPropdef then
 
+			# Compile all object-mechanisms sites
 			for site in object_sites do
 				site.ast2mo(mpropdef.as(not null))
 			end
 
-			mpropdef.return_expr = returnvar.get_movar(mpropdef.as(not null), self)
+			# Transform all Variable into MOVar
+			mpropdef.variables = new Array[MOVar]
+			for variable in variables do
+				var movar = variable.get_movar(mpropdef.as(not null))
+				mpropdef.variables.add(movar)
+			end
+
+			mpropdef.return_expr = returnvar.get_movar(mpropdef.as(not null))
 
 			mpropdef.compile_mo
 		end

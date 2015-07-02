@@ -85,7 +85,6 @@ redef class ModelBuilder
 		end
 
 		for site in pstats.analysed_sites do
-			# WARN: this cast is always true for now, but we need to put preexist_analysed on MPropDef when we'll analysed attribute with body.
 			site.lp.preexist_analysed = false
 			site.preexist_site
 			site.impl = null
@@ -397,44 +396,61 @@ class MOStats
 				end
 			end
 
-			# if propdef.name == "pop" or propdef.name == "action" then
-				# Trace of Julien's model
-				trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
+			# Trace of Julien's model
+			trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
+
+			if propdef.return_expr != null then
+				trace_file.write("preexistence {propdef.preexist_return}\n")
+			end
+
+			var node = sys.vm.modelbuilder.mpropdef2node(propdef)
+			if node isa APropdef then
+				trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
+
+				for v in node.variables do
+					trace_file.write("\t")
+
+					v.pretty_print(trace_file)
+					trace_file.write("\n")
+				end
+				trace_file.write("\n")
+
+				# trace of Colin's model
+				trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
 
 				if propdef.return_expr != null then
-					trace_file.write("preexistence {propdef.preexist_return}\n")
+					trace_model.write("preexistence {propdef.preexist_return}\n")
 				end
 
-				var node = sys.vm.modelbuilder.mpropdef2node(propdef)
-				if node isa APropdef then
-					trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
+				trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
 
-					for v in node.variables do
-						trace_file.write("\t")
+				for site in propdef.mosites do
+					trace_model.write("\t")
 
-						v.pretty_print(trace_file)
-						trace_file.write("\n")
-					end
-					trace_file.write("\n")
-
-					# trace of Colin's model
-					trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
-
-					if propdef.return_expr != null then
-						trace_model.write("preexistence {propdef.preexist_return}\n")
-					end
-
-					trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
-
-					for site in propdef.mosites do
-						trace_model.write("\t")
-
-						site.pretty_print(trace_model)
-						trace_model.write("\n")
-					end
+					site.pretty_print(trace_model)
 					trace_model.write("\n")
 				end
-			# end
+				trace_model.write("\n")
+
+
+				# Verify variables of the two models
+				var i = 0
+				if propdef.variables.length != node.variables.length then
+					print "Problem in {propdef} {node.location}"
+					print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
+				else
+					for variable in node.variables do
+						trace_model.write("MOVAR"+i.to_s+"\n\t")
+						propdef.variables[i].pretty_print_expr(trace_model)
+						trace_model.write("\n")
+
+						trace_model.write("Variable"+i.to_s+"\n\t")
+						variable.pretty_print(trace_model)
+						trace_model.write("\n")
+						i += 1
+					end
+				end
+			end
 		end
 
 		trace_file.close
@@ -787,8 +803,6 @@ redef class MOSite
 	#
 	fun incr_preexist(vm: VirtualMachine)
 	do
-		expr_recv.preexist_expr
-
 		var pre = expr_recv.is_pre
 
 		if pre and origin.from_primitive then

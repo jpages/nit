@@ -228,7 +228,7 @@ fun pmask_NPRE_NPER: Int do return 8
 fun pmask_RECURSIV: Int do return 0
 
 # Preexistence mask of unknown preexistence
-fun pmask_UNKNOWN: Int do return -1
+fun pmask_UNKNOWN: Int do return 255
 
 redef class MOExpr
 	# The cached preexistence of the expression (the return of the expression)

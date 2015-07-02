@@ -475,11 +475,11 @@ redef class AAttrPropdef
 		basic_block.first = self
 		basic_block.last = self
 
-		# Add the return variable
-		variables.add(returnvar)
-
 		# Add the self variable
 		if self.selfvariable != null then variables.add(selfvariable.as(not null))
+
+		# Add the return variable
+		variables.add(returnvar)
 
 		# Recursively goes into the nodes
 		if n_block != null then
@@ -496,6 +496,9 @@ redef class AMethPropdef
 		basic_block.first = self
 		basic_block.last = self
 
+		# Add the self variable
+		if self.selfvariable != null then variables.add(selfvariable.as(not null))
+
 		# If the method has a signature
 		if n_signature != null then
 			for p in n_signature.n_params do
@@ -507,9 +510,6 @@ redef class AMethPropdef
 
 		# Add the return variable
 		variables.add(returnvar)
-
-		# Add the self variable
-		if self.selfvariable != null then variables.add(selfvariable.as(not null))
 
 		# Recursively goes into the nodes
 		if n_block != null then
