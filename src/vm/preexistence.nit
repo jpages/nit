@@ -47,16 +47,6 @@ redef class VirtualMachine
 	end
 end
 
-redef class Int
-	# Display 8 lower bits of preexitence value
-	fun preexists_bits: Array[Int]
-	do
-		var bs = bits.reversed
-		for i in [0..23] do bs.shift
-		return bs
-	end
-end
-
 redef class MPropDef
 	# Tell if preexistance analysis is done
 	var preexist_analysed: Bool = false is writable
@@ -66,6 +56,8 @@ redef class MPropDef
 
 	# List of mutable non preexists expressions
 	var exprs_npreexist_mut = new List[MOExpr]
+
+	var preexist_mut_exprs = new List[MOExpr]
 
 	# Drop exprs_preesit_mut and set unknown state to all expression inside
 	# If the return_expr is in it, recurse on callers
@@ -78,6 +70,7 @@ redef class MPropDef
 
 		for expr in exprs_preexist_mut do expr.init_preexist
 		exprs_preexist_mut.clear
+		preexist_mut_exprs.clear
 
 		if flag and not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_preexist
 	end
@@ -93,6 +86,7 @@ redef class MPropDef
 
 		for expr in exprs_npreexist_mut do expr.init_preexist
 		exprs_npreexist_mut.clear
+		preexist_mut_exprs.clear
 
 		if flag and not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_npreexist
 	end
@@ -108,127 +102,117 @@ redef class MPropDef
 			end
 		end
 	end
-
-	# TODO: make preexistence analysis on attributes with body too
-	redef fun compile_mo
-	do
-		super
-
-		if self isa MMethodDef then preexist_all(vm)
-	end
 end
 
-redef class MMethodDef
-	# Compute the preexistence of the return of the method expression
-	fun preexist_return: Int
+redef class Int
+	# bit 1 preexistence
+	# bit 2 immutable (si pre)
+	# bit 3 value preexistence
+	# bit 4 non-preexistence
+	# bit 5 immutable (si non-pre)
+	# bit 6 recursif
+	# bit 7 self
+	# bit >7 autres paramètres
+	# bit 1-3 -> and
+	# bit 4-- -> or
+	fun check_preexist: Bool
 	do
-		# preexist_return is called only when return_expr is not null
-		var expr = return_expr.as(not null)
-
-		if not preexist_analysed then
-			expr.set_npre_nper
-		else if expr.is_pre_unknown then
-			expr.set_recursive
-			expr.preexist_expr
-
-			if expr.is_rec then
-				expr.set_pval_nper
-			end
+		# invariant d'une préexistence complètement calculée
+		var low = bin_and(63)
+		var preexist_values = once [0,1,0,3,0,5,0,7,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+		if low != preexist_values[low] then
+			print("Preexistence of {self} = {low}")
+			return false
 		end
 
-		return expr.preexist_expr_value
-	end
-
-	# Compute the preexistence of all invocation sites of the method
-	# Return true if the method is analysed, false otherwise (already compiled, extern or extern method)
-	#
-	# WARNING!
-	# The VM can't interpret FFI code, so intern/extern methods are not analysed,
-	# and a expression using a receiver from intern/extern method is preexistent.
-	#
-	fun preexist_all(vm: VirtualMachine): Bool
-	do
-		if preexist_analysed or is_intern or is_extern then return false
-		preexist_analysed = true
-
-		trace("\npreexist_all of {self}")
-		var preexist: Int
-
-		if not disable_preexistence_extensions then
-			for newexpr in monews do
-				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
-
-				preexist = newexpr.preexist_expr
-				fill_nper(newexpr)
-				trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
+		if self > 32 then
+			if not low < 8 then
+				print("Preexistence of {self} = {low}")
+				return false
 			end
 		end
-
-		for site in mosites do
-			preexist = site.preexist_site
-			var buff = "\tpreexist of "
-
-			fill_nper(site.expr_recv)
-
-			if site isa MOAttrSite then
-				buff += "attr {site.pattern.rst}.{site.pattern.gp}"
-			else if site isa MOSubtypeSite then
-				buff += "cast {site.pattern.rst} isa {site.target}"
-			else if site isa MOCallSite then
-				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
-			else if site isa MOAsNotNullSite then
-				buff += "cast not null {site.pattern.rst}"
-			else
-				abort
-			end
-
-			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
-			trace(buff)
-			trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
-		end
-
-		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
-		if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
 
 		return true
 	end
+
+	fun bit_param(n: Int): Bool
+	do
+		return bin_and(64.lshift(n)) > 0
+	end
+
+	fun bit_rec: Bool
+	do
+		return bin_and(32) == 32
+	end
+
+	fun bit_pre: Bool
+	do
+		return bin_and(1) == 1
+	end
+
+	fun bit_pre_immut : Bool
+	do
+		return bin_and(2) == 2
+	end
+
+	fun bit_pre_val: Bool
+	do
+		return bin_and(4) == 4
+	end
+
+	fun bit_npre: Bool
+	do
+		return bin_and(8) == 8
+	end
+
+	fun bit_npre_immut: Bool do
+		return bin_and(16) == 16
+	end
+
+	fun bit_mut: Bool do
+		return bin_and(18) == 0
+	end
+
+	fun bit_immut: Bool do
+		return bin_and(18) > 0
+	end
+
+	fun bit_unknown: Bool do
+		return self < 0
+	end
+
+	fun merge(n: Int): Int
+	do
+
+		check_preexist
+		n.check_preexist
+
+		var low = bin_and(n)
+		var high = bin_or(n)
+
+		if high.bit_npre then return high.bin_and(24)
+		if high.bit_rec then return 32
+
+		high.check_preexist
+		if low.bit_pre_immut != high.bit_pre_immut then
+			high = high.bin_and(-3)
+		end
+
+		if low.bit_pre_val != high.bit_pre_val then
+			high = high.bin_and(-5)
+		end
+
+		return high
+	end
+
+	# Display 8 lower bits of preexitence value
+	fun preexists_bits: Array[Int]
+	do
+		var bs = bits.reversed
+		for i in [0..23] do bs.shift
+		return bs
+	end
 end
-
-# Preexistence masks
-# PVAL_PER:	0...1111
-# PTYPE_PER:	0...1101
-# PVAL_NPER:	0...1011
-# PTYPE_NPER:	0...1001
-# NPRE_PER:	0...1100
-# NPRE_NPER:	0...1000
-# RECURSIV:	0...0000
-# PRE_PER:	0...0101
-# PRE_NPER:	0...0001
-# UNKNOWN:	1...
-
-# Preexistence mask of perennial value preexistence
-fun pmask_PVAL_PER: Int do return 15
-
-# Preexistence mask of perennial type preexistence
-fun pmask_PTYPE_PER: Int do return 13
-
-# Preexistence mask of no perennial value preexistence
-fun pmask_PVAL_NPER: Int do return 11
-
-# Preexistence mask of no perennial type preexistence
-fun pmask_PTYPE_NPER: Int do return 9
-
-# Preexistence mask of perennial no preexistence
-fun pmask_NPRE_PER: Int do return 12
-
-# Preexistence mask of no perennial no preexistence
-fun pmask_NPRE_NPER: Int do return 8
-
-# Preexistence mask of recursive calls
-fun pmask_RECURSIV: Int do return 0
-
-# Preexistence mask of unknown preexistence
-fun pmask_UNKNOWN: Int do return 255
 
 redef class MOExpr
 	# The cached preexistence of the expression (the return of the expression)
@@ -286,8 +270,10 @@ redef class MOExpr
 	fun is_rec: Bool do return preexist_expr_value == 0
 
 	# Return true if the expression preexists (recursive case is interpreted as preexistent)
-	fun is_pre: Bool do return preexist_expr_value > 0 and preexist_expr_value.bin_and(1) == 1
+	#fun is_pre: Bool do return preexist_expr_value > 0 and preexist_expr_value.bin_and(1) == 1
 	#or preexist_expr_value == 0
+
+	fun is_pre: Bool do return expr_preexist.bit_pre
 
 	# True true if the expression non preexists
 	fun is_npre: Bool do return not is_pre
@@ -310,10 +296,11 @@ redef class MOExpr
 	# Initialize preexist_cache to UNKNOWN
 	fun init_preexist do preexist_expr_value = pmask_UNKNOWN
 
+	fun preexist_init do preexist_value = -1
+
 	# Merge dependecies and preexistence state
 	fun merge_preexistence(expr: MOExpr): Int
 	do
-		# TODO: Si c'est npre_nper on retourne non_pre
 		if expr.is_npre_per then
 			set_npre_per
 		else if expr.is_rec then
@@ -330,93 +317,70 @@ redef class MOExpr
 
 		return preexist_expr_value
 	end
-end
 
-redef class MOSuper
-	redef fun preexist_expr
-	do
-		if is_pre_unknown then set_pval_per
-		return preexist_expr_value
-	end
-end
+	# The default value of preexistence
+	var preexist_value: Int = -1
 
-redef class MOLit
-	redef fun preexist_expr
+	fun expr_preexist: Int
 	do
-		if is_pre_unknown then set_pval_per
-		return preexist_expr_value
-	end
-end
+		if preexist_value.bit_unknown then
 
-redef class MOAsSubtypeSite
-	redef fun preexist_expr
-	do
-		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
-		return preexist_expr_value
-	end
-end
+			preexist_value = compute_preexist
 
-redef class MOIsaSubtypeSite
-	redef fun preexist_expr
-	do
-		if is_pre_unknown then set_npre_per
-		return preexist_expr_value
-	end
-end
+			if not preexist_value.check_preexist then
+				print "{self}"
+			end
 
-redef class MOAsNotNullSite
-	redef fun preexist_expr
-	do
-		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
-		return preexist_expr_value
+			if preexist_value.bit_mut then lp.preexist_mut_exprs.add(self)
+		end
+
+		return preexist_value
 	end
+
+	fun compute_preexist: Int is abstract
 end
 
 redef class MOParam
 	redef var preexist_expr_value = pmask_PVAL_PER
 
-	init do set_dependency_flag(offset)
-
-	redef fun init_preexist do end
-
-	redef fun preexist_expr do return preexist_expr_value
-end
-
-redef class MONew
-	redef fun init_preexist do
-		if disable_preexistence_extensions then
-			set_npre_per
-		else if pattern.is_loaded then
-			set_ptype_per
-		else
-			set_npre_nper
-		end
-	end
-
-	redef fun preexist_expr do
-		if is_pre_unknown then init_preexist
-		return preexist_expr_value
-	end
-end
-
-redef class MONull
-	redef var preexist_expr_value = pmask_PVAL_PER
-
-	redef fun init_preexist do end
-
-	redef fun preexist_expr do return preexist_expr_value
-
-end
-
-redef class MOPrimitive
-	redef fun preexist_expr
+	init
 	do
-		if is_pre_unknown then set_pval_per
-		return preexist_expr_value
+		set_dependency_flag(offset)
+	end
+
+	redef fun compute_preexist
+	do
+		preexist_value = 64.lshift(offset)+7
+		preexist_value.check_preexist
+
+		return preexist_value
+	end
+
+	redef fun preexist_expr do return preexist_expr_value
+end
+
+redef class MOVar
+	fun return_preexist: Int
+	do
+		if preexist_value.bit_unknown then
+			preexist_value = 32
+
+			preexist_value = compute_preexist
+			if not preexist_value.check_preexist then print(self.to_s)
+
+			if preexist_value.bit_mut then lp.preexist_mut_exprs.add(self)
+		end
+
+		return preexist_value
 	end
 end
 
 redef class MOSSAVar
+	redef fun compute_preexist
+	do
+		return dependency.expr_preexist
+	end
+
 	redef fun preexist_expr
 	do
 		if is_pre_unknown then preexist_expr_value = dependency.preexist_expr
@@ -425,6 +389,19 @@ redef class MOSSAVar
 end
 
 redef class MOPhiVar
+	redef fun compute_preexist
+	do
+		var preval = 0
+		for dep in dependencies do
+			if preval == 0 then
+				preval = dep.expr_preexist
+			else
+				preval = preval.merge(dep.expr_preexist)
+			end
+		end
+		return preval
+	end
+
 	redef fun preexist_expr
 	do
 		if is_pre_unknown then
@@ -442,39 +419,91 @@ redef class MOPhiVar
 	end
 end
 
-
-redef class MOReadSite
-	redef fun preexist_expr
+redef class MOSite
+	fun site_preexist: Int
 	do
-		if is_pre_unknown then
-			expr_recv.preexist_expr
-			if immutable then
-				if expr_recv.is_pre then
-					if expr_recv.is_per then
-						set_pval_per
-					else
-						set_pval_nper
-					end
+		expr_recv.expr_preexist
 
-					# The receiver is always at position 0 of the environment
-					set_dependency_flag(0)
-				else
-					if expr_recv.is_per then
-						set_npre_per
-					else
-						set_npre_nper
-					end
-				end
-			else
-				set_npre_per
-			end
+		if expr_recv.preexist_value.bit_rec then
+			expr_recv.preexist_value = 32.lshift(20) - 63
 		end
 
-		return preexist_expr_value
+		return expr_recv.preexist_value
+	end
+
+	# # Compute the preexistence of the site call
+	fun preexist_site: Int
+	do
+		expr_recv.preexist_expr
+		if expr_recv.is_rec then expr_recv.set_pval_nper
+		return expr_recv.preexist_expr_value
 	end
 end
 
 redef class MOCallSite
+	redef fun compute_preexist
+	do
+		if pattern.cuc > 0 then return 8
+
+		var callees: nullable List[MPropDef]
+		var gp = pattern.gp
+		var preval = 0
+
+		if concretes_receivers != null then
+			callees = new List[MPropDef]
+			for rcv in concretes_receivers.as(not null) do
+				callees.add_all(pattern.callees)
+			end
+		else
+			callees = pattern.callees
+			if callees.length == 0 then return 1
+		end
+
+		for lp in callees do
+			var prelp = lp.return_expr.return_preexist
+			if preval == 0 then
+				preval = prelp
+			else
+				preval = preval.merge(prelp)
+			end
+		end
+
+		if preval.bit_npre then return preval
+
+		var rec: Bool = false
+		var pval: Int
+		if preval.bit_rec then
+			# à vérifier
+			pval = -63
+			rec = true
+		else
+			pval = preval.bin_and(63)
+		end
+
+		## si preexistant on filtre par arguments
+		## on efface les dépendances dans le callee
+		pval = preval.bin_and(63)
+		## et on combine avec celles du caller
+		if preval.bit_param(0) then pval = pval.merge(expr_recv.expr_preexist)
+
+		var n = 0
+		for arg in given_args do
+			n += 1
+			if preval.bit_param(n) then pval = pval.merge(arg.expr_preexist)
+		end
+
+		if rec and pval.bit_pre then
+			return 32
+		else
+			# Si le graphe d'appel est clos
+			if concretes_receivers == null and pval.bit_pre_immut then
+				return pval.setbit(2, 0)
+			end
+
+			return pval
+		end
+	end
+
 	# If the receiver expression of `self` depends of the preexistence of the arg at `index`,
 	# check if `expr` depends of the preexistence of the same arg.
 	fun dep_matches(expr: MOExpr, index: Int): Bool
@@ -563,14 +592,277 @@ redef class MOCallSite
 	end
 end
 
-
-redef class MOSite
-	# Compute the preexistence of the site call
-	fun preexist_site: Int
+redef class MMethodDef
+	# Compute the preexistence of the return of the method expression
+	fun preexist_return: Int
 	do
-		expr_recv.preexist_expr
-		if expr_recv.is_rec then expr_recv.set_pval_nper
-		return expr_recv.preexist_expr_value
+		# preexist_return is called only when return_expr is not null
+		var expr = return_expr.as(not null)
+
+		if not preexist_analysed then
+			expr.set_npre_nper
+		else if expr.is_pre_unknown then
+			expr.set_recursive
+			expr.preexist_expr
+
+			if expr.is_rec then
+				expr.set_pval_nper
+			end
+		end
+
+		return expr.preexist_expr_value
+	end
+
+	# Compute the preexistence of all invocation sites of the method
+	# Return true if the method is analysed, false otherwise (already compiled, extern or extern method)
+	#
+	# WARNING!
+	# The VM can't interpret FFI code, so intern/extern methods are not analysed,
+	# and a expression using a receiver from intern/extern method is preexistent.
+	#
+	fun preexist_all(vm: VirtualMachine): Bool
+	do
+		if preexist_analysed or is_intern or is_extern then return false
+		preexist_analysed = true
+
+		trace("\npreexist_all of {self}")
+		var preexist: Int
+
+		if not disable_preexistence_extensions then
+			for newexpr in monews do
+				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
+
+				preexist = newexpr.preexist_expr
+				fill_nper(newexpr)
+				trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
+			end
+		end
+
+		for site in mosites do
+			preexist = site.site_preexist
+			var buff = "\tpreexist of "
+
+			fill_nper(site.expr_recv)
+
+			if site isa MOAttrSite then
+				buff += "attr {site.pattern.rst}.{site.pattern.gp}"
+			else if site isa MOSubtypeSite then
+				buff += "cast {site.pattern.rst} isa {site.target}"
+			else if site isa MOCallSite then
+				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
+			else if site isa MOAsNotNullSite then
+				buff += "cast not null {site.pattern.rst}"
+			else
+				abort
+			end
+
+			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
+			trace(buff)
+			trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
+		end
+
+		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
+		if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
+
+		return true
+	end
+
+	redef fun compile_mo
+	do
+		super
+
+		preexist_all(vm)
+	end
+end
+
+# Preexistence masks
+# PVAL_PER:	0...1111
+# PTYPE_PER:	0...1101
+# PVAL_NPER:	0...1011
+# PTYPE_NPER:	0...1001
+# NPRE_PER:	0...1100
+# NPRE_NPER:	0...1000
+# RECURSIV:	0...0000
+# PRE_PER:	0...0101
+# PRE_NPER:	0...0001
+# UNKNOWN:	1...
+
+# Preexistence mask of perennial value preexistence
+fun pmask_PVAL_PER: Int do return 15
+
+# Preexistence mask of perennial type preexistence
+fun pmask_PTYPE_PER: Int do return 13
+
+# Preexistence mask of no perennial value preexistence
+fun pmask_PVAL_NPER: Int do return 11
+
+# Preexistence mask of no perennial type preexistence
+fun pmask_PTYPE_NPER: Int do return 9
+
+# Preexistence mask of perennial no preexistence
+fun pmask_NPRE_PER: Int do return 12
+
+# Preexistence mask of no perennial no preexistence
+fun pmask_NPRE_NPER: Int do return 8
+
+# Preexistence mask of recursive calls
+fun pmask_RECURSIV: Int do return 0
+
+# Preexistence mask of unknown preexistence
+fun pmask_UNKNOWN: Int do return 255
+
+redef class MOSuper
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		# A Super is always preexisting
+		return 1
+	end
+end
+
+redef class MOLit
+	redef fun compute_preexist
+	do
+		return 7
+	end
+
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
+
+redef class MOAsSubtypeSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		return expr_recv.expr_preexist
+	end
+end
+
+redef class MOIsaSubtypeSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_npre_per
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		return 3
+	end
+end
+
+redef class MOAsNotNullSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then preexist_expr_value = expr_recv.preexist_expr
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		return expr_recv.expr_preexist
+	end
+end
+
+redef class MONew
+	redef fun init_preexist do
+		if disable_preexistence_extensions then
+			set_npre_per
+		else if pattern.is_loaded then
+			set_ptype_per
+		else
+			set_npre_nper
+		end
+	end
+
+	redef fun preexist_expr do
+		if is_pre_unknown then init_preexist
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		if disable_preexistence_extensions then
+			# Non perennial and not preexistant
+			return 24
+		else if pattern.is_loaded then
+			# Preexisting and perennial
+			return 3
+		else
+			# Non-preexisting and non perennial
+			return 8
+		end
+	end
+end
+
+redef class MONull
+	redef var preexist_expr_value = pmask_PVAL_PER
+
+	redef fun init_preexist do end
+
+	redef fun preexist_expr do return preexist_expr_value
+end
+
+redef class MOPrimitive
+	redef fun compute_preexist
+	do
+		return 7
+	end
+
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then set_pval_per
+		return preexist_expr_value
+	end
+end
+
+redef class MOReadSite
+	redef fun preexist_expr
+	do
+		if is_pre_unknown then
+			expr_recv.preexist_expr
+			if immutable then
+				if expr_recv.is_pre then
+					if expr_recv.is_per then
+						set_pval_per
+					else
+						set_pval_nper
+					end
+
+					# The receiver is always at position 0 of the environment
+					set_dependency_flag(0)
+				else
+					if expr_recv.is_per then
+						set_npre_per
+					else
+						set_npre_nper
+					end
+				end
+			else
+				set_npre_per
+			end
+		end
+
+		return preexist_expr_value
+	end
+
+	redef fun compute_preexist
+	do
+		# For now, an attribute read is non-preexisting perennial
+		return 24
 	end
 end
 
