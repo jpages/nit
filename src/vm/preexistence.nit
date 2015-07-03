@@ -102,6 +102,19 @@ redef class MPropDef
 			end
 		end
 	end
+
+	var recursive_origin: Bool = false
+
+	# The origin of the preexistence of self return variable (if any)
+	fun preexistence_origin: Int
+	do
+		if recursive_origin then
+			return 64
+		else
+			recursive_origin = true
+			return return_expr.preexistence_origin
+		end
+	end
 end
 
 redef class Int
@@ -220,6 +233,21 @@ redef class MOExpr
 
 	# Compute the preexistence of the expression
 	fun preexist_expr: Int is abstract
+
+	# Allows to trace the preexistence origin of a Site by encoding the following values:
+	# bit0: parameter
+	# bit1: a new
+	# bit2: a call
+	# bit3: a lit
+	# bit4: a primitive
+	# bit5: null receiver
+	# bit6: recursive
+	fun preexistence_origin: Int is abstract
+
+	fun preexistence_origin_recursive: Int
+	do
+		return preexistence_origin
+	end
 
 	# Set a bit in a dependency range on the given offset to a preexistence state
 	# Shift 4 bits (preexistence status) + the offset of dependency, and set bit to 1
@@ -354,9 +382,15 @@ redef class MOParam
 	end
 
 	redef fun preexist_expr do return preexist_expr_value
+
+	redef fun preexistence_origin: Int
+	do
+		return 1
+	end
 end
 
 redef class MOVar
+	#TODO: save the preexistence value
 	fun return_preexist: Int
 	do
 		if preexist_value.bit_unknown then
@@ -365,6 +399,7 @@ redef class MOVar
 			preexist_value = compute_preexist
 			if not preexist_value.check_preexist then print(self.to_s)
 
+			# If the preexistence of the return can changed, add it to the mutables list
 			if preexist_value.bit_mut then lp.preexist_mut_exprs.add(self)
 		end
 
@@ -383,6 +418,11 @@ redef class MOSSAVar
 		if is_pre_unknown then preexist_expr_value = dependency.preexist_expr
 		return preexist_expr_value
 	end
+
+	redef fun preexistence_origin: Int
+	do
+		return dependency.preexistence_origin
+	end
 end
 
 redef class MOPhiVar
@@ -397,6 +437,16 @@ redef class MOPhiVar
 			end
 		end
 		return preval
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		var res = 0
+		for dep in dependencies do
+			res = res.bin_or(dep.preexistence_origin)
+		end
+
+		return res
 	end
 
 	redef fun preexist_expr
@@ -419,13 +469,7 @@ end
 redef class MOSite
 	fun site_preexist: Int
 	do
-		expr_recv.expr_preexist
-
-		if expr_recv.preexist_value.bit_rec then
-			expr_recv.preexist_value = 32.lshift(20) - 63
-		end
-
-		return expr_recv.preexist_value
+		return expr_recv.expr_preexist
 	end
 
 	# # Compute the preexistence of the site call
@@ -475,7 +519,6 @@ redef class MOCallSite
 		var rec: Bool = false
 		var pval: Int
 		if preval.bit_rec then
-			# à vérifier
 			pval = -63
 			rec = true
 		else
@@ -504,6 +547,62 @@ redef class MOCallSite
 
 			return pval
 		end
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return 4
+	end
+
+	redef fun preexistence_origin_recursive: Int
+	do
+		var callees: nullable List[MPropDef]
+		var gp = pattern.gp
+
+		if concretes_receivers != null then
+			callees = new List[MPropDef]
+			for rcv in concretes_receivers.as(not null) do
+				callees.add_all(pattern.callees)
+			end
+		else
+			callees = pattern.callees
+			if callees.length == 0 then return 32
+		end
+
+		var res = 0
+		for lp in callees do
+			res = res.bin_or(lp.preexistence_origin)
+		end
+
+		return res
+	end
+
+	# Trace the origin of preexistence of a site
+	# bit0: cuc null
+	# bit1: at least one preexisting callee
+	# bit2: at least one non-preexisting callee
+	# bit3: the expression is preexisting
+	fun trace_origin: Int
+	do
+		var res = 0
+		if pattern.cuc > 0 then res = res.bin_or(1)
+
+		# Search for a preexisting (or not) return of a callee
+		for callee in pattern.callees do
+			if callee.return_expr != null then
+				if callee.return_expr.return_preexist.bit_pre then
+					res = res.bin_or(2)
+				end
+
+				if callee.return_expr.return_preexist.bit_npre then
+					res = res.bin_or(4)
+				end
+			end
+		end
+
+		if is_pre then res = res.bin_or(8)
+
+		return res
 	end
 
 	# If the receiver expression of `self` depends of the preexistence of the arg at `index`,
@@ -640,6 +739,11 @@ redef class MMethodDef
 			end
 		end
 
+		# If a returnvar is present, then compute its preexistence
+		if return_expr != null then
+			var pre = return_expr.return_preexist
+		end
+
 		for site in mosites do
 			preexist = site.site_preexist
 			var buff = "\tpreexist of "
@@ -725,12 +829,22 @@ redef class MOSuper
 		# A Super is always preexisting
 		return 1
 	end
+
+	redef fun preexistence_origin: Int
+	do
+		return 4
+	end
 end
 
 redef class MOLit
 	redef fun compute_preexist
 	do
 		return 7
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return 8
 	end
 
 	redef fun preexist_expr
@@ -750,6 +864,11 @@ redef class MOAsSubtypeSite
 	redef fun compute_preexist
 	do
 		return expr_recv.expr_preexist
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return expr_recv.preexistence_origin
 	end
 end
 
@@ -776,6 +895,11 @@ redef class MOAsNotNullSite
 	redef fun compute_preexist
 	do
 		return expr_recv.expr_preexist
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return expr_recv.preexistence_origin
 	end
 end
 
@@ -808,6 +932,11 @@ redef class MONew
 			return 8
 		end
 	end
+
+	redef fun preexistence_origin: Int
+	do
+		return 2
+	end
 end
 
 redef class MONull
@@ -822,6 +951,11 @@ redef class MOPrimitive
 	redef fun compute_preexist
 	do
 		return 7
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return 16
 	end
 
 	redef fun preexist_expr
