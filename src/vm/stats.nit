@@ -105,6 +105,27 @@ redef class ModelBuilder
 		end
 
 		print(pstats.pretty)
+
+		# Print the array of preexistence values
+		print("Stats on receiver_origin\n")
+		for i in [0..128[ do
+			if sys.vm.receiver_origin[i] > 0 then print("receiver_origin[{i}] = {sys.vm.receiver_origin[i]}")
+		end
+
+		print("\nStats on return_origin\n")
+		for i in [0..128[ do
+			if sys.vm.return_origin[i] > 0 then print("return_origin[{i}] = {sys.vm.return_origin[i]}")
+		end
+
+		print("Stats on receiver_origin_recursive\n")
+		for i in [0..128[ do
+			if sys.vm.receiver_origin_recursive[i] > 0 then print("receiver_origin_recursive[{i}] = {sys.vm.receiver_origin_recursive[i]}")
+		end
+
+		print("\nStats on return_origin_recursive\n")
+		for i in [0..128[ do
+			if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
+		end
 	end
 end
 
@@ -130,6 +151,14 @@ redef class VirtualMachine
 			pstats.inc("loaded_classes_implicits")
 		end
 	end
+
+	var return_origin = new Array[Int].filled_with(0, 128)
+
+	var receiver_origin = new Array[Int].filled_with(0, 128)
+
+	var return_origin_recursive = new Array[Int].filled_with(0, 128)
+
+	var receiver_origin_recursive = new Array[Int].filled_with(0, 128)
 end
 
 redef class APropdef
@@ -204,6 +233,11 @@ class MOStats
 	# Make text csv file contains overview statistics
 	fun overview
 	do
+		sys.vm.return_origin = new Array[Int].filled_with(0, 128)
+		sys.vm.receiver_origin = new Array[Int].filled_with(0, 128)
+		sys.vm.return_origin_recursive = new Array[Int].filled_with(0, 128)
+		sys.vm.receiver_origin_recursive = new Array[Int].filled_with(0, 128)
+
 		var buf: String
 		var file = new FileWriter.open("mo-stats-{lbl}.csv")
 
@@ -410,12 +444,22 @@ class MOStats
 
 			# Debug the two model
 			debug_model(propdef, trace_file, trace_model)
-			if propdef.return_expr != null then
+			if propdef.msignature.return_mtype != null and propdef.return_expr != null then
 				nb_method_return += 1
 
+				var primitive_return = false
+				if propdef.msignature.return_mtype.is_primitive_type then primitive_return = true
+
 				# If the propdef has a preexisting returns
-				if propdef.return_expr.return_preexist.bit_pre and propdef.callers.cuc == 0 then
+				if propdef.return_expr.is_pre and not primitive_return then
 					nb_method_return_pre += 1
+					# Trace the origin of preexistence
+					var origin = propdef.return_expr.preexistence_origin
+
+					sys.vm.return_origin[origin] += 1
+
+					var recursive = propdef.return_expr.preexistence_origin_recursive
+					sys.vm.return_origin_recursive[recursive] += 1
 				else
 					nb_method_return_npre += 1
 				end
@@ -806,6 +850,15 @@ redef class MOSite
 			end
 
 			sys.pstats.inc("object_sites")
+
+			if expr_recv.is_pre then
+				var origin = expr_recv.preexistence_origin
+				sys.vm.receiver_origin[origin] += 1
+
+
+				var recursive = expr_recv.preexistence_origin_recursive
+				sys.vm.receiver_origin_recursive[recursive] += 1
+			end
 		end
 
 		if print_location_preexist then dump_location_site
@@ -818,7 +871,7 @@ redef class MOSite
 	fun dump_location_site
 	do
 		# dump_location is null of first compilation, and set for last compilation
-		if dump_location != null and (site_type == "cast" or (site_type == "method" and pattern.as(MOPropSitePattern).gp.name == "pop"))then
+		if dump_location != null then
 			var from2str = ""
 			if expr_recv.is_pre then
 				if origin.from_new then from2str += " from-new "
@@ -832,6 +885,8 @@ redef class MOSite
 			end
 
 			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
+
+			# Print the preexistence origin of this site
 		end
 	end
 

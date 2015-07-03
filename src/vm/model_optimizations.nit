@@ -689,8 +689,8 @@ redef class MType
 	do
 		if self.to_s == "Int" then return true
 		if self.to_s == "nullable Int" then return true
-		if self.to_s == "String" then return true
-		if self.to_s == "nullable String" then return true
+		# if self.to_s == "String" then return true
+		# if self.to_s == "nullable String" then return true
 		if self.to_s == "Char" then return true
 		if self.to_s == "nullable Char" then return true
 		if self.to_s == "Bool" then return true
