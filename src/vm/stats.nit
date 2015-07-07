@@ -108,23 +108,32 @@ redef class ModelBuilder
 
 		# Print the array of preexistence values
 		print("Stats on receiver_origin\n")
-		for i in [0..128[ do
+		print("# bit0: parameter\n# bit1: a new\n# bit2: a call\n# bit3: a lit\n# bit4: a primitive")
+		print("# bit5: null receiver\n# bit6: recursive")
+		for i in [0..sys.vm.receiver_origin.length[ do
 			if sys.vm.receiver_origin[i] > 0 then print("receiver_origin[{i}] = {sys.vm.receiver_origin[i]}")
 		end
 
 		print("\nStats on return_origin\n")
-		for i in [0..128[ do
+		for i in [0..sys.vm.return_origin.length[ do
 			if sys.vm.return_origin[i] > 0 then print("return_origin[{i}] = {sys.vm.return_origin[i]}")
 		end
 
 		print("Stats on receiver_origin_recursive\n")
-		for i in [0..128[ do
+		for i in [0..sys.vm.receiver_origin_recursive.length[ do
 			if sys.vm.receiver_origin_recursive[i] > 0 then print("receiver_origin_recursive[{i}] = {sys.vm.receiver_origin_recursive[i]}")
 		end
 
 		print("\nStats on return_origin_recursive\n")
-		for i in [0..128[ do
+		for i in [0..sys.vm.return_origin_recursive.length[ do
 			if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
+		end
+
+		print("\nStats on trace_origin of MOCallSite\n")
+		print("# bit0: positive cuc\n# bit1: at least one preexisting callee")
+		print("# bit2: at least one non-preexisting callee\n# bit3: the expression is preexisting")
+		for i in [0..sys.vm.trace_origin.length[ do
+			if sys.vm.trace_origin[i] > 0 then print("trace_origin[{i}] = {sys.vm.trace_origin[i]}")
 		end
 	end
 end
@@ -152,13 +161,15 @@ redef class VirtualMachine
 		end
 	end
 
-	var return_origin = new Array[Int].filled_with(0, 128)
+	var return_origin = new Array[Int].filled_with(0, 129)
 
-	var receiver_origin = new Array[Int].filled_with(0, 128)
+	var receiver_origin = new Array[Int].filled_with(0, 129)
 
-	var return_origin_recursive = new Array[Int].filled_with(0, 128)
+	var return_origin_recursive = new Array[Int].filled_with(0, 129)
 
-	var receiver_origin_recursive = new Array[Int].filled_with(0, 128)
+	var receiver_origin_recursive = new Array[Int].filled_with(0, 129)
+
+	var trace_origin = new Array[Int].filled_with(0, 17)
 end
 
 redef class APropdef
@@ -233,10 +244,11 @@ class MOStats
 	# Make text csv file contains overview statistics
 	fun overview
 	do
-		sys.vm.return_origin = new Array[Int].filled_with(0, 128)
-		sys.vm.receiver_origin = new Array[Int].filled_with(0, 128)
-		sys.vm.return_origin_recursive = new Array[Int].filled_with(0, 128)
-		sys.vm.receiver_origin_recursive = new Array[Int].filled_with(0, 128)
+		sys.vm.return_origin = new Array[Int].filled_with(0, 129)
+		sys.vm.receiver_origin = new Array[Int].filled_with(0, 129)
+		sys.vm.return_origin_recursive = new Array[Int].filled_with(0, 129)
+		sys.vm.receiver_origin_recursive = new Array[Int].filled_with(0, 129)
+		sys.vm.trace_origin = new Array[Int].filled_with(0, 17)
 
 		var buf: String
 		var file = new FileWriter.open("mo-stats-{lbl}.csv")
@@ -457,9 +469,11 @@ class MOStats
 					var origin = propdef.return_expr.preexistence_origin
 
 					sys.vm.return_origin[origin] += 1
+					sys.vm.return_origin[sys.vm.return_origin.length-1] += 1
 
 					var recursive = propdef.return_expr.preexistence_origin_recursive
 					sys.vm.return_origin_recursive[recursive] += 1
+					sys.vm.return_origin_recursive[sys.vm.return_origin_recursive.length-1] += 1
 				else
 					nb_method_return_npre += 1
 				end
@@ -854,10 +868,22 @@ redef class MOSite
 			if expr_recv.is_pre then
 				var origin = expr_recv.preexistence_origin
 				sys.vm.receiver_origin[origin] += 1
-
+				sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
 
 				var recursive = expr_recv.preexistence_origin_recursive
 				sys.vm.receiver_origin_recursive[recursive] += 1
+				sys.vm.receiver_origin_recursive[sys.vm.receiver_origin_recursive.length-1] += 1
+			end
+
+			# Trace the origin of preexistence of callsites
+			if self isa MOCallSite then
+				if expr_recv.is_pre then
+					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} receiver_origin {expr_recv.preexistence_origin} nb_callees {nb_callees}")
+				else
+					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} non-preexisting_receiver nb_callees {nb_callees}")
+				end
+				sys.vm.trace_origin[trace_origin] += 1
+				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
 			end
 		end
 

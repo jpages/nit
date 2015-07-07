@@ -505,6 +505,7 @@ redef class MOCallSite
 			if callees.length == 0 then return 1
 		end
 
+		nb_callees = callees.length
 		for lp in callees do
 			var prelp = lp.return_expr.return_preexist
 			if preval == 0 then
@@ -559,7 +560,7 @@ redef class MOCallSite
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
 
-		if concretes_receivers != null then
+		if get_concretes.length > 0 then
 			callees = new List[MPropDef]
 			for rcv in concretes_receivers.as(not null) do
 				callees.add_all(pattern.callees)
@@ -571,14 +572,16 @@ redef class MOCallSite
 
 		var res = 0
 		for lp in callees do
-			res = res.bin_or(lp.preexistence_origin)
+			res = res.bin_or(lp.return_expr.preexistence_origin_recursive)
 		end
 
 		return res
 	end
 
+	var nb_callees = 0
+
 	# Trace the origin of preexistence of a site
-	# bit0: cuc null
+	# bit0: positive cuc
 	# bit1: at least one preexisting callee
 	# bit2: at least one non-preexisting callee
 	# bit3: the expression is preexisting
