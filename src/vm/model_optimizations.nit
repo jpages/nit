@@ -69,6 +69,9 @@ abstract class MOSitePattern
 	# Static type of the receiver
 	var rst: MType
 
+	# Static class of the receiver
+	var rsc: MClass
+
 	# List of expressions that refers to this pattern
 	var sites = new List[S]
 
@@ -148,13 +151,10 @@ class MOCallSitePattern
 
 	redef type S: MOCallSite
 
-	#
-	init(rst: MType, gp: MMethod)
+	init(rst: MType, rsc: MClass, gp: MMethod)
 	do
-		self.rst = rst
 		self.gp = gp
-
-		var rsc = rst.get_mclass(sys.vm).as(not null)
+		self.rst = rst
 
 		if not rsc.abstract_loaded then return
 
@@ -261,7 +261,7 @@ redef class MMethod
 		var ordering = mpropdef.mclassdef.mclass.ordering
 
 		for pattern in patterns do
-			var rsc = pattern.rst.get_mclass(sys.vm).as(not null)
+			var rsc = pattern.rst.get_mclass(sys.vm, mpropdef).as(not null)
 
 			if rsc.abstract_loaded and ordering.has(rsc) then
 				pattern.add_lp(mpropdef)
@@ -432,7 +432,7 @@ abstract class MOSite
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
 	var concretes_receivers: nullable List[MClass] is noinit, writable
 
-	fun pattern_factory(rst: MType, gp: MProperty): P is abstract
+	fun pattern_factory(rst: MType, gp: MProperty, rsc: MClass): P is abstract
 
 	# Compute the concretes receivers.
 	# If return null, drop the list (all receivers can't be statically and with intra-procedural analysis determined)
@@ -477,7 +477,7 @@ abstract class MOSubtypeSite
 	init(ast: AExpr, mpropdef: MPropDef, target: MType)
 	do
 		super
-		self.target = target
+		self.target = target.get_mclass(sys.vm, mpropdef).mclass_type
 	end
 
 	redef fun pretty_print(file)
@@ -536,9 +536,9 @@ class MOCallSite
 	# Values of each arguments
 	var given_args = new List[MOExpr]
 
-	redef fun pattern_factory(rst, gp)
+	redef fun pattern_factory(rst, gp, rsc)
 	do
-		return new MOCallSitePattern(rst, gp.as(MMethod))
+		return new MOCallSitePattern(rst, rsc, gp.as(MMethod))
 	end
 
 	redef fun pretty_print(file)
@@ -562,9 +562,9 @@ class MOReadSite
 
 	redef type P: MOReadSitePattern
 
-	redef fun pattern_factory(rst, gp)
+	redef fun pattern_factory(rst, gp, rsc)
 	do
-		return new MOReadSitePattern(rst, gp.as(MAttribute))
+		return new MOReadSitePattern(rst, rsc, gp.as(MAttribute))
 	end
 
 	# Tell if the attribute is immutable, useless at the moment
@@ -577,9 +577,9 @@ class MOWriteSite
 
 	redef type P: MOWriteSitePattern
 
-	redef fun pattern_factory(rst, gp)
+	redef fun pattern_factory(rst, gp, rsc)
 	do
-		return new MOWriteSitePattern(rst, gp.as(MAttribute))
+		return new MOWriteSitePattern(rst, rsc, gp.as(MAttribute))
 	end
 end
 
@@ -608,17 +608,17 @@ redef class MClass
 	end
 
 	# Create (if not exists) and set a pattern for object subtype sites
-	fun set_asnotnull_pattern(site: MOAsNotNullSite): MOAsNotNullPattern
+	fun set_asnotnull_pattern(site: MOAsNotNullSite, mpropdef: MPropDef): MOAsNotNullPattern
 	do
 		if asnotnull_pattern == null then
-			asnotnull_pattern = new MOAsNotNullPattern(mclass_type)
+			asnotnull_pattern = new MOAsNotNullPattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null))
 		end
 
 		site.pattern = asnotnull_pattern.as(not null)
 		return asnotnull_pattern.as(not null)
 	end
 
-	fun set_subtype_pattern(site: MOSubtypeSite)
+	fun set_subtype_pattern(site: MOSubtypeSite, mpropdef: MPropDef)
 	do
 		var pattern: nullable MOSubtypeSitePattern = null
 
@@ -630,7 +630,7 @@ redef class MClass
 		end
 
 		if pattern == null then
-			pattern = new MOSubtypeSitePattern(mclass_type, site.target)
+			pattern = new MOSubtypeSitePattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null), site.target)
 			subtype_pattern.add(pattern)
 		end
 
@@ -638,7 +638,7 @@ redef class MClass
 	end
 
 	# Create (if not exists) and set a pattern for objet prop sites
-	fun set_site_pattern(site: MOPropSite, gp: MProperty)
+	fun set_site_pattern(site: MOPropSite, gp: MProperty, mclass: MClass)
 	do
 		var pattern: nullable MOPropSitePattern = null
 
@@ -650,7 +650,7 @@ redef class MClass
 		end
 
 		if pattern == null then
-			pattern = site.pattern_factory(mclass_type, gp)
+			pattern = site.pattern_factory(mclass_type, gp, mclass)
 			sites_patterns.add(pattern)
 		end
 
@@ -689,8 +689,6 @@ redef class MType
 	do
 		if self.to_s == "Int" then return true
 		if self.to_s == "nullable Int" then return true
-		# if self.to_s == "String" then return true
-		# if self.to_s == "nullable String" then return true
 		if self.to_s == "Char" then return true
 		if self.to_s == "nullable Char" then return true
 		if self.to_s == "Bool" then return true
@@ -698,27 +696,28 @@ redef class MType
 	end
 
 	# Get the class of the type
-	fun get_mclass(vm: VirtualMachine): nullable MClass
+	fun get_mclass(vm: VirtualMachine, mpropdef: MPropDef): nullable MClass
 	do
 		if self isa MNullType then
 			return null
 		else if self isa MNotNullType then
-			return self.mtype.get_mclass(vm)
+			return self.mtype.get_mclass(vm, mpropdef)
 		else if self isa MClassType then
 			return self.mclass
 		else if self isa MNullableType then
-			return self.mtype.get_mclass(vm)
-		else if (self isa MVirtualType or self isa MParameterType) and need_anchor then
-			var anchor: MClassType
-			var anchor_type = vm.next_receivers.last
-
-			if anchor_type isa MNullableType then
-				anchor = anchor_type.mtype.as(MClassType)
-			else
-				anchor = anchor_type.as(MClassType)
+			return self.mtype.get_mclass(vm, mpropdef)
+		else if self isa MFormalType then
+			# Deletes nullable types
+			var anchor: MType = mpropdef.mclassdef.bound_mtype
+			if anchor isa MNullableType then
+				anchor = anchor.mtype
 			end
 
-			return anchor_to(vm.mainmodule, anchor).get_mclass(vm)
+			var mtype = anchor_to(sys.vm.mainmodule, anchor.as(MClassType))
+
+			if not mtype isa MClassType then print "PROBLMEEEEM {mtype}"
+
+			return mtype.get_mclass(vm, mpropdef)
 		else
 			# NYI
 			abort
@@ -786,8 +785,8 @@ redef class AAttrFormExpr
 		var recv = get_receiver
 		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
-		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(attr_site, mproperty.as(not null))
+		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
+		recv_class.set_site_pattern(attr_site, mproperty.as(not null), mpropdef.mclassdef.mclass)
 
 		return attr_site
 	end
@@ -837,8 +836,8 @@ class ASubtypeExpr
 		sys.ast2mo_clone_table[self] = cast_site
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
-		var recv_class = recv.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_subtype_pattern(cast_site)
+		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
+		recv_class.set_subtype_pattern(cast_site, mpropdef)
 
 		return cast_site
 	end
@@ -902,8 +901,8 @@ redef class AAsNotnullExpr
 
 		moexpr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_asnotnull_pattern(moexpr)
+		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
+		recv_class.set_asnotnull_pattern(moexpr, mpropdef)
 
 		return moexpr
 	end
@@ -1018,8 +1017,8 @@ redef class ASendExpr
 			moattr = new MOWriteSite(self, mpropdef)
 		end
 
-		var recv_class = n_expr.mtype.as(not null).get_mclass(vm).as(not null)
-		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty)
+		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
+		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty, mpropdef.mclassdef.mclass)
 
 		return moattr
 	end
@@ -1027,10 +1026,10 @@ redef class ASendExpr
 	fun copy_site_method(mpropdef: MPropDef): MOCallSite
 	do
 		var cs = callsite.as(not null)
-		var recv_class = cs.recv.get_mclass(vm).as(not null)
+		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
 		var mocallsite = new MOCallSite(self, mpropdef)
 
-		recv_class.set_site_pattern(mocallsite, cs.mproperty)
+		recv_class.set_site_pattern(mocallsite, cs.mproperty, mpropdef.mclassdef.mclass)
 
 		return mocallsite
 	end

@@ -877,6 +877,15 @@ redef class MOSite
 
 			# Trace the origin of preexistence of callsites
 			if self isa MOCallSite then
+				# Trace if the RST is null
+				# if not callsite.recv isa MFormalType then
+				# 	print "callsite.recv {callsite.recv}"
+				# else
+				# 	print "callsite.recv GENERIC {callsite.recv} bound {callsite.recv.lookup_bound(sys.vm.mainmodule, mtype)}"
+				# 	print "callsite.mpropdef {callsite.mpropdef}"
+				# end
+
+				#TODO: est-ce qu'il y a des types concrets pour ce site ?
 				if expr_recv.is_pre then
 					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} receiver_origin {expr_recv.preexistence_origin} nb_callees {nb_callees}")
 				else
@@ -1029,7 +1038,7 @@ redef class MOSite
 	#
 	fun incr_rst_unloaded(vm: VirtualMachine)
 	do
-		var rst_loaded = pattern.rst.get_mclass(vm).as(not null).abstract_loaded
+		var rst_loaded = pattern.rsc.abstract_loaded
 
 		if not rst_loaded then
 			var impl = get_impl(vm)

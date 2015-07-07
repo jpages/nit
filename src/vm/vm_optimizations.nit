@@ -537,7 +537,7 @@ redef abstract class MOSitePattern
 	# Compute the implementation
 	fun compute_impl(vm: VirtualMachine)
 	do
-		if not rst.get_mclass(vm).as(not null).loaded then
+		if rsc.loaded then
 			if pic_pos_unique(vm) then
 				if can_be_static then
 					set_static_impl(true)
@@ -594,7 +594,7 @@ redef abstract class MOSitePattern
 
 	# Return the offset of the introduction property of the class
 	# Redef in MOAttrPattern to use MClass:get_position_attribute instead of get_position_method
-	private fun get_bloc_position(vm: VirtualMachine): Int do return rst.get_mclass(vm).as(not null).get_position_methods(get_pic(vm))
+	private fun get_bloc_position(vm: VirtualMachine): Int do return rsc.get_position_methods(get_pic(vm))
 
 	# Tell if the pic is at unique position on whole class hierarchy
 	private fun pic_pos_unique(vm: VirtualMachine): Bool do return get_pic_position(vm) > 0
@@ -607,13 +607,13 @@ end
 redef class MOSubtypeSitePattern
 	redef fun get_offset(vm) do return get_pic(vm).color
 
-	redef fun get_pic(vm) do return target.get_mclass(vm).as(not null)
+	redef fun get_pic(vm) do return target.as(MClassType).mclass
 end
 
 redef class MOAsNotNullPattern
 	redef fun get_offset(vm) do return 0
 
-	redef fun get_pic(vm) do return rst.get_mclass(vm).as(not null)
+	redef fun get_pic(vm) do return rsc
 end
 
 redef abstract class MOPropSitePattern
@@ -636,7 +636,7 @@ redef abstract class MOPropSitePattern
 end
 
 redef class MOAttrPattern
-	redef fun get_bloc_position(vm) do return rst.get_mclass(vm).as(not null).get_position_attributes(get_pic(vm))
+	redef fun get_bloc_position(vm) do return rsc.get_position_attributes(get_pic(vm))
 
  	redef fun get_pic_position(vm) do return get_pic(vm).position_attributes
 
@@ -673,7 +673,7 @@ redef abstract class MOSite
 	# Compute the implementation with rst/pic, and concretes if any
 	fun compute_impl_concretes(vm: VirtualMachine)
 	do
-		if not pattern.rst.get_mclass(vm).as(not null).loaded then
+		if not pattern.rsc.loaded then
 			# The PHImpl here is mutable because it can be switch to a
 			# lightweight implementation when the class will be loaded
 			set_ph_impl(vm, true)
@@ -733,7 +733,7 @@ redef abstract class MOSite
 	fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_bloc_position(vm, pattern.rst.get_mclass(vm).as(not null))
+		var pos_cls = get_bloc_position(vm, pattern.rsc)
 
 		impl = new SSTImpl(mutable, pos_cls + offset)
 	end
@@ -759,7 +759,7 @@ end
 redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
 
-	redef fun get_pic(vm) do return target.get_mclass(vm).as(not null)
+	redef fun get_pic(vm) do return target.get_mclass(vm, lp).as(not null)
 
 	redef fun set_static_impl(vm, mutable)
 	do
@@ -767,7 +767,7 @@ redef class MOSubtypeSite
 			impl = new StaticImplSubtype(mutable, false)
 		else
 			var target_id = get_pic(vm).vtable.as(not null).id
-			var source_vt = pattern.rst.get_mclass(vm).as(not null).vtable.as(not null)
+			var source_vt = pattern.rsc.vtable.as(not null)
 			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
 			impl = new StaticImplSubtype(mutable, cast_value)
 		end
@@ -777,7 +777,7 @@ end
 redef class MOAsNotNullSite
 	redef fun get_offset(vm) do return 0
 
-	redef fun get_pic(vm) do return pattern.rst.get_mclass(vm).as(not null)
+	redef fun get_pic(vm) do return pattern.rsc
 
 	redef fun set_static_impl(vm, mutable)
 	do
@@ -785,7 +785,7 @@ redef class MOAsNotNullSite
 			impl = new StaticImplSubtype(mutable, false)
 		else
 			var target_id = get_pic(vm).vtable.as(not null).id
-			var source_vt = pattern.rst.get_mclass(vm).as(not null).vtable.as(not null)
+			var source_vt = pattern.rsc.vtable.as(not null)
 			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
 			impl = new StaticImplSubtype(mutable, cast_value)
 		end
@@ -809,10 +809,15 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		var rst_vt = get_concretes.first.vtable.as(not null)
-		var pic_id = get_pic(vm).vtable.as(not null).id
-		var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
-		impl = new StaticImplProp(mutable, method)
+		#TODO: a null implementation
+		if not get_concretes.first.loaded then
+			impl = new NullImpl(true)
+		else
+			var rst_vt = get_concretes.first.vtable.as(not null)
+			var pic_id = get_pic(vm).vtable.as(not null).id
+			var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
+			impl = new StaticImplProp(mutable, method)
+		end
 	end
 
 	# Clone a MOSite
