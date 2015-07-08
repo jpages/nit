@@ -1,4 +1,4 @@
-# Statistics of the VM (implementations, preexistance...)
+# Statistics of the VM (implementations, preexistence...)
 module stats
 
 import vm_optimizations
@@ -65,6 +65,8 @@ redef class ModelBuilder
 			pstats.overview
 			post_exec(mainmodule)
 			pstats.overview
+
+			pstats.trace_patterns
 			# Meh...
 		end
 	end
@@ -129,9 +131,17 @@ redef class ModelBuilder
 			if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
 		end
 
-		print("\nStats on trace_origin of MOCallSite\n")
-		print("# bit0: positive cuc\n# bit1: at least one preexisting callee")
-		print("# bit2: at least one non-preexisting callee\n# bit3: the expression is preexisting")
+		var s = """
+		# bit0: positive cuc
+		# bit1: at least one preexisting callee
+		# bit2: at least one non-preexisting callee
+		# bit3: the callee is a procedure
+		# bit4: the expression is preexisting
+		# bit5: concretes types
+		# bit6: generic/formal receiver
+		"""
+		print(s)
+
 		for i in [0..sys.vm.trace_origin.length[ do
 			if sys.vm.trace_origin[i] > 0 then print("trace_origin[{i}] = {sys.vm.trace_origin[i]}")
 		end
@@ -169,7 +179,7 @@ redef class VirtualMachine
 
 	var receiver_origin_recursive = new Array[Int].filled_with(0, 129)
 
-	var trace_origin = new Array[Int].filled_with(0, 17)
+	var trace_origin = new Array[Int].filled_with(0, 129)
 end
 
 redef class APropdef
@@ -241,6 +251,17 @@ class MOStats
 		return ret
 	end
 
+	fun trace_patterns
+	do
+		var file = new FileWriter.open("trace_patterns.txt")
+
+		for pattern in sys.vm.all_patterns do
+			file.write("{pattern.trace} {pattern}\n")
+		end
+
+		file.close
+	end
+
 	# Make text csv file contains overview statistics
 	fun overview
 	do
@@ -248,7 +269,7 @@ class MOStats
 		sys.vm.receiver_origin = new Array[Int].filled_with(0, 129)
 		sys.vm.return_origin_recursive = new Array[Int].filled_with(0, 129)
 		sys.vm.receiver_origin_recursive = new Array[Int].filled_with(0, 129)
-		sys.vm.trace_origin = new Array[Int].filled_with(0, 17)
+		sys.vm.trace_origin = new Array[Int].filled_with(0, 129)
 
 		var buf: String
 		var file = new FileWriter.open("mo-stats-{lbl}.csv")
@@ -496,7 +517,13 @@ class MOStats
 		# compiled "new" of unloaded class at the end of execution
 		file.write("\n")
 		var compiled_new_unloaded = 0
-		for newsite in compiled_new do if not newsite.pattern.cls.abstract_loaded then compiled_new_unloaded += 1
+		for newsite in sys.vm.all_new_sites do
+			if not newsite.pattern.cls.abstract_loaded then
+				compiled_new_unloaded += 1
+				print("UNLOADED {newsite} class = {newsite.pattern.cls}")
+			end
+		end
+
 		file.write("compiled new of unloaded classes, {compiled_new_unloaded}")
 
 		file.write("\n")
@@ -559,6 +586,13 @@ class MOStats
 				trace_model.write("\t")
 
 				site.pretty_print(trace_model)
+
+				if site isa MOCallSite then
+					if site.trace_origin == 32 and site.expr_recv.preexistence_origin == 3 then
+						print "concretes_receivers"
+					end
+				end
+
 				trace_model.write("\n")
 			end
 			trace_model.write("\n")
@@ -885,7 +919,6 @@ redef class MOSite
 				# 	print "callsite.mpropdef {callsite.mpropdef}"
 				# end
 
-				#TODO: est-ce qu'il y a des types concrets pour ce site ?
 				if expr_recv.is_pre then
 					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} receiver_origin {expr_recv.preexistence_origin} nb_callees {nb_callees}")
 				else
@@ -1016,7 +1049,7 @@ redef class MOSite
 	#
 	fun incr_concrete_site(vm: VirtualMachine)
 	do
-		if get_concretes.length > 0 then
+		if get_concretes != null then
 			var pre = expr_recv.is_pre
 
 			pstats.inc("concretes")

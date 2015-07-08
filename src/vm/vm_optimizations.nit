@@ -662,7 +662,7 @@ redef abstract class MOSite
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 			return impl.as(not null)
-		else if get_concretes.length == 0 then
+		else if get_concretes != null then
 			return pattern.get_impl(vm)
 		else
 			compute_impl_concretes(vm)
@@ -703,9 +703,11 @@ redef abstract class MOSite
 	# 1 : unique position
 	private fun unique_pos_for_each_recv(vm: VirtualMachine): Int
 	do
-		for recv in get_concretes do
-			if not recv.loaded then return -1
-			if get_bloc_position(vm, recv) < 0 then return 0
+		if get_concretes != null then
+			for recv in get_concretes do
+				if not recv.loaded then return -1
+				if get_bloc_position(vm, recv) < 0 then return 0
+			end
 		end
 
 		return 1
@@ -724,7 +726,7 @@ redef abstract class MOSite
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Tell if the implementation can be static
-	fun can_be_static: Bool do return get_concretes.length == 1
+	fun can_be_static: Bool do return get_concretes != null
 
 	# Set a static implementation
 	fun set_static_impl(vm: VirtualMachine, mutable: Bool) is abstract
@@ -809,15 +811,10 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		#TODO: a null implementation
-		if not get_concretes.first.loaded then
-			impl = new NullImpl(true)
-		else
-			var rst_vt = get_concretes.first.vtable.as(not null)
-			var pic_id = get_pic(vm).vtable.as(not null).id
-			var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
-			impl = new StaticImplProp(mutable, method)
-		end
+		var rst_vt = get_concretes.first.vtable.as(not null)
+		var pic_id = get_pic(vm).vtable.as(not null).id
+		var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
+		impl = new StaticImplProp(mutable, method)
 	end
 
 	# Clone a MOSite
