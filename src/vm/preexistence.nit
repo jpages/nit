@@ -390,7 +390,6 @@ redef class MOParam
 end
 
 redef class MOVar
-	#TODO: save the preexistence value
 	fun return_preexist: Int
 	do
 		if preexist_value.bit_unknown then
@@ -489,8 +488,6 @@ redef class MOCallSite
 			return 8
 		end
 
-		if pattern.cuc > 0 then return 8
-
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
 		var preval = 0
@@ -498,16 +495,30 @@ redef class MOCallSite
 		if concretes_receivers != null then
 			callees = new List[MPropDef]
 			for rcv in concretes_receivers.as(not null) do
-				callees.add_all(pattern.callees)
+				var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+
+				if propdef.is_compiled then
+					callees.add(propdef)
+				else
+					return 8
+				end
 			end
 		else
+			if pattern.cuc > 0 then return 8
 			callees = pattern.callees
 			if callees.length == 0 then return 1
 		end
 
 		nb_callees = callees.length
 		for lp in callees do
-			var prelp = lp.return_expr.return_preexist
+			var prelp: Int
+			if lp.as(MMethodDef).is_abstract then
+				# By default, a method is preexisting
+				prelp = 7
+			else
+				prelp = lp.return_expr.return_preexist
+			end
+
 			if preval == 0 then
 				preval = prelp
 			else
@@ -560,7 +571,7 @@ redef class MOCallSite
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
 
-		if get_concretes.length > 0 then
+		if get_concretes != null then
 			callees = new List[MPropDef]
 			for rcv in concretes_receivers.as(not null) do
 				callees.add_all(pattern.callees)
@@ -584,7 +595,10 @@ redef class MOCallSite
 	# bit0: positive cuc
 	# bit1: at least one preexisting callee
 	# bit2: at least one non-preexisting callee
-	# bit3: the expression is preexisting
+	# bit3: the callee is a procedure
+	# bit4: the expression is preexisting
+	# bit5: concretes types
+	# bit6: generic/formal receiver
 	fun trace_origin: Int
 	do
 		var res = 0
@@ -592,18 +606,22 @@ redef class MOCallSite
 
 		# Search for a preexisting (or not) return of a callee
 		for callee in pattern.callees do
-			if callee.return_expr != null then
-				if callee.return_expr.return_preexist.bit_pre then
+			if callee.return_expr == null then
+				res = res.bin_or(8)
+			else
+				if callee.return_expr.is_pre then
 					res = res.bin_or(2)
-				end
-
-				if callee.return_expr.return_preexist.bit_npre then
+				else
 					res = res.bin_or(4)
 				end
 			end
 		end
 
-		if is_pre then res = res.bin_or(8)
+		if is_pre then res = res.bin_or(16)
+
+		if concretes_receivers != null then res = res.bin_or(32)
+
+		if ast.get_receiver.mtype isa MFormalType then res = res.bin_or(64)
 
 		return res
 	end
@@ -767,7 +785,7 @@ redef class MMethodDef
 
 			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
 			trace(buff)
-			trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
+			trace("\t\tconcretes receivers? {(site.get_concretes != null)}")
 		end
 
 		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
