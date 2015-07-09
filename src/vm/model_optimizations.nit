@@ -151,6 +151,8 @@ class MOSubtypeSitePattern
 	# Static type of the target
 	var target: MType
 
+	var target_mclass: MClass
+
 	redef fun trace
 	do
 		return super + "target = {target} {target.name}"
@@ -519,10 +521,14 @@ abstract class MOSubtypeSite
 	# Static type on which the test is applied
 	var target: MType
 
+	var target_mclass: MClass
+
 	init(ast: AExpr, mpropdef: MPropDef, target: MType)
 	do
 		super
-		self.target = target.get_mclass(sys.vm, mpropdef).mclass_type
+		var mclass = target.get_mclass(sys.vm, mpropdef)
+		self.target = mclass.mclass_type
+		self.target_mclass = mclass.as(not null)
 	end
 
 	redef fun pretty_print(file)
@@ -597,6 +603,21 @@ class MOCallSite
 				file.write("{arg} ")
 			end
 		end
+	end
+
+	fun concretes_callees: List[MPropDef]
+	do
+		var callees = new List[MPropDef]
+
+		for rcv in concretes_receivers.as(not null) do
+			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+
+			if not callees.has(propdef) then
+				callees.add(propdef)
+			end
+		end
+
+		return callees
 	end
 end
 
@@ -678,7 +699,7 @@ redef class MClass
 		end
 
 		if pattern == null then
-			pattern = (new MOSubtypeSitePattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null), site.target)).init_abstract
+			pattern = (new MOSubtypeSitePattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null), site.target, site.target_mclass)).init_abstract
 			subtype_pattern.add(pattern)
 		end
 
@@ -716,6 +737,18 @@ redef class MClass
 	do
 		new_pattern.newexprs.add(newsite)
 		newsite.pattern = new_pattern
+	end
+
+	# Indicate if target is the only loaded subclass of target
+	fun single_loaded_subclass(target: MClass): Bool
+	do
+		if self == target and (subclasses == null or subclasses.length == 0) then
+			return true
+		else if subclasses.length == 1 then
+			return subclasses.first.single_loaded_subclass(target)
+		end
+
+		return false
 	end
 end
 
@@ -773,7 +806,6 @@ redef class MType
 
 			var anchor: MType = mpropdef.mclassdef.bound_mtype
 			var res = anchor_to(sys.vm.mainmodule, anchor.as(MClassType)).get_mclass(vm, mpropdef)
-			print "ANCHOR self = {self} {self.name}, anchor = {anchor} {anchor.name}, anchor_to = {res.as(not null)} {res.name}"
 
 			return res
 		else

@@ -562,13 +562,13 @@ redef abstract class MOSitePattern
 		end
 	end
 
-	# Get the relative offset of the "property" (gp for MOPropPattern, methodbloc offset for MOSubtypePattern)
+	# Get the relative offset of the "property" (gp for MOPropPattern, methodbloc offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Get the pic
 	fun get_pic(vm: VirtualMachine): MClass is abstract
 
-	# True if the site can be static
+	# True if the pattern can be static
 	# False by default
 	fun can_be_static: Bool do return false
 
@@ -608,12 +608,38 @@ redef class MOSubtypeSitePattern
 	redef fun get_offset(vm) do return get_pic(vm).color
 
 	redef fun get_pic(vm) do return target.as(MClassType).mclass
+
+	redef fun can_be_static
+	do
+		# If the target is not loaded, the cast will always fail
+		if not target_mclass.abstract_loaded then return true
+
+		# If rsc has only one loaded subclass, then true
+		if rsc.single_loaded_subclass(target_mclass) then return true
+
+		return false
+	end
+
+	redef fun set_static_impl(mutable)
+	do
+		impl = new StaticImplSubtype(false, true)
+	end
 end
 
 redef class MOAsNotNullPattern
 	redef fun get_offset(vm) do return 0
 
 	redef fun get_pic(vm) do return rsc
+
+	redef fun set_static_impl(mutable)
+	do
+		impl = new StaticImplSubtype(false, true)
+	end
+
+	redef fun can_be_static
+	do
+		return false
+	end
 end
 
 redef abstract class MOPropSitePattern
@@ -662,7 +688,7 @@ redef abstract class MOSite
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 			return impl.as(not null)
-		else if get_concretes != null then
+		else if get_concretes == null then
 			return pattern.get_impl(vm)
 		else
 			compute_impl_concretes(vm)
@@ -726,7 +752,10 @@ redef abstract class MOSite
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Tell if the implementation can be static
-	fun can_be_static: Bool do return get_concretes != null
+	fun can_be_static: Bool
+	do
+		return pattern.can_be_static
+	end
 
 	# Set a static implementation
 	fun set_static_impl(vm: VirtualMachine, mutable: Bool) is abstract
@@ -829,6 +858,18 @@ redef class MOCallSite
 		end
 
 		return copy
+	end
+
+	redef fun can_be_static
+	do
+		# If the pattern can be static, return true
+		if super then return true
+
+		if get_concretes == null then
+			return false
+		else
+			return concretes_callees.length == 1
+		end
 	end
 end
 

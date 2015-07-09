@@ -242,7 +242,15 @@ redef class MOExpr
 	# bit4: a primitive
 	# bit5: null receiver
 	# bit6: recursive
-	fun preexistence_origin: Int is abstract
+	# bit7: is_npre
+	fun preexistence_origin: Int
+	do
+		if is_pre then
+			return 0
+		else
+			return 128
+		end
+	end
 
 	fun preexistence_origin_recursive: Int
 	do
@@ -385,7 +393,7 @@ redef class MOParam
 
 	redef fun preexistence_origin: Int
 	do
-		return 1
+		return super.bin_or(1)
 	end
 end
 
@@ -493,15 +501,10 @@ redef class MOCallSite
 		var preval = 0
 
 		if concretes_receivers != null then
-			callees = new List[MPropDef]
-			for rcv in concretes_receivers.as(not null) do
-				var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+			callees = concretes_callees
 
-				if propdef.is_compiled then
-					callees.add(propdef)
-				else
-					return 8
-				end
+			for callee in callees do
+				if not callee.is_compiled then return 8
 			end
 		else
 			if pattern.cuc > 0 then return 8
@@ -563,7 +566,7 @@ redef class MOCallSite
 
 	redef fun preexistence_origin: Int
 	do
-		return 4
+		return super.bin_or(4)
 	end
 
 	redef fun preexistence_origin_recursive: Int
@@ -853,7 +856,7 @@ redef class MOSuper
 
 	redef fun preexistence_origin: Int
 	do
-		return 4
+		return super.bin_or(4)
 	end
 end
 
@@ -865,7 +868,7 @@ redef class MOLit
 
 	redef fun preexistence_origin: Int
 	do
-		return 8
+		return super.bin_or(8)
 	end
 
 	redef fun preexist_expr
@@ -956,7 +959,7 @@ redef class MONew
 
 	redef fun preexistence_origin: Int
 	do
-		return 2
+		return super.bin_or(2)
 	end
 end
 
@@ -976,7 +979,7 @@ redef class MOPrimitive
 
 	redef fun preexistence_origin: Int
 	do
-		return 16
+		return super.bin_or(16)
 	end
 
 	redef fun preexist_expr

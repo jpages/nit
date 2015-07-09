@@ -63,6 +63,7 @@ redef class ModelBuilder
 		if toolcontext.stats_on.value then
 			print(pstats.pretty)
 			pstats.overview
+
 			post_exec(mainmodule)
 			pstats.overview
 
@@ -77,6 +78,8 @@ redef class ModelBuilder
 	do
 		# Recompile all active objet sites to get the upper bound of the preexistence
 		# We don't need pstats counters with lower bound anymore, so we override it
+
+		sys.vm.init_stats
 
 		var old_counters = sys.pstats
 		sys.pstats = new MOStats("last")
@@ -111,7 +114,7 @@ redef class ModelBuilder
 		# Print the array of preexistence values
 		print("Stats on receiver_origin\n")
 		print("# bit0: parameter\n# bit1: a new\n# bit2: a call\n# bit3: a lit\n# bit4: a primitive")
-		print("# bit5: null receiver\n# bit6: recursive")
+		print("# bit5: null receiver\n# bit6: recursive\n# bit7: is_npre")
 		for i in [0..sys.vm.receiver_origin.length[ do
 			if sys.vm.receiver_origin[i] > 0 then print("receiver_origin[{i}] = {sys.vm.receiver_origin[i]}")
 		end
@@ -121,15 +124,15 @@ redef class ModelBuilder
 			if sys.vm.return_origin[i] > 0 then print("return_origin[{i}] = {sys.vm.return_origin[i]}")
 		end
 
-		print("Stats on receiver_origin_recursive\n")
-		for i in [0..sys.vm.receiver_origin_recursive.length[ do
-			if sys.vm.receiver_origin_recursive[i] > 0 then print("receiver_origin_recursive[{i}] = {sys.vm.receiver_origin_recursive[i]}")
-		end
+		# print("Stats on receiver_origin_recursive\n")
+		# for i in [0..sys.vm.receiver_origin_recursive.length[ do
+		# 	if sys.vm.receiver_origin_recursive[i] > 0 then print("receiver_origin_recursive[{i}] = {sys.vm.receiver_origin_recursive[i]}")
+		# end
 
-		print("\nStats on return_origin_recursive\n")
-		for i in [0..sys.vm.return_origin_recursive.length[ do
-			if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
-		end
+		# print("\nStats on return_origin_recursive\n")
+		# for i in [0..sys.vm.return_origin_recursive.length[ do
+		# 	if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
+		# end
 
 		var s = """
 		# bit0: positive cuc
@@ -171,15 +174,29 @@ redef class VirtualMachine
 		end
 	end
 
-	var return_origin = new Array[Int].filled_with(0, 129)
+	var return_origin: Array[Int] is noinit
 
-	var receiver_origin = new Array[Int].filled_with(0, 129)
+	var receiver_origin: Array[Int] is noinit
 
-	var return_origin_recursive = new Array[Int].filled_with(0, 129)
+	var return_origin_recursive: Array[Int] is noinit
 
-	var receiver_origin_recursive = new Array[Int].filled_with(0, 129)
+	var receiver_origin_recursive: Array[Int] is noinit
 
-	var trace_origin = new Array[Int].filled_with(0, 129)
+	var trace_origin: Array[Int] is noinit
+
+	init
+	do
+		init_stats
+	end
+
+	fun init_stats
+	do
+		return_origin = new Array[Int].filled_with(0, 129)
+		receiver_origin = new Array[Int].filled_with(0, 257)
+		return_origin_recursive = new Array[Int].filled_with(0, 129)
+		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
+		trace_origin = new Array[Int].filled_with(0, 129)
+	end
 end
 
 redef class APropdef
@@ -265,12 +282,6 @@ class MOStats
 	# Make text csv file contains overview statistics
 	fun overview
 	do
-		sys.vm.return_origin = new Array[Int].filled_with(0, 129)
-		sys.vm.receiver_origin = new Array[Int].filled_with(0, 129)
-		sys.vm.return_origin_recursive = new Array[Int].filled_with(0, 129)
-		sys.vm.receiver_origin_recursive = new Array[Int].filled_with(0, 129)
-		sys.vm.trace_origin = new Array[Int].filled_with(0, 129)
-
 		var buf: String
 		var file = new FileWriter.open("mo-stats-{lbl}.csv")
 
@@ -492,9 +503,9 @@ class MOStats
 					sys.vm.return_origin[origin] += 1
 					sys.vm.return_origin[sys.vm.return_origin.length-1] += 1
 
-					var recursive = propdef.return_expr.preexistence_origin_recursive
-					sys.vm.return_origin_recursive[recursive] += 1
-					sys.vm.return_origin_recursive[sys.vm.return_origin_recursive.length-1] += 1
+					# var recursive = propdef.return_expr.preexistence_origin_recursive
+					# sys.vm.return_origin_recursive[recursive] += 1
+					# sys.vm.return_origin_recursive[sys.vm.return_origin_recursive.length-1] += 1
 				else
 					nb_method_return_npre += 1
 				end
@@ -899,15 +910,13 @@ redef class MOSite
 
 			sys.pstats.inc("object_sites")
 
-			if expr_recv.is_pre then
-				var origin = expr_recv.preexistence_origin
-				sys.vm.receiver_origin[origin] += 1
-				sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
+			var origin = expr_recv.preexistence_origin
+			sys.vm.receiver_origin[origin] += 1
+			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
 
-				var recursive = expr_recv.preexistence_origin_recursive
-				sys.vm.receiver_origin_recursive[recursive] += 1
-				sys.vm.receiver_origin_recursive[sys.vm.receiver_origin_recursive.length-1] += 1
-			end
+			# var recursive = expr_recv.preexistence_origin_recursive
+			# sys.vm.receiver_origin_recursive[recursive] += 1
+			# sys.vm.receiver_origin_recursive[sys.vm.receiver_origin_recursive.length-1] += 1
 
 			# Trace the origin of preexistence of callsites
 			if self isa MOCallSite then
@@ -953,8 +962,6 @@ redef class MOSite
 			end
 
 			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
-
-			# Print the preexistence origin of this site
 		end
 	end
 
