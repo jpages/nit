@@ -826,7 +826,6 @@ redef class MClass
 	# *`offset` The offset of block of attributes of `current_class` in `self`
 	fun moved_class_attributes(vm: VirtualMachine, current_class: MClass, offset: Int)
 	do
-		#TODO >= 0
 		# `current_class` was moved in `self` attribute table
 		if current_class.position_attributes > 0 then
 			# The invariant position is no longer satisfied
@@ -875,12 +874,10 @@ redef class MClass
 
 		# The position has an invariant position for this class and its subclasses only
 		if positions_methods.has_key(cl) then
-			var pos = positions_methods[cl]
-			if pos > 0 then return pos
-			return -1
+			return positions_methods[cl]
 		end
 
-		# No invariant position at all, the caller must use a multiple inheritance implementation
+		# TODO
 		return -1
 	end
 
@@ -893,12 +890,10 @@ redef class MClass
 
 		# The position has an invariant position for this class and its subclasses only
 		if positions_attributes.has_key(cl) then
-			var pos = positions_attributes[cl]
-			if pos > 0 then return pos
-			return -1
+			return positions_attributes[cl]
 		end
 
-		# No invariant position at all, the caller must use a multiple inheritance implementation
+		# TODO
 		return -1
 	end
 end

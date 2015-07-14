@@ -521,6 +521,7 @@ abstract class MOSubtypeSite
 	# Static type on which the test is applied
 	var target: MType
 
+	# Static MClass of the class
 	var target_mclass: MClass
 
 	init(ast: AExpr, mpropdef: MPropDef, target: MType)
