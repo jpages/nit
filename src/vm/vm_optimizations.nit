@@ -697,22 +697,34 @@ redef abstract class MOSite
 	end
 
 	# Compute the implementation with rst/pic, and concretes if any
+	# TODO: comment the code
 	fun compute_impl_concretes(vm: VirtualMachine)
 	do
-		if not pattern.rsc.loaded then
-			# The PHImpl here is mutable because it can be switch to a
-			# lightweight implementation when the class will be loaded
+		# Static
+		if can_be_static then
+			set_static_impl(vm, true)
+			return
+		end
+
+		if not get_pic(vm).abstract_loaded then
+			set_null_impl
+			return
+		end
+
+		if not pattern.rsc.abstract_loaded then
 			set_ph_impl(vm, true)
+			return
+		end
+
+		# SST
+		if get_pic(vm).is_instance_of_object(vm) then
+			set_sst_impl(vm, false)
 			return
 		end
 
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
-		if get_pic(vm).is_instance_of_object(vm) then
-			set_sst_impl(vm, true)
-		else if can_be_static then
-			set_static_impl(vm, true)
-		else if unique_pos_indicator == 1 then
+		if unique_pos_indicator == 1 then
 			# SST immutable because it can't be more than these concretes receivers statically
 			set_sst_impl(vm, false)
 		else if unique_pos_indicator == -1 then
@@ -729,19 +741,41 @@ redef abstract class MOSite
 	# 1 : unique position
 	private fun unique_pos_for_each_recv(vm: VirtualMachine): Int
 	do
+		var position = -1
+
 		if get_concretes != null then
 			for recv in get_concretes do
 				if not recv.loaded then return -1
-				if get_bloc_position(vm, recv) < 0 then return 0
+
+				var bloc_position = get_bloc_position(vm, recv)
+				if bloc_position < 0 then
+					bloc_position = - bloc_position
+				end
+
+				if position == -1 then
+					position = bloc_position
+				else
+					if position != bloc_position then return -1
+				end
+			end
+
+			return 1
+		else
+			# Go see in patterns
+			if get_bloc_position(vm, pattern.rsc) > 0 then
+				return 1
+			else
+				return 0
 			end
 		end
-
-		return 1
 	end
 
 	# Must return the position given by MClass:get_position_method
 	# Must be redefined by MOAttrSite to use MClass::get_position_attribute
-	private fun get_bloc_position(vm: VirtualMachine, recv: MClass): Int do return recv.get_position_methods(get_pic(vm))
+	private fun get_bloc_position(vm: VirtualMachine, recv: MClass): Int
+	do
+		return recv.get_position_methods(get_pic(vm))
+	end
 
 	# Return the pic
 	# In case of the subtype test, the pic is the target class
@@ -840,10 +874,12 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		var rst_vt = get_concretes.first.vtable.as(not null)
-		var pic_id = get_pic(vm).vtable.as(not null).id
-		var method = vm.method_dispatch_ph(rst_vt.internal_vtable, rst_vt.mask, pic_id, get_offset(vm))
-		impl = new StaticImplProp(mutable, method)
+		if get_concretes == null then
+			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rst)
+			impl = new StaticImplProp(mutable, propdef)
+		else
+			impl = new StaticImplProp(mutable, concretes_callees.first)
+		end
 	end
 
 	# Clone a MOSite
