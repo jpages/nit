@@ -743,7 +743,7 @@ redef class MClass
 	# Indicate if target is the only loaded subclass of target
 	fun single_loaded_subclass(target: MClass): Bool
 	do
-		if self == target and (subclasses == null or subclasses.length == 0) then
+		if self == target and subclasses.length == 0 then
 			return true
 		else if subclasses.length == 1 then
 			return subclasses.first.single_loaded_subclass(target)

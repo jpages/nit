@@ -94,7 +94,6 @@ redef class ModelBuilder
 		for site in pstats.analysed_sites
 		do
 			site.lp.preexist_analysed = false
-			site.preexist_site
 
 			site.site_preexist
 
@@ -903,7 +902,8 @@ redef class MOSite
 				buf += "\tpattern: {pattern2str}\n"
 				buf += "\tlp: {lp.mclassdef.name}::{lp.name}\n"
 				buf += "\tlocation: {ast.location}\n"
-				buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.is_nper}\n"
+				# TODO: fix that
+				buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.expr_preexist.bit_npre_immut}\n"
 				buf += "\timpl: {get_impl(vm)}\n"
 				print(buf)
 			end
