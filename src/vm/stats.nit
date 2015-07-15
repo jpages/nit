@@ -112,8 +112,17 @@ redef class ModelBuilder
 
 		# Print the array of preexistence values
 		print("Stats on receiver_origin\n")
-		print("# bit0: parameter\n# bit1: a new\n# bit2: a call\n# bit3: a lit\n# bit4: a primitive")
-		print("# bit5: null receiver\n# bit6: recursive\n# bit7: is_npre")
+		var receiver_origin_string = """# Allows to trace the preexistence origin of a Site by encoding the following values:
+		# 1: parameter
+		# 2: a new
+		# 4: a call
+		# 8: a lit
+		# 16: a primitive
+		# 32: null receiver
+		# 64: recursive
+		# 128: is_npre
+		# 256: a readsite"""
+		print(receiver_origin_string)
 		for i in [0..sys.vm.receiver_origin.length[ do
 			if sys.vm.receiver_origin[i] > 0 then print("receiver_origin[{i}] = {sys.vm.receiver_origin[i]}")
 		end
@@ -133,16 +142,17 @@ redef class ModelBuilder
 		# 	if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
 		# end
 
-		var s = """
-		# bit0: positive cuc
-		# bit1: at least one preexisting callee
-		# bit2: at least one non-preexisting callee
-		# bit3: the callee is a procedure
-		# bit4: the expression is preexisting
-		# bit5: concretes types
-		# bit6: generic/formal receiver
+		var trace_origin_string = """
+		# Trace the origin of preexistence of a site
+		# 1: positive cuc
+		# 2: at least one preexisting callee
+		# 4: at least one non-preexisting callee
+		# 8: the callee is a procedure
+		# 16: the expression is preexisting
+		# 32: concretes types
+		# 64: generic/formal receiver
 		"""
-		print(s)
+		print(trace_origin_string)
 
 		for i in [0..sys.vm.trace_origin.length[ do
 			if sys.vm.trace_origin[i] > 0 then print("trace_origin[{i}] = {sys.vm.trace_origin[i]}")
@@ -191,10 +201,10 @@ redef class VirtualMachine
 	fun init_stats
 	do
 		return_origin = new Array[Int].filled_with(0, 129)
-		receiver_origin = new Array[Int].filled_with(0, 257)
+		receiver_origin = new Array[Int].filled_with(0, 513)
 		return_origin_recursive = new Array[Int].filled_with(0, 129)
 		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
-		trace_origin = new Array[Int].filled_with(0, 129)
+		trace_origin = new Array[Int].filled_with(0, 257)
 	end
 end
 
@@ -920,14 +930,6 @@ redef class MOSite
 
 			# Trace the origin of preexistence of callsites
 			if self isa MOCallSite then
-				# Trace if the RST is null
-				# if not callsite.recv isa MFormalType then
-				# 	print "callsite.recv {callsite.recv}"
-				# else
-				# 	print "callsite.recv GENERIC {callsite.recv} bound {callsite.recv.lookup_bound(sys.vm.mainmodule, mtype)}"
-				# 	print "callsite.mpropdef {callsite.mpropdef}"
-				# end
-
 				if expr_recv.is_pre then
 					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} receiver_origin {expr_recv.preexistence_origin} nb_callees {nb_callees}")
 				else
