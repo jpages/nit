@@ -206,14 +206,15 @@ end
 
 redef class MOExpr
 	# Allows to trace the preexistence origin of a Site by encoding the following values:
-	# bit0: parameter
-	# bit1: a new
-	# bit2: a call
-	# bit3: a lit
-	# bit4: a primitive
-	# bit5: null receiver
-	# bit6: recursive
-	# bit7: is_npre
+	# 1: parameter
+	# 2: a new
+	# 4: a call
+	# 8: a lit
+	# 16: a primitive
+	# 32: null receiver
+	# 64: recursive
+	# 128: is_npre
+	# 256: the receiver is a readsite
 	fun preexistence_origin: Int
 	do
 		if is_pre then
@@ -442,13 +443,13 @@ redef class MOCallSite
 	var nb_callees = 0
 
 	# Trace the origin of preexistence of a site
-	# bit0: positive cuc
-	# bit1: at least one preexisting callee
-	# bit2: at least one non-preexisting callee
-	# bit3: the callee is a procedure
-	# bit4: the expression is preexisting
-	# bit5: concretes types
-	# bit6: generic/formal receiver
+	# 1: positive cuc
+	# 2: at least one preexisting callee
+	# 4: at least one non-preexisting callee
+	# 8: the callee is a procedure
+	# 16: the expression is preexisting
+	# 32: concretes types
+	# 64: generic/formal receiver
 	fun trace_origin: Int
 	do
 		var res = 0
@@ -541,42 +542,6 @@ redef class MMethodDef
 		preexist_all(vm)
 	end
 end
-
-# Preexistence masks
-# PVAL_PER:	0...1111
-# PTYPE_PER:	0...1101
-# PVAL_NPER:	0...1011
-# PTYPE_NPER:	0...1001
-# NPRE_PER:	0...1100
-# NPRE_NPER:	0...1000
-# RECURSIV:	0...0000
-# PRE_PER:	0...0101
-# PRE_NPER:	0...0001
-# UNKNOWN:	1...
-
-# Preexistence mask of perennial value preexistence
-fun pmask_PVAL_PER: Int do return 15
-
-# Preexistence mask of perennial type preexistence
-fun pmask_PTYPE_PER: Int do return 13
-
-# Preexistence mask of no perennial value preexistence
-fun pmask_PVAL_NPER: Int do return 11
-
-# Preexistence mask of no perennial type preexistence
-fun pmask_PTYPE_NPER: Int do return 9
-
-# Preexistence mask of perennial no preexistence
-fun pmask_NPRE_PER: Int do return 12
-
-# Preexistence mask of no perennial no preexistence
-fun pmask_NPRE_NPER: Int do return 8
-
-# Preexistence mask of recursive calls
-fun pmask_RECURSIV: Int do return 0
-
-# Preexistence mask of unknown preexistence
-fun pmask_UNKNOWN: Int do return 255
 
 redef class MOSuper
 	redef fun compute_preexist
@@ -676,6 +641,11 @@ redef class MOReadSite
 	do
 		# For now, an attribute read is non-preexisting perennial
 		return 24
+	end
+
+	redef fun preexistence_origin: Int
+	do
+		return super.bin_or(256)
 	end
 end
 
