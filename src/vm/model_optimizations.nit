@@ -443,11 +443,7 @@ end
 
 # MO of super calls
 class MOSuper
-#	super MOCallSite
 	super MOExpr
-
-	# It's very complex to write a good code for ast2mo for ASuperExpr (it depends of a super call on init or regular method)
-	# So, for now, MOSuper is an expression
 end
 
 # MO of literals
@@ -713,10 +709,6 @@ redef class MClass
 		var pattern: nullable MOPropSitePattern = null
 
 		for p in sites_patterns do
-			if p.rsc != self then
-				print "PATTERN self = {self} {self.name}, pattern = {p} ,p.rsc = {p.rsc} {p.rsc.name}, p.rst = {p.rst} {p.rst.name}, gp = {gp} {gp.full_name}"
-			end
-
 			if p.gp == gp and p.rst == mclass_type and p.compatible_site(site) then
 				assert p.rsc == self
 				pattern = p
@@ -920,9 +912,6 @@ class ASubtypeExpr
 		if mo_entity != null then return mo_entity
 
 		var recv = get_receiver
-		# if recv.mtype isa MNullType or recv.mtype == null then return sys.monull
-
-		# TODO: be sure that cast_type is never null here
 		var cast_site = copy_site(mpropdef).as(MOSubtypeSite)
 		sys.ast2mo_clone_table[self] = cast_site
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
@@ -1184,7 +1173,6 @@ redef class AOnceExpr
 	do
 		var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity
-		# if n_expr.mtype isa MNullType or n_expr.mtype == null then return sys.monull
 
 		var moexpr = n_expr.ast2mo(mpropdef)
 		sys.ast2mo_clone_table[self] = moexpr
@@ -1202,39 +1190,6 @@ redef class ASuperExpr
 		sys.ast2mo_clone_table[self] = mosuper
 		return mosuper
 	end
-
-#	redef fun ast2mo(mpropdef) do
-#		var mo_entity = get_mo_from_clone_table
-#		if mo_entity != null then return mo_entity
-#
-#		var recv_class: MClass
-#		var called_mproperty: MProperty
-#
-#		if callsite != null then
-#			# super init call
-#			var cs = callsite.as(not null)
-#			recv_class = cs.recv.get_mclass(vm).as(not null)
-#			called_mproperty = cs.mproperty
-#		else
-#			# super standard call
-#			called_mproperty = self.mpropdef.as(not null).mproperty
-#			recv_class = called_mproperty.intro_mclassdef.mclass
-#		end
-#
-#		var mosuper = new MOSuperSite(self, mpropdef)
-#		sys.ast2mo_clone_table[self] = mosuper
-#
-#		recv_class.set_site_pattern(mosuper, recv_class.mclass_type, called_mproperty)
-#
-#		mosuper.expr_recv = n_args.n_exprs.first.ast2mo(mpropdef).as(MOExpr)
-#
-#		# Expressions arguments given to the method called
-#		for i_arg in [1..n_args.n_exprs.length] do
-#			mosuper.given_args.add(n_args.n_exprs[i_arg].ast2mo(mpropdef).as(MOExpr))
-#		end
-#
-#		return mosuper
-#	end
 end
 
 redef class ANullExpr
