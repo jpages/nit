@@ -388,10 +388,10 @@ redef class MOCallSite
 			pval = preval.bin_and(63)
 		end
 
-		## si preexistant on filtre par arguments
-		## on efface les dépendances dans le callee
+		# If preexisting, we filter by arguments and erase the dependances in the callee
 		pval = preval.bin_and(63)
-		## et on combine avec celles du caller
+
+		# And we combine with the one of the caller
 		if preval.bit_param(0) then pval = pval.merge(expr_recv.expr_preexist)
 
 		var n = 0
@@ -403,7 +403,7 @@ redef class MOCallSite
 		if rec and pval.bit_pre then
 			return 32
 		else
-			# Si le graphe d'appel est clos
+			# If we do not have any receivers
 			if concretes_receivers == null and pval.bit_pre_immut then
 				return pval.setbit(2, 0)
 			end
@@ -491,7 +491,6 @@ redef class MMethodDef
 		if preexist_analysed or is_intern or is_extern then return false
 		preexist_analysed = true
 
-		trace("\npreexist_all of {self}")
 		var preexist: Int
 
 		if not disable_preexistence_extensions then
@@ -499,7 +498,6 @@ redef class MMethodDef
 				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
 
 				preexist = newexpr.expr_preexist
-				trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
 			end
 		end
 
@@ -510,27 +508,7 @@ redef class MMethodDef
 
 		for site in mosites do
 			preexist = site.site_preexist
-			var buff = "\tpreexist of "
-
-			if site isa MOAttrSite then
-				buff += "attr {site.pattern.rst}.{site.pattern.gp}"
-			else if site isa MOSubtypeSite then
-				buff += "cast {site.pattern.rst} isa {site.target}"
-			else if site isa MOCallSite then
-				buff += "meth {site.pattern.rst}.{site.pattern.gp}"
-			else if site isa MOAsNotNullSite then
-				buff += "cast not null {site.pattern.rst}"
-			else
-				abort
-			end
-
-			buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
-			trace(buff)
-			trace("\t\tconcretes receivers? {(site.get_concretes != null)}")
 		end
-
-		if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
-		if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
 
 		return true
 	end

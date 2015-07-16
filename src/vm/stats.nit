@@ -548,7 +548,7 @@ class MOStats
 
 		file.write("\n")
 		file.write("ast sites, {map["ast_sites"]}\n")
-		file.write("new sites, {map["new_sites"]}\n")
+		file.write("new sites, {sys.vm.all_new_sites.length}\n")
 		file.write("object sites, {map["object_sites"]}\n")
 
 		file.write("\n")
@@ -650,7 +650,7 @@ class MOStats
 		compiled_methods.add_all(counters.compiled_methods)
 		compiled_new.add_all(counters.compiled_new)
 		map["ast_sites"] = counters.get("ast_sites")
-		map["new_sites"] = counters.get("new_sites")
+		map["new_sites"] = sys.vm.all_new_sites.length
 	end
 
 	init
