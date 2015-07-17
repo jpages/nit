@@ -56,6 +56,7 @@ redef class MPropDef
 	# List of mutable non preexists expressions
 	var exprs_npreexist_mut = new List[MOExpr]
 
+	# List of mutable expressions
 	var preexist_mut_exprs = new List[MOExpr]
 
 	# Drop exprs_preesit_mut and set unknown state to all expression inside

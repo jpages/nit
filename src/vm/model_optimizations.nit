@@ -444,6 +444,11 @@ end
 # MO of super calls
 class MOSuper
 	super MOExpr
+
+	init
+	do
+		sys.vm.all_moentitites.add(self)
+	end
 end
 
 # MO of literals
@@ -505,6 +510,8 @@ abstract class MOSite
 		self.ast = ast
 		lp = mpropdef
 		lp.mosites.add(self)
+
+		sys.vm.all_moentitites.add(self)
 	end
 end
 
@@ -746,30 +753,23 @@ redef class MClass
 end
 
 redef class VirtualMachine
-	# The top of list is the type of the receiver that will be used after new_frame
-	var next_receivers = new List[MType]
-
 	# All living MPropDef
 	var compiled_mproperties = new List[MPropDef]
 
-	# All living
+	# All living new sites
 	var all_new_sites = new List[MONew]
 
+	# The list of all object entities
 	var all_moexprs = new List[MOExpr]
+
+	# The list of all object entities
+	var all_moentitites = new List[MOEntity]
 
 	# All patterns of the program
 	var all_patterns = new List[MOSitePattern]
 
 	# All MONewPattern
 	var all_new_patterns = new List[MONewPattern]
-
-	redef fun new_frame(node, mpropdef, args)
-	do
-		next_receivers.push(args.first.mtype)
-		var ret = super(node, mpropdef, args)
-		next_receivers.pop
-		return ret
-	end
 end
 
 redef class MType
@@ -849,6 +849,9 @@ redef class AExpr
 	end
 
 	fun copy_site(mpropdef: MPropDef): MOEntity is abstract
+
+	# The corresponding model entity
+	var mo_entity: MOEntity is noinit
 end
 
 redef class AAttrFormExpr
@@ -882,13 +885,6 @@ redef class AAttrExpr
 	end
 end
 
-redef class AIssetAttrExpr
-	redef fun copy_site(mpropdef: MPropDef): MOReadSite
-	do
-		return new MOReadSite(self, mpropdef)
-	end
-end
-
 redef class AAttrAssignExpr
 	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
 	do
@@ -900,6 +896,13 @@ redef class AAttrReassignExpr
 	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
 	do
 		return new MOWriteSite(self, mpropdef)
+	end
+end
+
+redef class AIssetAttrExpr
+	redef fun copy_site(mpropdef: MPropDef): MOReadSite
+	do
+		return new MOReadSite(self, mpropdef)
 	end
 end
 

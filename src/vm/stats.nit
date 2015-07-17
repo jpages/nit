@@ -451,15 +451,11 @@ class MOStats
 		file.write("from return cuc pos,{buf}\n")
 
 		# from read site
-
 		buf = "{map["method_sites_from_read"]},"
 		buf += "{map["attribute_sites_from_read"]},"
 		buf += "{map["cast_sites_from_read"]},"
 		buf += "{map["sites_from_read"]}"
 		file.write("from readsite,{buf}\n")
-
-		# cuc
-
 		file.write("\n")
 
 		var living_propdefs = new HashSet[MMethodDef]
@@ -474,6 +470,7 @@ class MOStats
 			end
 		end
 
+		# cuc
 		var cuc_pos = 0
 		var cuc_null = 0
 
@@ -549,7 +546,7 @@ class MOStats
 		file.write("\n")
 		file.write("ast sites, {map["ast_sites"]}\n")
 		file.write("new sites, {sys.vm.all_new_sites.length}\n")
-		file.write("object sites, {map["object_sites"]}\n")
+		file.write("object sites, {sys.vm.all_moentitites.length}\n")
 
 		file.write("\n")
 		file.write("methods with a return, {nb_method_return}\n")
@@ -651,6 +648,7 @@ class MOStats
 		compiled_new.add_all(counters.compiled_new)
 		map["ast_sites"] = counters.get("ast_sites")
 		map["new_sites"] = sys.vm.all_new_sites.length
+		map["object_sites"] = sys.vm.all_moentitites.length
 	end
 
 	init
@@ -918,7 +916,7 @@ redef class MOSite
 				print(buf)
 			end
 
-			sys.pstats.inc("object_sites")
+			# sys.pstats.inc("object_sites")
 
 			var origin = expr_recv.preexistence_origin
 			sys.vm.receiver_origin[origin] += 1
