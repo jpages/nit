@@ -24,7 +24,7 @@ redef class Sys
 	# Hashmap used for clone AST to MO
 	# The key is typed by ANode instead of AExpr, because we use get_movar to get the return expression of a method,
 	# and get_movar needs to use this table to put the generated MOExpr.
-	var ast2mo_clone_table = new HashMap[ANode, MOEntity]
+	# var ast2mo_clone_table = new HashMap[ANode, MOEntity]
 
 	var var2mo_clone_table = new HashMap[Variable, MOVar]
 
@@ -819,39 +819,10 @@ redef class AExpr
 	# Otherwise, create it, set it in clone table, set it's dependencies, return it.
 	fun ast2mo(mpropdef: MPropDef): MOEntity is abstract
 
-	# Generic ast2mo function for primitive nodes
-	fun ast2mo_generic_primitive(mpropdef: MPropDef): MOEntity
-	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-
-		sys.ast2mo_clone_table[self] = sys.moprimitive
-		return sys.moprimitive
-	end
-
-	# Generic ast2mo function for literal nodes
-	fun ast2mo_generic_literal(mpropdef: MPropDef): MOEntity
-	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
-
-		sys.ast2mo_clone_table[self] = sys.moliteral
-		return sys.moliteral
-	end
-
-	# Return the MOEntity if it's already in the clone table
-	fun get_mo_from_clone_table: nullable MOEntity
-	do
-		if sys.ast2mo_clone_table.has_key(self) then
-			return sys.ast2mo_clone_table[self]
-		end
-		return null
-	end
-
 	fun copy_site(mpropdef: MPropDef): MOEntity is abstract
 
 	# The corresponding model entity
-	var mo_entity: MOEntity is noinit
+	var mo_entity: nullable MOEntity
 end
 
 redef class AAttrFormExpr
@@ -862,17 +833,18 @@ redef class AAttrFormExpr
 
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var attr_site = copy_site(mpropdef).as(MOAttrSite)
 
-		sys.ast2mo_clone_table[self] = attr_site
 		var recv = get_receiver
 		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_site_pattern(attr_site, mproperty.as(not null), mpropdef.mclassdef.mclass)
+
+		# Associate the MOEntity with the AST node
+		mo_entity = attr_site
 
 		return attr_site
 	end
@@ -911,17 +883,16 @@ class ASubtypeExpr
 
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var recv = get_receiver
 		var cast_site = copy_site(mpropdef).as(MOSubtypeSite)
-		sys.ast2mo_clone_table[self] = cast_site
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_subtype_pattern(cast_site, mpropdef)
 
+		mo_entity = cast_site
 		return cast_site
 	end
 end
@@ -964,21 +935,20 @@ redef class AAsNotnullExpr
 
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var moexpr = copy_site(mpropdef)
-		sys.ast2mo_clone_table[self] = moexpr
-
 		moexpr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_asnotnull_pattern(moexpr, mpropdef)
 
+		mo_entity = moexpr
 		return moexpr
 	end
 end
 
+#TODO: associates variables of the two models without using the hashmap
 redef class Variable
 	# Create the movar corresponding to AST node, and return it
 	fun get_movar(mpropdef: MPropDef): MOVar
@@ -1015,13 +985,13 @@ end
 redef class ANewExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var monew = new MONew(mpropdef)
-		sys.ast2mo_clone_table[self] = monew
 		mpropdef.monews.add(monew)
 		recvtype.as(not null).mclass.set_new_pattern(monew)
+
+		mo_entity = monew
 		return monew
 	end
 end
@@ -1029,11 +999,12 @@ end
 redef class ASelfExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var movar = new MOParam(mpropdef, variable.as(not null), 0)
-		sys.ast2mo_clone_table[self] = movar
+
+		mo_entity = movar
+
 		return movar
 	end
 end
@@ -1051,24 +1022,21 @@ redef class APropdef
 	do
 		super
 
-		if self isa AMethPropdef then
-
-			# Compile all object-mechanisms sites
-			for site in object_sites do
-				site.ast2mo(mpropdef.as(not null))
-			end
-
-			# Transform all Variable into MOVar
-			mpropdef.variables = new Array[MOVar]
-			for variable in variables do
-				var movar = variable.get_movar(mpropdef.as(not null))
-				mpropdef.variables.add(movar)
-			end
-
-			mpropdef.return_expr = returnvar.get_movar(mpropdef.as(not null))
-
-			mpropdef.compile_mo
+		# Compile all object-mechanisms sites
+		for site in object_sites do
+			site.ast2mo(mpropdef.as(not null))
 		end
+
+		# Transform all Variable into MOVar
+		mpropdef.variables = new Array[MOVar]
+		for variable in variables do
+			var movar = variable.get_movar(mpropdef.as(not null))
+			mpropdef.variables.add(movar)
+		end
+
+		mpropdef.return_expr = returnvar.get_movar(mpropdef.as(not null))
+
+		mpropdef.compile_mo
 	end
 end
 
@@ -1107,8 +1075,7 @@ redef class ASendExpr
 
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var cs = callsite.as(not null)
 
@@ -1118,9 +1085,13 @@ redef class ASendExpr
 
 		# ast2mo_accessor and ast2mo_method will add the node on the ast2mo_clone_table
 		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
-			return ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
+			var mo = ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
+			mo_entity = mo
+			return mo
 		else
-			return ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
+			var mo = ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
+			mo_entity = mo
+			return mo
 		end
 	end
 
@@ -1129,7 +1100,6 @@ redef class ASendExpr
 	do
 		var moattr = copy_site_accessor(mpropdef, called_node_ast)
 
-		sys.ast2mo_clone_table[self] = moattr
 		moattr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
 		return moattr
@@ -1140,8 +1110,6 @@ redef class ASendExpr
 	fun ast2mo_method(mpropdef: MPropDef, called_node_ast: ANode, is_attribute: Bool): MOEntity
 	do
 		var mocallsite = copy_site_method(mpropdef)
-
-		sys.ast2mo_clone_table[self] = mocallsite
 
 		mocallsite.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
@@ -1162,11 +1130,12 @@ end
 redef class AParExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		# var mo_entity = get_mo_from_clone_table
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var moexpr = n_expr.ast2mo(mpropdef)
-		sys.ast2mo_clone_table[self] = moexpr
+
+		mo_entity = moexpr
 		return moexpr
 	end
 end
@@ -1174,11 +1143,10 @@ end
 redef class AOnceExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var moexpr = n_expr.ast2mo(mpropdef)
-		sys.ast2mo_clone_table[self] = moexpr
+		mo_entity = moexpr
 		return moexpr
 	end
 end
@@ -1186,11 +1154,11 @@ end
 redef class ASuperExpr
 	redef fun ast2mo(mpropdef)
 	do
-		var mo_entity = get_mo_from_clone_table
-		if mo_entity != null then return mo_entity
+		if mo_entity != null then return mo_entity.as(not null)
 
 		var mosuper = new MOSuper(mpropdef)
-		sys.ast2mo_clone_table[self] = mosuper
+
+		mo_entity = mosuper
 		return mosuper
 	end
 end
@@ -1200,29 +1168,29 @@ redef class ANullExpr
 end
 
 redef class AStringExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class ASuperstringExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class ACharExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class AIntExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class AFloatExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class ABoolExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_primitive(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
 redef class AArrayExpr
-	redef fun ast2mo(mpropdef) do return ast2mo_generic_literal(mpropdef)
+	redef fun ast2mo(mpropdef) do return sys.moliteral
 end
