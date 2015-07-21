@@ -735,10 +735,10 @@ redef abstract class MOSite
 		end
 	end
 
-	# Each concrete receiver has unique method position
-	# -1 : some classes still unloaded
-	# 0 : no unique position
-	# 1 : unique position
+	# Indicates if each concrete receiver has a unique method's position:
+	# * -1: some classes are still unloaded
+	# * 0: no unique position
+	# * 1: unique position
 	private fun unique_pos_for_each_recv(vm: VirtualMachine): Int
 	do
 		var position = -1
@@ -761,7 +761,7 @@ redef abstract class MOSite
 
 			return 1
 		else
-			# Go see in patterns
+			# See in patterns
 			if get_bloc_position(vm, pattern.rsc) > 0 then
 				return 1
 			else
@@ -812,7 +812,10 @@ redef abstract class MOSite
 	end
 
 	# Set a null implementation (eg. PIC null)
-	fun set_null_impl do impl = new NullImpl(true)
+	fun set_null_impl
+	do
+		impl = new NullImpl(true)
+	end
 
 	fun clone: MOSite
 	do
@@ -925,13 +928,13 @@ redef class MOReadSite
 	end
 end
 
-# Root of type implementation (sst, ph, static)
+# The superclass of implementations of object mechanisms
 abstract class Implementation
-	# Is is a mutable implementation ?
+	# Is the implementation mutable in the future ?
 	var is_mutable: Bool
 end
 
-# Use for null implementation, and trigger a trampoline
+# A null implementation
 class NullImpl
 	super Implementation
 end
@@ -945,7 +948,9 @@ abstract class ObjectImpl
 end
 
 # SST implementation
-class SSTImpl super ObjectImpl end
+class SSTImpl
+	super ObjectImpl
+end
 
 # Perfect hashing implementation
 class PHImpl

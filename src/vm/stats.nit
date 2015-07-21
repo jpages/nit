@@ -68,7 +68,6 @@ redef class ModelBuilder
 			pstats.overview
 
 			pstats.trace_patterns
-			# Meh...
 		end
 	end
 
@@ -209,7 +208,6 @@ redef class VirtualMachine
 end
 
 redef class APropdef
-	#
 	redef fun compile(vm)
 	do
 		super
