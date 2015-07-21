@@ -483,7 +483,7 @@ class MOStats
 		var nb_method_return_npre = 0 # A method with a non-preexisting return
 
 		for propdef in sys.vm.compiled_mproperties do
-			assert propdef isa MMethodDef
+			if not propdef isa MMethodDef then continue
 			if propdef.callers.length > 0 then
 				if propdef.callers.first.cuc == 0 then
 					cuc_null += 1
