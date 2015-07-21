@@ -21,13 +21,6 @@ redef class Sys
 	# Tell if trace is enabled
 	var trace_on: Bool is noinit
 
-	# Hashmap used for clone AST to MO
-	# The key is typed by ANode instead of AExpr, because we use get_movar to get the return expression of a method,
-	# and get_movar needs to use this table to put the generated MOExpr.
-	# var ast2mo_clone_table = new HashMap[ANode, MOEntity]
-
-	var var2mo_clone_table = new HashMap[Variable, MOVar]
-
 	# Singleton of MONull
 	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
@@ -815,8 +808,6 @@ end
 redef class AExpr
 	# Clone a AST expression to a MOEntity
 	# `mpropdef` is the local property containing this expression (or expression-site)
-	# Return a MOEntity it's already created (already in the clone table).
-	# Otherwise, create it, set it in clone table, set it's dependencies, return it.
 	fun ast2mo(mpropdef: MPropDef): MOEntity is abstract
 
 	fun copy_site(mpropdef: MPropDef): MOEntity is abstract
@@ -950,18 +941,24 @@ end
 
 #TODO: associates variables of the two models without using the hashmap
 redef class Variable
-	# Create the movar corresponding to AST node, and return it
+	# The associated MOVar
+	var movar: nullable MOVar
+
+	# Create the movar corresponding to this Variable, and return it
+	# `mpropdef` The enclosing MPropdef
 	fun get_movar(mpropdef: MPropDef): MOVar
 	do
-		if sys.var2mo_clone_table.has_key(self) then return sys.var2mo_clone_table[self]
+		if movar != null then return movar.as(not null)
 
+		# The corresponding movar
 		if dep_exprs.length == 0 and parameter then
 			var moparam = new MOParam(mpropdef, self, position)
-			sys.var2mo_clone_table[self] = moparam
+
+			movar = moparam
 			return moparam
 		else if dep_exprs.length == 1 or dep_exprs.length == 0 then
 			var mossa = new MOSSAVar(mpropdef, self, position)
-			sys.var2mo_clone_table[self] = mossa
+			movar = mossa
 
 			if dep_exprs.length == 0 then
 				mossa.dependency = sys.monull
@@ -971,9 +968,8 @@ redef class Variable
 
 			return mossa
 		else
-			assert dep_exprs.length > 1
 			var mophi = new MOPhiVar(mpropdef, self, position)
-			sys.var2mo_clone_table[self] = mophi
+			movar = mophi
 
 			for dep in dep_exprs do mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
 
@@ -1017,7 +1013,7 @@ redef class AVarExpr
 end
 
 redef class APropdef
-	# Compute the implementation of sites of this local property when AST node is compiled
+	# Compute the implementation of sites of this local property when the AST node is compiled
 	redef fun compile(vm)
 	do
 		super
@@ -1083,7 +1079,6 @@ redef class ASendExpr
 		var called_node_ast = vm.modelbuilder.mpropdef2node(cs.mpropdef)
 		var is_attribute = called_node_ast isa AAttrPropdef
 
-		# ast2mo_accessor and ast2mo_method will add the node on the ast2mo_clone_table
 		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
 			var mo = ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
 			mo_entity = mo
@@ -1130,7 +1125,6 @@ end
 redef class AParExpr
 	redef fun ast2mo(mpropdef)
 	do
-		# var mo_entity = get_mo_from_clone_table
 		if mo_entity != null then return mo_entity.as(not null)
 
 		var moexpr = n_expr.ast2mo(mpropdef)
