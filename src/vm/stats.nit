@@ -1198,13 +1198,16 @@ redef class MPropDef
 	do
 		super
 
-		if self isa MMethodDef then
-			for site in self.mosites do
-				site.stats(vm)
-				sys.pstats.analysed_sites.add(site)
-			end
+		for site in self.mosites do
+			site.stats(vm)
+			sys.pstats.analysed_sites.add(site)
+		end
 
-			for newexpr in self.monews do sys.pstats.inc("new_sites")
+		for newexpr in self.monews do
+			sys.pstats.inc("new_sites")
+		end
+
+		if self isa MMethodDef then
 			sys.pstats.compiled_methods.add(self)
 			sys.pstats.get_method_return_origin(self)
 		end
