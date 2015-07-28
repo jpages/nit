@@ -252,6 +252,84 @@ class MOStats
 	# Internal encoding of counters
 	var map = new HashMap[String, Int]
 
+	# The general matrix of the statistics
+	var matrix: Array[Array[Int]] = new Array[Array[Int]]
+
+	# Return an array which contains all captions of the statistics for the x axis
+	fun caption_x: Array[String]
+	do
+		var res = new Array[String].with_capacity(7)
+
+		res.add(",")
+		res.add("method,")
+		res.add("attribute,")
+		res.add("cast,")
+		res.add("rst null,")
+		res.add("asnotnull,")
+		res.add("total\n")
+
+		return res
+	end
+
+	# Return an array which contains all captions of the statistics for the y axis
+	fun caption_y: Array[String]
+	do
+		var res = new Array[String].with_capacity(54)
+
+		res.add("self,\n")
+		res.add("preexist,\n")
+		res.add("preexist_primitive,\n")
+		res.add("npreexist,\n")
+		res.add("concretes,\n")
+		res.add("concretes preexist,\n")
+		res.add("concretes npreexist,\n")
+		res.add("static,\n")
+		res.add("static preexist,\n")
+		res.add("static npreexist,\n")
+		res.add("sst,\n")
+		res.add("sst preexist,\n")
+		res.add("sst npreexist,\n")
+		res.add("ph,\n")
+		res.add("ph preexist,\n")
+		res.add("ph npreexist,\n")
+		res.add("null,\n")
+		res.add("null preexist,\n")
+		res.add("null npreexist,\n")
+		res.add("\n,\n")
+		res.add("optimisable inline,\n")
+		res.add("non optimisable inline,\n")
+		res.add("non inline,\n")
+		res.add("\n,\n")
+		res.add("from new,\n")
+		res.add("from new preexist,\n")
+		res.add("from new no preexist,\n")
+		res.add("from return,\n")
+		res.add("from return cuc null,\n")
+		res.add("from return cuc null preexist,\n")
+		res.add("from return cuc null no preexist,\n")
+		res.add("from return cuc pos,\n")
+		res.add("from readsite,\n")
+		res.add("\n,\n")
+		res.add("callers cuc pos,\n")
+		res.add("callers cuc null,\n")
+		res.add("\n,\n")
+		res.add("inter procedural return from new,\n")
+		res.add("inter procedural return from other,\n")
+		res.add("from primitive/lit,\n")
+		res.add("procedure,\n")
+		res.add("\n,\n")
+		res.add("compiled new of unloaded classes,\n")
+		res.add("ast sites,\n")
+		res.add("new sites,\n")
+		res.add("object sites,\n")
+		res.add("\n,\n")
+		res.add("methods with a return,\n")
+		res.add("methods with a preexisting return,\n")
+		res.add("methods with a non-preexisting return,\n")
+
+		return res
+	end
+
 	# Increment a counter
 	fun inc(el: String) do map[el] += 1
 
@@ -291,8 +369,9 @@ class MOStats
 	do
 		var buf: String
 		var file = new FileWriter.open("mo-stats-{lbl}.csv")
+		var new_file = new FileWriter.open("statistics-{lbl}.csv")
 
-		file.write(", method, attribute, cast, total, rst null\n")
+		file.write(", method, attribute, cast, total, rst null, asnotnull\n")
 
 		var self_meth = map["method_self"]
 		var self_attr = map["attribute_self"]
@@ -456,6 +535,15 @@ class MOStats
 		file.write("from readsite,{buf}\n")
 		file.write("\n")
 
+		#TODO: new method for printing statistics
+		for caption in caption_x do
+			new_file.write(caption)
+		end
+
+		for caption in caption_y do
+			new_file.write(caption)
+		end
+
 		var living_propdefs = new HashSet[MMethodDef]
 		for site in analysed_sites do
 			if site isa MOCallSite then
@@ -552,6 +640,7 @@ class MOStats
 		file.write("methods with a non-preexisting return, {nb_method_return_npre}\n")
 
 		file.close
+		new_file.close
 	end
 
 	# Pretty format
@@ -886,6 +975,9 @@ redef class MOSite
 	# Type of the site (method, attribute or cast)
 	var site_type: String is noinit
 
+	# All MOSite have an index in x to be identified in results
+	var index_x: Int = 0
+
 	# Non-recursive origin of the dependency
 	var origin: DependencyTrace is noinit
 
@@ -914,8 +1006,6 @@ redef class MOSite
 				print(buf)
 			end
 
-			# sys.pstats.inc("object_sites")
-
 			var origin = expr_recv.preexistence_origin
 			sys.vm.receiver_origin[origin] += 1
 			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
@@ -934,6 +1024,8 @@ redef class MOSite
 				sys.vm.trace_origin[trace_origin] += 1
 				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
 			end
+
+			#TODO: new method for printing statistics
 		end
 
 		if print_location_preexist then dump_location_site
@@ -1119,8 +1211,75 @@ redef class MOExprSite
 	end
 end
 
+redef class MOPropSite
+	redef fun pattern2str do return "{pattern.rst}::{pattern.gp}"
+end
+
 redef class MOCallSite
+	redef var index_x = 1
+
 	redef var site_type = "method"
+end
+
+redef class MOAttrSite
+	redef var index_x = 2
+
+	redef var site_type = "attribute"
+end
+
+redef class MOSubtypeSite
+	redef fun pattern2str do return "{pattern.rst}->{pattern.target}"
+
+	redef var index_x = 3
+
+	redef var site_type = "cast"
+end
+
+redef class MOAsNotNullSite
+	redef fun pattern2str do return "{pattern.rst}->not null"
+
+	redef var site_type = "asnotnull"
+
+	redef var index_x = 4
+
+	redef fun incr_type_impl(vm: VirtualMachine)
+	do
+	end
+
+	redef fun incr_from_site do	end
+
+	redef fun incr_concrete_site(vm: VirtualMachine)
+	do
+	end
+
+	redef fun incr_self
+	do
+	end
+
+	redef fun incr_rst_unloaded(vm: VirtualMachine)
+	do
+	end
+end
+
+redef class Implementation
+	# All Implementation are associated with an index in y
+	var index_y: Int = 8
+end
+
+redef class StaticImpl
+	redef var index_y = 8
+end
+
+redef class SSTImpl
+	redef var index_y = 11
+end
+
+redef class PHImpl
+	redef var index_y = 14
+end
+
+redef class NullImpl
+	redef var index_y = 17
 end
 
 redef class AExpr
@@ -1152,44 +1311,6 @@ redef class AVarFormExpr
 	redef fun pretty_print(file)
 	do
 		variable.pretty_print(file)
-	end
-end
-
-redef class MOPropSite
-	redef fun pattern2str do return "{pattern.rst}::{pattern.gp}"
-end
-
-redef class MOAttrSite
-	redef var site_type = "attribute"
-end
-
-redef class MOSubtypeSite
-	redef fun pattern2str do return "{pattern.rst}->{pattern.target}"
-
-	redef var site_type = "cast"
-end
-
-redef class MOAsNotNullSite
-	redef fun pattern2str do return "{pattern.rst}->not null"
-
-	redef var site_type = "asnotnull"
-
-	redef fun incr_type_impl(vm: VirtualMachine)
-	do
-	end
-
-	redef fun incr_from_site do	end
-
-	redef fun incr_concrete_site(vm: VirtualMachine)
-	do
-	end
-
-	redef fun incr_self
-	do
-	end
-
-	redef fun incr_rst_unloaded(vm: VirtualMachine)
-	do
 	end
 end
 
