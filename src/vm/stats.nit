@@ -204,6 +204,12 @@ redef class VirtualMachine
 		return_origin_recursive = new Array[Int].filled_with(0, 129)
 		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
 		trace_origin = new Array[Int].filled_with(0, 257)
+
+		# Initialize the matrix of results
+		sys.pstats.matrix = new Array[Array[Int]].with_capacity(58)
+		for i in [0..58[ do
+			sys.pstats.matrix[i] = new Array[Int].filled_with(0, 6)
+		end
 	end
 end
 
@@ -264,8 +270,8 @@ class MOStats
 		res.add("method,")
 		res.add("attribute,")
 		res.add("cast,")
-		res.add("rst null,")
 		res.add("asnotnull,")
+		res.add("rst null,")
 		res.add("total\n")
 
 		return res
@@ -276,56 +282,55 @@ class MOStats
 	do
 		var res = new Array[String].with_capacity(54)
 
-		res.add("self,\n")
-		res.add("preexist,\n")
-		res.add("preexist_primitive,\n")
-		res.add("npreexist,\n")
-		res.add("concretes,\n")
-		res.add("concretes preexist,\n")
-		res.add("concretes npreexist,\n")
-		res.add("static,\n")
-		res.add("static preexist,\n")
-		res.add("static npreexist,\n")
-		res.add("sst,\n")
-		res.add("sst preexist,\n")
-		res.add("sst npreexist,\n")
-		res.add("ph,\n")
-		res.add("ph preexist,\n")
-		res.add("ph npreexist,\n")
-		res.add("null,\n")
-		res.add("null preexist,\n")
-		res.add("null npreexist,\n")
-		res.add("\n,\n")
-		res.add("optimisable inline,\n")
-		res.add("non optimisable inline,\n")
-		res.add("non inline,\n")
-		res.add("\n,\n")
-		res.add("from new,\n")
-		res.add("from new preexist,\n")
-		res.add("from new no preexist,\n")
-		res.add("from return,\n")
-		res.add("from return cuc null,\n")
-		res.add("from return cuc null preexist,\n")
-		res.add("from return cuc null no preexist,\n")
-		res.add("from return cuc pos,\n")
-		res.add("from readsite,\n")
-		res.add("\n,\n")
-		res.add("callers cuc pos,\n")
-		res.add("callers cuc null,\n")
-		res.add("\n,\n")
-		res.add("inter procedural return from new,\n")
-		res.add("inter procedural return from other,\n")
-		res.add("from primitive/lit,\n")
-		res.add("procedure,\n")
-		res.add("\n,\n")
-		res.add("compiled new of unloaded classes,\n")
-		res.add("ast sites,\n")
-		res.add("new sites,\n")
-		res.add("object sites,\n")
-		res.add("\n,\n")
-		res.add("methods with a return,\n")
-		res.add("methods with a preexisting return,\n")
-		res.add("methods with a non-preexisting return,\n")
+		res.add("self,")
+		res.add("preexist,")
+		res.add("npreexist,")
+		res.add("concretes,")
+		res.add("concretes preexist,")
+		res.add("concretes npreexist,")
+		res.add("static,")
+		res.add("static preexist,")
+		res.add("static npreexist,")
+		res.add("sst,")
+		res.add("sst preexist,")
+		res.add("sst npreexist,")
+		res.add("ph,")
+		res.add("ph preexist,")
+		res.add("ph npreexist,")
+		res.add("null,")
+		res.add("null preexist,")
+		res.add("null npreexist,")
+		res.add("\n,")
+		res.add("optimisable inline,")
+		res.add("non optimisable inline,")
+		res.add("non inline,")
+		res.add("\n,")
+		res.add("from new,")
+		res.add("from new preexist,")
+		res.add("from new no preexist,")
+		res.add("from return,")
+		res.add("from return cuc null,")
+		res.add("from return cuc null preexist,")
+		res.add("from return cuc null no preexist,")
+		res.add("from return cuc pos,")
+		res.add("from readsite,")
+		res.add("\n,")
+		res.add("callers cuc pos,")
+		res.add("callers cuc null,")
+		res.add("\n,")
+		res.add("inter procedural return from new,")
+		res.add("inter procedural return from other,")
+		res.add("from primitive/lit,")
+		res.add("procedure,")
+		res.add("\n,")
+		res.add("compiled new of unloaded classes,")
+		res.add("ast sites,")
+		res.add("new sites,")
+		res.add("object sites,")
+		res.add("\n,")
+		res.add("methods with a return,")
+		res.add("methods with a preexisting return,")
+		res.add("methods with a non-preexisting return,")
 
 		return res
 	end
@@ -535,15 +540,6 @@ class MOStats
 		file.write("from readsite,{buf}\n")
 		file.write("\n")
 
-		#TODO: new method for printing statistics
-		for caption in caption_x do
-			new_file.write(caption)
-		end
-
-		for caption in caption_y do
-			new_file.write(caption)
-		end
-
 		var living_propdefs = new HashSet[MMethodDef]
 		for site in analysed_sites do
 			if site isa MOCallSite then
@@ -639,6 +635,22 @@ class MOStats
 		file.write("methods with a preexisting return, {nb_method_return_pre}\n")
 		file.write("methods with a non-preexisting return, {nb_method_return_npre}\n")
 
+		#TODO: new method for printing statistics
+		for caption in caption_x do
+			new_file.write(caption)
+		end
+
+		# TODO: -10 ?
+		for i in [0..pstats.matrix.length-10[ do
+			new_file.write(caption_y[i])
+
+			var size = pstats.matrix[i].length
+			for j in [0..size[ do
+				var value = pstats.matrix[i][j]
+				new_file.write(value.to_s+",")
+			end
+			new_file.write("\n")
+		end
 		file.close
 		new_file.close
 	end
@@ -736,6 +748,11 @@ class MOStats
 		map["ast_sites"] = counters.get("ast_sites")
 		map["new_sites"] = sys.vm.all_new_sites.length
 		map["object_sites"] = sys.vm.all_moentitites.length
+
+		matrix = new Array[Array[Int]].with_capacity(57)
+		for i in [0..counters.matrix.length[ do
+			matrix[i] = counters.matrix[i]
+		end
 	end
 
 	init
@@ -1026,6 +1043,10 @@ redef class MOSite
 			end
 
 			#TODO: new method for printing statistics
+			pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
+
+			# Increment the total for implementation of the previous line
+			incr_total
 		end
 
 		if print_location_preexist then dump_location_site
@@ -1052,6 +1073,35 @@ redef class MOSite
 			end
 
 			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
+		end
+	end
+
+	fun incr_total
+	do
+		var impl = get_impl(vm)
+		var pre = expr_recv.is_pre
+
+		pstats.matrix[impl.index_y][5] += 1
+
+		if impl isa StaticImpl then
+			pstats.matrix[impl.index_y][index_x] += 1
+			pstats.matrix[impl.index_y][5] += 1
+		else if impl isa SSTImpl then
+			pstats.matrix[impl.index_y][index_x] += 1
+			pstats.matrix[impl.index_y][5] += 1
+		else if impl isa PHImpl then
+			pstats.matrix[impl.index_y][index_x] += 1
+			pstats.matrix[impl.index_y][5] += 1
+		else if impl isa NullImpl then
+			pstats.matrix[impl.index_y][index_x] += 1
+			pstats.matrix[impl.index_y][5] += 1
+		end
+
+		# The total of preexisting sites
+		if pre then
+			pstats.matrix[1][index_x] += 1
+		else
+			pstats.matrix[2][index_x] += 1
 		end
 	end
 
@@ -1153,6 +1203,21 @@ redef class MOSite
 			pstats.inc("{site_type}_concretes")
 			incr_specific_counters(pre, "concretes_preexist", "concretes_npreexist")
 			incr_specific_counters(pre, "{site_type}_concretes_preexist", "{site_type}_concretes_npreexist")
+
+			# Total of concretes for each category
+			pstats.matrix[3][index_x] += 1
+
+			# Total of concretes
+			pstats.matrix[3][5] += 1
+
+			# Preexisting and non-preexisting sites with concretes
+			if pre then
+				pstats.matrix[4][index_x] += 1
+				pstats.matrix[4][5] += 1
+			else
+				pstats.matrix[5][index_x] += 1
+				pstats.matrix[5][5] += 1
+			end
 		end
 	end
 
@@ -1216,13 +1281,13 @@ redef class MOPropSite
 end
 
 redef class MOCallSite
-	redef var index_x = 1
+	redef var index_x = 0
 
 	redef var site_type = "method"
 end
 
 redef class MOAttrSite
-	redef var index_x = 2
+	redef var index_x = 1
 
 	redef var site_type = "attribute"
 end
@@ -1230,7 +1295,7 @@ end
 redef class MOSubtypeSite
 	redef fun pattern2str do return "{pattern.rst}->{pattern.target}"
 
-	redef var index_x = 3
+	redef var index_x = 2
 
 	redef var site_type = "cast"
 end
@@ -1240,7 +1305,7 @@ redef class MOAsNotNullSite
 
 	redef var site_type = "asnotnull"
 
-	redef var index_x = 4
+	redef var index_x = 3
 
 	redef fun incr_type_impl(vm: VirtualMachine)
 	do
@@ -1263,23 +1328,34 @@ end
 
 redef class Implementation
 	# All Implementation are associated with an index in y
-	var index_y: Int = 8
+	var index_y: Int = 6
+
+	# Compute the y index of this implementation
+	# `mosite` The site which contains the implementation
+	fun compute_index_y(mosite: MOSite): Int
+	do
+		if mosite.expr_recv.is_pre then
+			return index_y + 1
+		else
+			return index_y + 2
+		end
+	end
 end
 
 redef class StaticImpl
-	redef var index_y = 8
+	redef var index_y = 6
 end
 
 redef class SSTImpl
-	redef var index_y = 11
+	redef var index_y = 9
 end
 
 redef class PHImpl
-	redef var index_y = 14
+	redef var index_y = 12
 end
 
 redef class NullImpl
-	redef var index_y = 17
+	redef var index_y = 15
 end
 
 redef class AExpr
