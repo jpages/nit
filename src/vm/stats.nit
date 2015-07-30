@@ -992,7 +992,8 @@ redef class MOSite
 	# Type of the site (method, attribute or cast)
 	var site_type: String is noinit
 
-	# All MOSite have an index in x to be identified in results
+	# All MOSite have an index in x to be identified in results,
+	# The index represents the type of the site: method, attribute, cast or asnotnull
 	var index_x: Int = 0
 
 	# Non-recursive origin of the dependency
@@ -1007,10 +1008,12 @@ redef class MOSite
 
 		if not origin.from_primitive then
 			incr_from_site
-			incr_concrete_site(vm)
+			incr_concrete_site
 			incr_self
+
+			# These two categories must be exclusive
 			incr_rst_unloaded(vm)
-			incr_type_impl(vm)
+			incr_type_impl
 
 			if print_site_state then
 				var buf = "site {self}\n"
@@ -1081,21 +1084,9 @@ redef class MOSite
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
 
+		pstats.matrix[impl.index_y][index_x] += 1
 		pstats.matrix[impl.index_y][5] += 1
-
-		if impl isa StaticImpl then
-			pstats.matrix[impl.index_y][index_x] += 1
-			pstats.matrix[impl.index_y][5] += 1
-		else if impl isa SSTImpl then
-			pstats.matrix[impl.index_y][index_x] += 1
-			pstats.matrix[impl.index_y][5] += 1
-		else if impl isa PHImpl then
-			pstats.matrix[impl.index_y][index_x] += 1
-			pstats.matrix[impl.index_y][5] += 1
-		else if impl isa NullImpl then
-			pstats.matrix[impl.index_y][index_x] += 1
-			pstats.matrix[impl.index_y][5] += 1
-		end
+		pstats.matrix[impl.compute_index_y(self)][5] += 1
 
 		# The total of preexisting sites
 		if pre then
@@ -1123,7 +1114,7 @@ redef class MOSite
 	end
 
 	#
-	fun incr_type_impl(vm: VirtualMachine)
+	fun incr_type_impl
 	do
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
@@ -1193,8 +1184,8 @@ redef class MOSite
 		end
 	end
 
-	#
-	fun incr_concrete_site(vm: VirtualMachine)
+	# Increment counters for callsites which have concretes receiver
+	fun incr_concrete_site
 	do
 		if get_concretes != null then
 			var pre = expr_recv.is_pre
@@ -1221,12 +1212,15 @@ redef class MOSite
 		end
 	end
 
-	#
+	# Increment counters if the receiver is `self`
 	fun incr_self
 	do
 		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
 			pstats.inc("self")
 			pstats.inc("{site_type}_self")
+
+			pstats.matrix[0][index_x] += 1
+			pstats.matrix[0][5] += 1
 		end
 	end
 
@@ -1238,6 +1232,9 @@ redef class MOSite
 		if not rst_loaded then
 			var impl = get_impl(vm)
 			var pre = expr_recv.is_pre
+
+			pstats.matrix[impl.index_y][4] += 1
+			pstats.matrix[impl.compute_index_y(self)][4] += 1
 
 			if impl isa StaticImpl then
 				pstats.inc("rst_unloaded_static")
@@ -1307,13 +1304,13 @@ redef class MOAsNotNullSite
 
 	redef var index_x = 3
 
-	redef fun incr_type_impl(vm: VirtualMachine)
+	redef fun incr_type_impl
 	do
 	end
 
 	redef fun incr_from_site do	end
 
-	redef fun incr_concrete_site(vm: VirtualMachine)
+	redef fun incr_concrete_site
 	do
 	end
 
