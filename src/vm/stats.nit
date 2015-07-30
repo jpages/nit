@@ -474,7 +474,7 @@ class MOStats
 		file.write("\n\n")
 
 		var optimizable_inline = map["method_preexist_static"] + map["attribute_preexist_sst"] + map["cast_preexist_static"] + map["cast_preexist_sst"]
-		file.write("optimisable inline,{optimizable_inline}\n")
+		file.write("optimisable inline, {optimizable_inline}\n")
 
 		var no_optimizable = map["method_npreexist_static"] + map["attribute_npreexist_sst"] + map["cast_npreexist_sst"] + map["cast_npreexist_static"]
 		file.write("non optimisable inline,{no_optimizable}\n")
@@ -482,8 +482,15 @@ class MOStats
 		var no_inline = map["method_ph"] + map["method_sst"] + map["attribute_ph"] + map["cast_ph"]
 		file.write("non inline,{no_inline}\n")
 
+		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + asnotnull_preexist_sst
+		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[10][3]
+
+		#non optimizable inline: method_npreexist_static + attribute_npreexist_sst + cast_npreexist_static + cast_npreexist_sst + asnotnull_npreexist_sst
+		pstats.matrix[20][0] = pstats.matrix[8][0] + pstats.matrix[11][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[11][3]
 		file.write("\n\n")
 
+		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph
+		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3]
 		# from new
 
 		file.write("from new,{map["method_sites_from_new"]}, {map["attribute_sites_from_new"]},{map["cast_sites_from_new"]},{map["sites_from_new"]}\n")
@@ -1091,8 +1098,10 @@ redef class MOSite
 		# The total of preexisting sites
 		if pre then
 			pstats.matrix[1][index_x] += 1
+			pstats.matrix[1][5] += 1
 		else
 			pstats.matrix[2][index_x] += 1
+			pstats.matrix[2][5] += 1
 		end
 	end
 
@@ -1184,7 +1193,7 @@ redef class MOSite
 		end
 	end
 
-	# Increment counters for callsites which have concretes receiver
+	# Increment counters for callsites with concrete receivers
 	fun incr_concrete_site
 	do
 		if get_concretes != null then
