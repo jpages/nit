@@ -491,8 +491,8 @@ class MOStats
 
 		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph
 		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3]
-		# from new
 
+		# from new
 		file.write("from new,{map["method_sites_from_new"]}, {map["attribute_sites_from_new"]},{map["cast_sites_from_new"]},{map["sites_from_new"]}\n")
 
 		buf = "{map["method_sites_from_new_pre"]},"
@@ -612,6 +612,9 @@ class MOStats
 
 		file.write("callers cuc pos, {cuc_pos}\n")
 		file.write("callers cuc null, {cuc_null}\n")
+
+		pstats.matrix[33][0] = cuc_pos
+		pstats.matrix[34][0] = cuc_null
 
 		# return from new with inter-procedural analysis
 		file.write("\n")
@@ -1159,6 +1162,17 @@ redef class MOSite
 	fun incr_from_site
 	do
 		if origin.from_new then
+			pstats.matrix[23][index_x] += 1
+			pstats.matrix[23][5] += 1
+
+			if expr_recv.is_pre then
+				pstats.matrix[24][index_x] += 1
+				pstats.matrix[24][5] += 1
+			else
+				pstats.matrix[25][index_x] += 1
+				pstats.matrix[25][5] += 1
+			end
+
 			pstats.inc("sites_from_new")
 			pstats.inc("{site_type}_sites_from_new")
 
@@ -1167,6 +1181,10 @@ redef class MOSite
 		end
 
 		if origin.from_return then
+			# The total of callsites
+			pstats.matrix[26][index_x] += 1
+			pstats.matrix[26][5] += 1
+
 			pstats.inc("sites_from_meth_return")
 			pstats.inc("{site_type}_sites_from_meth_return")
 
@@ -1177,6 +1195,17 @@ redef class MOSite
 			incr_specific_counters(origin.cuc_null, "sites_from_meth_return_cuc_null", "sites_from_meth_return_cuc_pos")
 
 			if origin.cuc_null then
+				pstats.matrix[27][index_x] += 1
+				pstats.matrix[27][5] += 1
+
+				if expr_recv.is_pre then
+					pstats.matrix[28][index_x] += 1
+					pstats.matrix[28][5] += 1
+				else
+					pstats.matrix[29][index_x] += 1
+					pstats.matrix[29][5] += 1
+				end
+
 				incr_specific_counters(expr_recv.is_pre,
 				"{site_type}_sites_from_meth_return_cuc_null_pre",
 				"{site_type}_sites_from_meth_return_cuc_null_npre")
@@ -1184,10 +1213,17 @@ redef class MOSite
 				incr_specific_counters(expr_recv.is_pre,
 				"sites_from_meth_return_cuc_null_pre",
 				"sites_from_meth_return_cuc_null_npre")
+			else
+				# Callsites with a positive cuc
+				pstats.matrix[30][index_x] += 1
+				pstats.matrix[30][5] += 1
 			end
 		end
 
 		if origin.from_read then
+			pstats.matrix[31][index_x] += 1
+			pstats.matrix[31][5] += 1
+
 			pstats.inc("sites_from_read")
 			pstats.inc("{site_type}_sites_from_read")
 		end
