@@ -217,7 +217,7 @@ redef class APropdef
 	redef fun compile(vm)
 	do
 		super
-		sys.pstats.map["ast_sites"] = sys.pstats.map["ast_sites"] + object_sites.length
+		sys.pstats.map["ast_sites"] += object_sites.length
 	end
 end
 
@@ -633,14 +633,22 @@ class MOStats
 			end
 		end
 
+		pstats.matrix[41][0] = compiled_new_unloaded
 		file.write("compiled new of unloaded classes, {compiled_new_unloaded}")
 
 		file.write("\n")
+		pstats.matrix[42][0] = map["ast_sites"]
+		pstats.matrix[43][0] = sys.vm.all_new_sites.length
+		pstats.matrix[44][0] = sys.vm.all_moentitites.length
+
 		file.write("ast sites, {map["ast_sites"]}\n")
 		file.write("new sites, {sys.vm.all_new_sites.length}\n")
 		file.write("object sites, {sys.vm.all_moentitites.length}\n")
 
 		file.write("\n")
+		pstats.matrix[46][0] = nb_method_return
+		pstats.matrix[47][0] = nb_method_return_pre
+		pstats.matrix[48][0] = nb_method_return_npre
 		file.write("methods with a return, {nb_method_return}\n")
 		file.write("methods with a preexisting return, {nb_method_return_pre}\n")
 		file.write("methods with a non-preexisting return, {nb_method_return_npre}\n")
@@ -650,14 +658,16 @@ class MOStats
 			new_file.write(caption)
 		end
 
-		# TODO: -10 ?
-		for i in [0..pstats.matrix.length-10[ do
+		# TODO: -9 ?
+		for i in [0..pstats.matrix.length-9[ do
 			new_file.write(caption_y[i])
 
 			var size = pstats.matrix[i].length
 			for j in [0..size[ do
 				var value = pstats.matrix[i][j]
-				new_file.write(value.to_s+",")
+				if value != 0 then new_file.write(value.to_s)
+
+				new_file.write(",")
 			end
 			new_file.write("\n")
 		end
@@ -964,8 +974,10 @@ class MOStats
 			# If the method return an object, it's return_expr is a MOVar
 			method.return_expr.as(MOVar).return_stats(method.mproperty)
 		else if method.return_expr != null then
+			pstats.matrix[37][0] += 1
 			sys.pstats.inc("return_from_not_object")
 		else
+			pstats.matrix[38][0] += 1
 			sys.pstats.inc("procedure")
 		end
 	end
@@ -1460,8 +1472,10 @@ redef class MOVar
 		var callees = new List[MProperty]
 		callees.add(mproperty)
 		if trace_origin(self, callees) then
+			pstats.matrix[36][0] += 1
 			sys.pstats.inc("inter_return_from_new")
 		else
+			pstats.matrix[37][0] += 1
 			sys.pstats.inc("inter_return_from_other")
 		end
 	end
