@@ -110,8 +110,7 @@ end
 redef class AAttrExpr
 	redef fun expr(v)
 	do
-		# TODO : a workaround for now
-		if not v isa VirtualMachine then return super
+		assert v isa VirtualMachine
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
@@ -119,25 +118,18 @@ redef class AAttrExpr
 		var mproperty = self.mproperty.as(not null)
 
 		assert recv isa MutableInstance
-		if status == 0 then optimize(mproperty, recv)
+
+		# Get the implementation and execute it
+		var impl = mo_entity.as(MOSite).get_impl(sys.vm)
 
 		var i: Instance
-		if status == 1 then
-			# SST
-			i = v.read_attribute_sst(recv.internal_attributes, offset)
-		else
-			# PH
-			i = v.read_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable, recv.vtable.as(not null).mask, id, offset)
-		end
+		i = impl.exec_attribute(recv, null).as(not null)
 
 		# If we get a `MInit` value, throw an error
 		if i == v.initialization_value then
 			v.fatal("Uninitialized attribute {mproperty.name}")
 			abort
 		end
-
-		#TODO : we need recompilations here
-		status = 0
 
 		return i
 	end
@@ -146,11 +138,7 @@ end
 redef class AAttrAssignExpr
 	redef fun stmt(v)
 	do
-		# TODO : a workaround for now
-		if not v isa VirtualMachine then
-			super
-			return
-		end
+		assert v isa VirtualMachine
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return
@@ -225,8 +213,7 @@ redef class AIsaExpr
 
 	redef fun expr(v)
 	do
-		# TODO : a workaround for now
-		if not v isa VirtualMachine then return super
+		assert v isa VirtualMachine
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
@@ -290,8 +277,7 @@ redef class AAsCastExpr
 
 	redef fun expr(v)
 	do
-		# TODO : a workaround for now
-		if not v isa VirtualMachine then return super
+		assert v isa VirtualMachine
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
@@ -346,57 +332,8 @@ redef class AAsCastExpr
 	end
 end
 
-redef class ASendExpr
-	# Indicate this call is inlined
-	var inlined: Bool = false
-
-	# If the call is inlined, do not execute it and continue the execution
-	# directly inside the calle
-	# redef fun expr(v)
-	# do
-	# 	var recv = v.expr(self.n_expr)
-	# 	if recv == null then return null
-	# 	var args = v.varargize(callsite.mpropdef, callsite.signaturemap, recv, self.raw_arguments)
-	# 	if args == null then return null
-
-	# 	# TODO: verify this hack works
-	# 	var mocallsite = get_mo_from_clone_table.as(nullable MOSite)
-
-	# 	# Inline the call if possible
-	# 	if mocallsite != null then
-	# 		if mocallsite.can_be_static and mocallsite.impl isa StaticImplProp then
-	# 			# If the callsite can be static (only one method for candidate), then inline
-	# 			var callee = vm.modelbuilder.mpropdef2node(mocallsite.impl.as(StaticImplProp).lp)
-	# 			var caller = sys.vm.current_propdef.mpropdef
-
-	# 			# Inline the callee inside the caller (just the model, not the code)
-
-	# 			if callee isa APropdef then
-	# 				# Create the two objects of intermediate representation
-	# 				caller.create_ir
-	# 				callee.mpropdef.create_ir
-
-	# 				caller.inline(callee, self)
-	# 				inlined = true
-	# 			end
-	# 		end
-	# 	else
-	# 		# Check if self is an attribute access or a call on a primitive receiver
-	# 	end
-
-	# 	var res = v.callsite(callsite, args)
-	# 	return res
-	# end
-end
-
 # TODO: De-optimize the inlining if needed
 redef class MPropDef
-	# The intermediate representation
-	var ir: nullable IR is noinit
-
-	# If true, the mpropdef contains at least one inlined callsite
-	var contains_inlining: Bool = false
-
 	redef fun compile_mo
 	do
 		super
@@ -405,122 +342,6 @@ redef class MPropDef
 			for site in self.mosites do site.get_impl(vm)
 		end
 	end
-
-	# Create the intermediate representation of this mpropdef
-	fun create_ir
-	do
-		# Do not generate twice the IR for the same MPropDef
-		if ir != null then return
-
-		# Collect all patterns to save them
-		var patterns = new List[MOSitePattern]
-		for site in mosites do
-			patterns.add(site.pattern)
-		end
-
-		ir = new IR(self, mosites, monews, patterns)
-	end
-
-	# Inline the `inlined` IR in self,
-	# The `inlined` IR will be cloned inside self
-	# `send` The expression of the call
-	fun inline(inlined: APropdef, send: ASendExpr)
-	do
-		# Add the object sites of the inlined to self
-		for callsite in inlined.mpropdef.mosites do
-			ir.callsites.add(callsite.clone)
-		end
-
-		ir.news.add_all(inlined.mpropdef.monews)
-		var params = new HashMap[MOParam, MOVar]
-
-		# TODO: change the dependences of the inlined method's variables
-		var i = 0
-		for site in ir.callsites do
-
-			# TODO: returnvar
-			print "Receiver expression = {site.expr_recv}"
-			if site.expr_recv isa MOParam then
-				# Change the dependences, the receiver should be a MOVar
-				if not params.has_key(site.expr_recv) then
-					# Create a new MOVar and set its dependences
-					var movar = new MOSSAVar(self, new Variable("param"), 0)
-
-					var moexpr = send.raw_arguments[i].ast2mo(self)
-					movar.dependency = moexpr.as(MOExpr)
-
-					params[site.expr_recv.as(MOParam)] = movar
-				end
-
-				# Replace into the site the MOParam by the corresponding MOVar
-				site.expr_recv = params[site.expr_recv]
-			end
-
-			# new_var.dep_exprs.add(send.raw_arguments[i])
-		end
-
-		#TODO Delete the inlined site inside the caller
-		contains_inlining = true
-	end
-
-	fun clone_variable(variable: Variable): Variable
-	do
-		var res = new Variable(variable.name)
-
-		res.location = variable.location
-		res.position = variable.position
-
-		return res
-	end
-end
-
-redef class MMethodDef
-	# redef fun preexist_all(vm: VirtualMachine): Bool
-	# do
-	# 	if preexist_analysed or is_intern or is_extern then return false
-	# 	preexist_analysed = true
-
-	# 	trace("\npreexist_all of {self}")
-	# 	var preexist: Int
-
-	# 	if ir == null then create_ir
-
-	# 	if not disable_preexistence_extensions then
-	# 		for newexpr in ir.news do
-	# 			assert not newexpr.pattern.cls.mclass_type.is_primitive_type
-
-	# 			preexist = newexpr.preexist_expr
-	# 			fill_nper(newexpr)
-	# 			trace("\tpreexist of new {newexpr} loaded:{newexpr.pattern.is_loaded} {preexist} {preexist.preexists_bits}")
-	# 		end
-	# 	end
-
-	# 	for site in ir.callsites do
-	# 		preexist = site.preexist_site
-	# 		var buff = "\tpreexist of "
-
-	# 		fill_nper(site.expr_recv)
-
-	# 		if site isa MOAttrSite then
-	# 			buff += "attr {site.pattern.rst}.{site.pattern.gp}"
-	# 		else if site isa MOSubtypeSite then
-	# 			buff += "cast {site.pattern.rst} isa {site.target}"
-	# 		else if site isa MOCallSite then
-	# 			buff += "meth {site.pattern.rst}.{site.pattern.gp}"
-	# 		else
-	# 			abort
-	# 		end
-
-	# 		buff += " {site.expr_recv}.{site} {preexist} {preexist.preexists_bits}"
-	# 		trace(buff)
-	# 		trace("\t\tconcretes receivers? {(site.get_concretes.length > 0)}")
-	# 	end
-
-	# 	if exprs_preexist_mut.length > 0 then trace("\tmutables pre: {exprs_preexist_mut}")
-	# 	if exprs_npreexist_mut.length > 0 then trace("\tmutables nper: {exprs_npreexist_mut}")
-
-	# 	return true
-	# end
 end
 
 redef abstract class MOSitePattern
@@ -545,7 +366,7 @@ redef abstract class MOSitePattern
 					set_sst_impl(vm, true)
 				end
 			else
-				set_ph_impl(vm, true)
+				set_ph_impl(vm, true, get_pic(vm).vtable.id)
 			end
 		else
 			var pos_cls = get_bloc_position(vm)
@@ -557,7 +378,7 @@ redef abstract class MOSitePattern
 			else if pos_cls > 0 then
 				set_sst_impl(vm, true)
 			else
-				set_ph_impl(vm, false)
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		end
 	end
@@ -585,11 +406,13 @@ redef abstract class MOSitePattern
 	end
 
 	# Set a ph impl
-	fun set_ph_impl(vm: VirtualMachine, mutable: Bool)
+	# *`mutable` Indicate if the implementation can change in the future
+	# *`id` The target identifier
+	fun set_ph_impl(vm: VirtualMachine, mutable: Bool, id: Int)
 	do
 		var offset = get_offset(vm)
 
-		impl = new PHImpl(mutable, offset)
+		impl = new PHImpl(mutable, offset, id)
 	end
 
 	# Return the offset of the introduction property of the class
@@ -677,7 +500,7 @@ end
 
 redef abstract class MOSite
 	# Implementation of the site (null if can't determine concretes receivers)
-	# We always must use get_impl to read this value
+	# get_impl must be used to read this value
 	var impl: nullable Implementation is writable, noinit
 
 	# Get the implementation of the site, according to preexist value
@@ -808,7 +631,7 @@ redef abstract class MOSite
 	do
 		var offset = get_offset(vm)
 
-		impl = new PHImpl(mutable, offset)
+		impl = new PHImpl(mutable, offset, get_pic(vm).vtable.id)
 	end
 
 	# Set a null implementation (eg. PIC null)
@@ -932,6 +755,21 @@ end
 abstract class Implementation
 	# Is the implementation mutable in the future ?
 	var is_mutable: Bool
+
+	# Execute an attribute access
+	# *`recv` The receiver
+	# *`value` The value to write, null if the implementation is an attribute read
+	# Return the read value if self is an attribute read
+	fun exec_attribute(recv: MutableInstance, value: nullable Instance): nullable Instance is abstract
+
+	# Execute a method dispatch
+	# *`recv` The receiver
+	fun exec_method(recv: MutableInstance): MMethodDef is abstract
+
+	# Execute a subtyping test
+	# *`recv` The receiver
+	# Return the result of the test
+	fun exec_subtype(recv: MutableInstance): Bool is abstract
 end
 
 # A null implementation
@@ -950,11 +788,38 @@ end
 # SST implementation
 class SSTImpl
 	super ObjectImpl
+
+	redef fun exec_attribute(recv, value)
+	do
+		# If this is an attribute read
+		if value == null then
+			return sys.vm.read_attribute_sst(recv.internal_attributes, offset)
+		else
+			return null
+		end
+	end
+
+	redef fun exec_method(recv: MutableInstance): MMethodDef is abstract
+
+	redef fun exec_subtype(recv: MutableInstance): Bool is abstract
 end
 
 # Perfect hashing implementation
 class PHImpl
 	super ObjectImpl
+
+	# The target identifier of the subtyping-test or the class which introduced the GP
+	var id: Int
+
+	redef fun exec_attribute(recv, value)
+	do
+		# If this is an attribute read
+		if value == null then
+			return sys.vm.read_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
+		else
+			return null
+		end
+	end
 end
 
 # Common class for static implementation between subtypes, attr, meth.
@@ -968,6 +833,11 @@ class StaticImplProp
 
 	# The called lp
 	var lp: MPropDef
+
+	redef fun exec_method(recv)
+	do
+		return lp.as(MMethodDef)
+	end
 end
 
 # Static implementation (used only for subtype tests)
@@ -976,23 +846,4 @@ class StaticImplSubtype
 
 	# Is subtype ?
 	var is_subtype: Bool
-end
-
-# An instance of this class is related to a propdef,
-# it contains all the intermediate representation which is needed for compilation
-class IR
-	# The propdef represented by this intermediate representation
-	var mpropdef: MPropDef
-
-	# The object mechanisms sites of the IR
-	var callsites: List[MOSite]
-
-	# List of instantiations sites in this local property
-	var news: List[MONew]
-
-	# The patterns related to `callsites`
-	var patterns: List[MOSitePattern]
-
-	# The local variables in the model form
-	var variables: Array[MOVar] = new Array[MOVar] is lazy
 end
