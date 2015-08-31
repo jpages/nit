@@ -58,9 +58,6 @@ redef class ModelBuilder
 	# of preexistence (see redef in vm_optimizations)
 	fun post_exec(mainmodule: MModule)
 	do
-		# Recompile all active objet sites to get the upper bound of the preexistence
-		# We don't need pstats counters with lower bound anymore, so we override it
-
 		sys.vm.init_stats
 
 		var old_counters = sys.pstats
@@ -310,8 +307,8 @@ class MOStats
 		res.add("from return cuc pos,")
 		res.add("from readsite,")
 		res.add("\n,")
-		res.add("callers cuc pos,")
-		res.add("callers cuc null,")
+		res.add("callers positive cuc,")
+		res.add("callers null cuc,")
 		res.add("\n,")
 		res.add("inter procedural return from new,")
 		res.add("inter procedural return from other,")
@@ -344,7 +341,7 @@ class MOStats
 	# Make text csv file contains overview statistics
 	fun overview
 	do
-		var new_file = new FileWriter.open("statistics-{lbl}.csv")
+		var file = new FileWriter.open("statistics-{lbl}.csv")
 
 		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + asnotnull_preexist_sst
 		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[10][3]
@@ -430,28 +427,28 @@ class MOStats
 
 		# Print the captions of the statistics file
 		for caption in caption_x do
-			new_file.write(caption)
+			file.write(caption)
 		end
 
 		# TODO: -9 ?
 		for i in [0..pstats.matrix.length-9[ do
-			new_file.write(caption_y[i])
+			file.write(caption_y[i])
 
 			var size = pstats.matrix[i].length
 			for j in [0..size[ do
 				var value = pstats.matrix[i][j]
-				if value != 0 then new_file.write(value.to_s)
+				if value != 0 then file.write(value.to_s)
 
-				new_file.write(",")
+				file.write(",")
 			end
-			new_file.write("\n")
+			file.write("\n")
 		end
-		new_file.close
+		file.close
 	end
 
 	fun debug_model(propdef: MPropDef, trace_file: FileWriter, trace_model: FileWriter)
 	do
-		# Trace of Julien's model
+		# Trace of AST model
 		trace_file.write("full_name {propdef.full_name} location {propdef.location} ")
 
 		if propdef.return_expr != null then
@@ -471,7 +468,7 @@ class MOStats
 			end
 			trace_file.write("\n")
 
-			# trace of Colin's model
+			# trace of MO model
 			trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
 
 			if propdef.return_expr != null then
@@ -495,8 +492,7 @@ class MOStats
 			end
 			trace_model.write("\n")
 
-
-			# Verify variables of the two models
+			# Verify that the variables of the two models are equal
 			var i = 0
 			if propdef.variables.length != node.variables.length then
 				print "Problem in {propdef} {node.location}"
@@ -527,7 +523,6 @@ class MOStats
 		compiled_new.add_all(counters.compiled_new)
 		nb_ast_sites = counters.nb_ast_sites
 
-		# TODO
 		new_sites = sys.vm.all_new_sites.length
 		object_sites = sys.vm.all_moentitites.length
 
@@ -535,10 +530,6 @@ class MOStats
 		for i in [0..counters.matrix.length[ do
 			matrix[i] = counters.matrix[i]
 		end
-	end
-
-	init
-	do
 	end
 
 	# Tell where the return of method is come from
@@ -583,12 +574,13 @@ redef class MOPhiVar
 end
 
 redef class MOSite
-	# Type of the site (method, attribute or cast)
-	var site_type: String is noinit
-
 	# All MOSite have an index in x to be identified in results,
 	# The index represents the type of the site: method, attribute, cast or asnotnull
 	var index_x: Int = 0
+
+	# The type of the site (used for debug),
+	# can be a method, attribute, cast or asnotnull
+	var site_type: String is noinit
 
 	# Non-recursive origin of the dependency
 	var origin: DependencyTrace is noinit
@@ -639,7 +631,6 @@ redef class MOSite
 				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
 			end
 
-			#TODO: new method for printing statistics
 			pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
 
 			# Increment the total for implementation of the previous line
