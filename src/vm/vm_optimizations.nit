@@ -119,17 +119,25 @@ redef class AAttrExpr
 
 		assert recv isa MutableInstance
 
-		# Get the implementation and execute it
-		var impl = mo_entity.as(MOSite).get_impl(sys.vm)
+		if status == 0 then optimize(mproperty, recv)
 
 		var i: Instance
-		i = impl.exec_attribute(recv, null).as(not null)
+		if status == 1 then
+			# SST
+			i = v.read_attribute_sst(recv.internal_attributes, offset)
+		else
+			# PH
+			i = v.read_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable, recv.vtable.as(not null).mask, id, offset)
+		end
 
 		# If we get a `MInit` value, throw an error
 		if i == v.initialization_value then
 			v.fatal("Uninitialized attribute {mproperty.name}")
 			abort
 		end
+
+		#TODO : we need recompilations here
+		status = 0
 
 		return i
 	end
@@ -637,7 +645,7 @@ redef abstract class MOSite
 	# Set a null implementation (eg. PIC null)
 	fun set_null_impl
 	do
-		impl = new NullImpl(true)
+		impl = new NullImpl(true, self, get_offset(sys.vm), get_pic(sys.vm))
 	end
 
 	fun clone: MOSite
@@ -764,17 +772,56 @@ abstract class Implementation
 
 	# Execute a method dispatch
 	# *`recv` The receiver
-	fun exec_method(recv: MutableInstance): MMethodDef is abstract
+	fun exec_method(recv: Instance): MMethodDef is abstract
 
 	# Execute a subtyping test
 	# *`recv` The receiver
 	# Return the result of the test
-	fun exec_subtype(recv: MutableInstance): Bool is abstract
+	fun exec_subtype(recv: Instance): Bool is abstract
 end
 
 # A null implementation
 class NullImpl
 	super Implementation
+
+	# The site which contains self
+	var mosite: MOSite
+
+	# The (global if SST, relative if PH) offset of the property
+	var offset: Int
+
+	# The PIC of the implementation (not loaded at compile-time)
+	var pic: MClass
+
+	# A NullImpl must load the corresponding class and execute it
+	# At compile-time the receiver class was not loaded yet
+	redef fun exec_attribute(recv, value)
+	do
+		# Execute a trampoline for this site (i.e. replace it by a PH implementation)
+		var impl = trampoline(recv)
+
+		# We execute the PHImpl
+		var res = impl.exec_attribute(recv, value)
+
+		if value == null and res == null then
+			print "Problème recv {recv}"
+		end
+
+		# We replace the implementation in the corresponding site by a new one
+		mosite.impl = impl
+
+		# Finally, return the read value if any
+		return res
+	end
+
+	# The method load the PIC (the class which introduced the property),
+	# Then it creates a new PHImpl for this site and return it
+	fun trampoline(recv: Instance): PHImpl
+	do
+		sys.vm.load_class(recv.mtype.as(MClassType).mclass)
+
+		return new PHImpl(true, offset, pic.vtable.id)
+	end
 end
 
 # Commons properties on object mecanism implementations (sst, ph)
@@ -795,13 +842,14 @@ class SSTImpl
 		if value == null then
 			return sys.vm.read_attribute_sst(recv.internal_attributes, offset)
 		else
+			sys.vm.write_attribute_sst(recv.internal_attributes, offset, value)
 			return null
 		end
 	end
 
-	redef fun exec_method(recv: MutableInstance): MMethodDef is abstract
+	redef fun exec_method(recv: Instance): MMethodDef is abstract
 
-	redef fun exec_subtype(recv: MutableInstance): Bool is abstract
+	redef fun exec_subtype(recv: Instance): Bool is abstract
 end
 
 # Perfect hashing implementation
@@ -817,6 +865,8 @@ class PHImpl
 		if value == null then
 			return sys.vm.read_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
 		else
+			# Attribute write
+			sys.vm.write_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset, value)
 			return null
 		end
 	end

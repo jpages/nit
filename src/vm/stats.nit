@@ -352,6 +352,18 @@ class MOStats
 		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph
 		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3]
 
+		var living_propdefs = new HashSet[MMethodDef]
+		for site in analysed_sites do
+			if site isa MOCallSite then
+				for lp in site.pattern.gp.living_mpropdefs do
+					# The hashset make duplicates if the site is already in (!!!??!!)
+					if not living_propdefs.has(site.lp) then
+						living_propdefs.add(lp)
+					end
+				end
+			end
+		end
+
 		# cuc: caller uncompiled
 		var cuc_pos = 0
 		var cuc_null = 0
