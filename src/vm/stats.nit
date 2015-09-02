@@ -343,26 +343,14 @@ class MOStats
 	do
 		var file = new FileWriter.open("statistics-{lbl}.csv")
 
-		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + asnotnull_preexist_sst
-		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[10][3]
+		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst
+		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2]
 
-		#non optimizable inline: method_npreexist_static + attribute_npreexist_sst + cast_npreexist_static + cast_npreexist_sst + asnotnull_npreexist_sst
-		pstats.matrix[20][0] = pstats.matrix[8][0] + pstats.matrix[11][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[11][3]
+		#non optimizable inline: method_npreexist_static + attribute_npreexist_sst + cast_npreexist_static + cast_npreexist_sst + asnotnull_npreexist_sst + asnotnull_preexist_sst
+		pstats.matrix[20][0] = pstats.matrix[8][0] + pstats.matrix[11][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[11][3] + pstats.matrix[10][3]
 
-		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph
-		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3]
-
-		var living_propdefs = new HashSet[MMethodDef]
-		for site in analysed_sites do
-			if site isa MOCallSite then
-				for lp in site.pattern.gp.living_mpropdefs do
-					# The hashset make duplicates if the site is already in (!!!??!!)
-					if not living_propdefs.has(site.lp) then
-						living_propdefs.add(lp)
-					end
-				end
-			end
-		end
+		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph + method_null + attribute_null + cast_null
+		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3] + pstats.matrix[15][0] + pstats.matrix[15][1] + pstats.matrix[15][2]
 
 		# cuc: caller uncompiled
 		var cuc_pos = 0
@@ -604,7 +592,7 @@ redef class MOSite
 		origin.trace
 		incr_preexist(vm)
 
-		if not origin.from_primitive then
+		# if not origin.from_primitive then
 			incr_from_site
 			incr_concrete_site
 			incr_self
@@ -647,7 +635,7 @@ redef class MOSite
 
 			# Increment the total for implementation of the previous line
 			incr_total
-		end
+		# end
 
 		if print_location_preexist then dump_location_site
 	end
@@ -781,14 +769,14 @@ redef class MOSite
 		end
 	end
 
-	#
+	# Increment counters if the receiver static class is unloaded
 	fun incr_rst_unloaded(vm: VirtualMachine)
 	do
 		var rst_loaded = pattern.rsc.abstract_loaded
 
 		if not rst_loaded then
 			var impl = get_impl(vm)
-			var pre = expr_recv.is_pre
+			# var pre = expr_recv.is_pre
 
 			pstats.matrix[impl.index_y][4] += 1
 			pstats.matrix[impl.compute_index_y(self)][4] += 1
@@ -1012,7 +1000,8 @@ class DependencyTrace
 	# from super
 	var from_super = false
 
-	# cuc is null ? usefull only when it comes from a method
+	# The cuc is the number of uncompiled candidate methods is null
+	# A cuc = 0 means all candidates are already compiled
 	var cuc_null = true
 
 	# the expression to trace
