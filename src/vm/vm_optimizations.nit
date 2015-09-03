@@ -346,9 +346,7 @@ redef class MPropDef
 	do
 		super
 
-		if self isa MMethodDef then
-			for site in self.mosites do site.get_impl(vm)
-		end
+		for site in self.mosites do site.get_impl(vm)
 	end
 end
 
