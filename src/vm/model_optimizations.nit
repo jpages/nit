@@ -441,6 +441,7 @@ class MOSuper
 	init
 	do
 		sys.vm.all_moentitites.add(self)
+		sys.vm.mo_supers.add(self)
 	end
 end
 
@@ -757,6 +758,9 @@ redef class VirtualMachine
 
 	# The list of all object entities
 	var all_moentitites = new List[MOEntity]
+
+	# The list of all MOSuper
+	var mo_supers = new List[MOSuper]
 
 	# All patterns of the program
 	var all_patterns = new List[MOSitePattern]

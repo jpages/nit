@@ -81,7 +81,11 @@ redef class ModelBuilder
 			site.stats(sys.vm)
 		end
 
-		for method in sys.pstats.compiled_methods do sys.pstats.get_method_return_origin(method)
+		for method in sys.pstats.compiled_methods do
+			if method isa MMethodDef then
+				sys.pstats.get_method_return_origin(method)
+			end
+		end
 
 		if sys.print_location_preexist then
 			dump_location.as(not null).close
@@ -224,7 +228,7 @@ class MOStats
 	var analysed_sites = new List[MOSite]
 
 	# List of compiled methods
-	var compiled_methods = new List[MMethodDef]
+	var compiled_methods = new List[MPropDef]
 
 	# List of new site compiled
 	var compiled_new = new List[MONew]
@@ -250,6 +254,9 @@ class MOStats
 	# The number of loaded abstract classes
 	var loaded_classes_abstracts: Int = 0
 
+	# The number of MOSite with a primitive receiver
+	var nb_primitive_sites: Int = 0
+
 	# The general matrix of the statistics
 	var matrix: Array[Array[Int]] = new Array[Array[Int]]
 
@@ -272,7 +279,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(54)
+		var res = new Array[String].with_capacity(56)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -319,6 +326,8 @@ class MOStats
 		res.add("ast sites,")
 		res.add("new sites,")
 		res.add("object sites,")
+		res.add("mo_supers,")
+		res.add("primitive_sites,")
 		res.add("\n,")
 		res.add("methods with a return,")
 		res.add("methods with a preexisting return,")
@@ -420,20 +429,23 @@ class MOStats
 		pstats.matrix[42][0] = sys.pstats.nb_ast_sites
 		pstats.matrix[43][0] = sys.vm.all_new_sites.length
 		pstats.matrix[44][0] = sys.vm.all_moentitites.length
+		pstats.matrix[45][0] = sys.vm.mo_supers.length
+		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
 
-		pstats.matrix[46][0] = nb_method_return
-		pstats.matrix[47][0] = nb_method_return_pre
-		pstats.matrix[48][0] = nb_method_return_npre
+		pstats.matrix[48][0] = nb_method_return
+		pstats.matrix[49][0] = nb_method_return_pre
+		pstats.matrix[50][0] = nb_method_return_npre
 
 		# Print the captions of the statistics file
 		for caption in caption_x do
 			file.write(caption)
 		end
 
-		# TODO: -9 ?
-		for i in [0..pstats.matrix.length-9[ do
-			file.write(caption_y[i])
+		for i in [0..pstats.matrix.length[ do
+			# Write the caption oh the line if any
+			if i < caption_y.length then file.write(caption_y[i])
 
+			# Then print the statistics
 			var size = pstats.matrix[i].length
 			for j in [0..size[ do
 				var value = pstats.matrix[i][j]
@@ -592,7 +604,7 @@ redef class MOSite
 		origin.trace
 		incr_preexist(vm)
 
-		# if not origin.from_primitive then
+		if not origin.from_primitive then
 			incr_from_site
 			incr_concrete_site
 			incr_self
@@ -635,7 +647,10 @@ redef class MOSite
 
 			# Increment the total for implementation of the previous line
 			incr_total
-		# end
+		else
+			# Increment the total of sites with a primitive receiver
+			sys.pstats.nb_primitive_sites += 1
+		end
 
 		if print_location_preexist then dump_location_site
 	end
@@ -930,8 +945,9 @@ redef class MPropDef
 			sys.pstats.new_sites += 1
 		end
 
+		sys.pstats.compiled_methods.add(self)
+
 		if self isa MMethodDef then
-			sys.pstats.compiled_methods.add(self)
 			sys.pstats.get_method_return_origin(self)
 		end
 	end
