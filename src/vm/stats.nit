@@ -611,7 +611,6 @@ redef class MOSite
 
 			# These two categories must be exclusive
 			incr_rst_unloaded(vm)
-			incr_type_impl
 
 			if print_site_state then
 				var buf = "site {self}\n"
@@ -703,11 +702,6 @@ redef class MOSite
 	do
 	end
 
-	#
-	fun incr_type_impl
-	do
-	end
-
 	# WARN : this partition is not exclusive
 	fun incr_from_site
 	do
@@ -791,10 +785,16 @@ redef class MOSite
 
 		if not rst_loaded then
 			var impl = get_impl(vm)
-			# var pre = expr_recv.is_pre
 
 			pstats.matrix[impl.index_y][4] += 1
 			pstats.matrix[impl.compute_index_y(self)][4] += 1
+
+			# Increment the total of preexisting and non-preexisting
+			if expr_recv.is_pre then
+				pstats.matrix[1][4] += 1
+			else
+				pstats.matrix[2][4] += 1
+			end
 		end
 	end
 
@@ -847,24 +847,6 @@ redef class MOAsNotNullSite
 	redef var site_type = "asnotnull"
 
 	redef var index_x = 3
-
-	redef fun incr_type_impl
-	do
-	end
-
-	redef fun incr_from_site do	end
-
-	redef fun incr_concrete_site
-	do
-	end
-
-	redef fun incr_self
-	do
-	end
-
-	redef fun incr_rst_unloaded(vm: VirtualMachine)
-	do
-	end
 end
 
 redef class Implementation
