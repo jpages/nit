@@ -352,14 +352,14 @@ class MOStats
 	do
 		var file = new FileWriter.open("statistics-{lbl}.csv")
 
-		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst
-		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2]
+		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + null_preexist (total)
+		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][5]
 
-		#non optimizable inline: method_npreexist_static + attribute_npreexist_sst + cast_npreexist_static + cast_npreexist_sst + asnotnull_npreexist_sst + asnotnull_preexist_sst
-		pstats.matrix[20][0] = pstats.matrix[8][0] + pstats.matrix[11][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[11][3] + pstats.matrix[10][3]
+		# non optimizable inline: npreexist_static + attribute_npreexist_sst + cast_npreexist_sst + null_npreexist (total)
+		pstats.matrix[20][0] = pstats.matrix[8][5] + pstats.matrix[11][1] + pstats.matrix[11][2] + pstats.matrix[17][5]
 
-		# non_inline: method_ph + method_sst + attribute_ph + cast_ph + asnotnull_ph + method_null + attribute_null + cast_null
-		pstats.matrix[21][0] = pstats.matrix[12][0] + pstats.matrix[9][0] + pstats.matrix[12][1] + pstats.matrix[12][2] + pstats.matrix[12][3] + pstats.matrix[15][0] + pstats.matrix[15][1] + pstats.matrix[15][2]
+		# non_inline: total_ph + method_sst + asnotnull_sst
+		pstats.matrix[21][0] = pstats.matrix[12][5] + pstats.matrix[9][0] + pstats.matrix[9][3]
 
 		# cuc: caller uncompiled
 		var cuc_pos = 0
