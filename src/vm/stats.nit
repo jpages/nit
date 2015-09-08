@@ -456,6 +456,32 @@ class MOStats
 			file.write("\n")
 		end
 		file.close
+
+		# A special output to .tex files
+		dump_to_tex(lbl)
+	end
+
+	# A special output of statistics to a .tex files with several tables
+	# `lbl` The label to add in the filename
+	private fun dump_to_tex(lbl: String)
+	do
+		var file = new FileWriter.open("tables-{lbl}.tex")
+
+		# Table 1: Original preexistence
+		var table1 = "\\begin\{tabular}\{@\{~}l | r r r | rr@\{~}} & method & attribute & cast & total & \\%\n"
+		table1 += "\\hline\n"
+
+		var total_pre = (pstats.matrix[1][0] + pstats.matrix[1][1] + pstats.matrix[1][2]).to_f
+		var total_npre = (pstats.matrix[2][0] + pstats.matrix[2][1] + pstats.matrix[2][2]).to_f
+		#TODO: compatibiliser les asnotnull avec les casts ?
+		table1 += "preexisting & {pstats.matrix[1][0]} & {pstats.matrix[1][1]} & {pstats.matrix[1][2]} & {total_pre} & {(total_pre*100.0/(total_pre+total_npre)).to_f}\\%\\\\\n"
+		table1 += "non preexisting & {pstats.matrix[2][0]} & {pstats.matrix[2][1]} & {pstats.matrix[2][2]} & \\textbf\{{total_npre}\} & \\textbf\{{(total_npre*100.0/(total_pre+total_npre)).to_f}\\%\}\\\\\n"
+		table1 += "\\hline\n"
+		table1 += "total & {pstats.matrix[1][0] + pstats.matrix[2][0]} & {pstats.matrix[1][1] + pstats.matrix[2][1]} & {pstats.matrix[1][2] + pstats.matrix[2][2]} & {total_pre + total_npre}\n"
+		table1 += "\\end\{tabular\}\n"
+
+		file.write(table1)
+		file.close
 	end
 
 	fun debug_model(propdef: MPropDef, trace_file: FileWriter, trace_model: FileWriter)
