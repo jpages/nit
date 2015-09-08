@@ -481,6 +481,30 @@ class MOStats
 		table1 += "\\end\{tabular\}\n"
 
 		file.write(table1)
+		file.write("\n\n")
+
+		var table2 = "\\begin\{tabular}\{@\{~}l | r r r | rr@\{~}} & method & attribute & cast & total & \\% \\\\\n"
+		table2 += "\\hline\n"
+		var total_from_new = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
+		table2 += "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_from_new} & 24\\% \\\\\n"
+
+		var total_from_callsite = pstats.matrix[26][0] + pstats.matrix[26][1] + pstats.matrix[26][2]
+		table2 += "CallSite & {pstats.matrix[26][0]} & {pstats.matrix[26][1]} & {pstats.matrix[26][2]} & {total_from_callsite} & 39\\%\\\\\n"
+
+		var total_from_readsite = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
+		table2 += "ReadSite & {pstats.matrix[31][0]} & {pstats.matrix[31][1]} & {pstats.matrix[31][2]} & {total_from_readsite} & 35\\%\\\\\n"
+
+		#TODO : pourcentages
+		#TODO : ligne other
+		table2 += "other & 71 & 30 & 3 & 104 & 2\\%\\\\\n"
+		table2 += "\\hline\n"
+
+		var total_general = total_from_new + total_from_callsite + total_from_readsite
+		table2 += "total & {pstats.matrix[23][0] + pstats.matrix[26][0] + pstats.matrix[31][0]} & {pstats.matrix[23][1] + pstats.matrix[26][1] + pstats.matrix[31][1]} & {pstats.matrix[23][2] + pstats.matrix[26][2] + pstats.matrix[31][2]} & {total_general} & 100\\%\n"
+		table2 += "\\end\{tabular}\n"
+
+		file.write(table2)
+
 		file.close
 	end
 
