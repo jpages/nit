@@ -70,16 +70,15 @@ redef class MOStats
 	do
 		# Table 1: Original preexistence
 		file.write("%Table 1\n")
-		var table1 = "\\hline\n"
 
 		total_pre = pstats.matrix[1][0] + pstats.matrix[1][1] + pstats.matrix[1][2]
 		total_npre = pstats.matrix[2][0] + pstats.matrix[2][1] + pstats.matrix[2][2]
 
 		#TODO: compatibiliser les asnotnull avec les casts ?
-		table1 += "preexisting & {pstats.matrix[1][0]} & {pstats.matrix[1][1]} & {pstats.matrix[1][2]} & {total_pre} & {(total_pre*100/(total_pre+total_npre)).to_f}\\\\\n"
+		var table1 = "preexisting & {pstats.matrix[1][0]} & {pstats.matrix[1][1]} & {pstats.matrix[1][2]} & {total_pre} & {(total_pre*100/(total_pre+total_npre)).to_f}\\\\\n"
 		table1 += "non preexisting & {pstats.matrix[2][0]} & {pstats.matrix[2][1]} & {pstats.matrix[2][2]} & \\textbf\{{total_npre}\} & \\textbf\{{(total_npre*100/(total_pre+total_npre)).to_f}\}\\\\\n"
 		table1 += "\\hline\n"
-		table1 += "total & {pstats.matrix[1][0] + pstats.matrix[2][0]} & {pstats.matrix[1][1] + pstats.matrix[2][1]} & {pstats.matrix[1][2] + pstats.matrix[2][2]} & {(total_pre + total_npre)}\n"
+		table1 += "total & {pstats.matrix[1][0] + pstats.matrix[2][0]} & {pstats.matrix[1][1] + pstats.matrix[2][1]} & {pstats.matrix[1][2] + pstats.matrix[2][2]} & {(total_pre + total_npre)} & 100\%\n"
 
 		file.write(table1)
 		file.write("\n\n")
@@ -91,7 +90,6 @@ redef class MOStats
 	private fun table2(file: FileWriter)
 	do
 		file.write("%Table 2\n")
-		var table2 = "\\hline\n"
 
 		# Line "other", the difference between npre from first table for each category minus the column from
 		var other_methods = pstats.matrix[2][0] - (pstats.matrix[23][0] + pstats.matrix[26][0] + pstats.matrix[31][0])
@@ -105,7 +103,7 @@ redef class MOStats
 
 		var general_total = total_from_new + total_from_callsite + total_from_readsite + other_methods + other_attributes + other_casts
 
-		table2 += "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\% \\\\\n"
+		var table2 = "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\% \\\\\n"
 		table2 += "CallSite & {pstats.matrix[26][0]} & {pstats.matrix[26][1]} & {pstats.matrix[26][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\%\\\\\n"
 		table2 += "ReadSite & {pstats.matrix[31][0]} & {pstats.matrix[31][1]} & {pstats.matrix[31][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\%\\\\\n"
 		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {(total_others*100/general_total).to_f}\\%\\\\\n"
@@ -129,24 +127,23 @@ redef class MOStats
 	private fun table3(file: FileWriter)
 	do
 		file.write("%Table 3\n")
-		var table3 = "\\hline\n"
 
 		var total_newsites = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
 		var total_callsites = pstats.matrix[28][0] + pstats.matrix[28][1] + pstats.matrix[28][2]
 		var total_table3 = total_newsites + total_callsites
 
-		table3 += "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_newsites} & 37\\% \\\\\n"
-		table3 += "CallSite & {pstats.matrix[28][0]} & {pstats.matrix[28][1]} & {pstats.matrix[28][2]} & {total_callsites} & 0\\% \\\\\n"
-
 		# Get improvable_methods from table2-original
 		var reader = new FileReader.open("output_latex/table2-last-original.tex")
 		var lines = reader.read_lines
-		var improvables = lines[7].split('&')
+		var improvables = lines[6].split('&')
 		reader.close
 
+		var table3 = "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_newsites} & {total_newsites.to_f*100.0/(improvables[4]).to_f}\\% \\\\\n"
+		table3 += "CallSite & {pstats.matrix[28][0]} & {pstats.matrix[28][1]} & {pstats.matrix[28][2]} & {total_callsites} & {total_callsites.to_f*100.0/(improvables[4]).to_f}\\% \\\\\n"
+
 		table3 += "\\hline\n"
+		table3 += "total improved & {pstats.matrix[23][0] + pstats.matrix[28][0]} & {pstats.matrix[23][1] + pstats.matrix[28][1]} & {pstats.matrix[23][2] + pstats.matrix[28][2]} & {total_table3} & {total_table3.to_f*100.0/improvables[4].to_f}\\%\n"
 		table3 += "improvable total & {improvables[1]} & {improvables[2]} & {improvables[3]} & {improvables[4]} & 100 \\% \\\\\n"
-		table3 += "total & {pstats.matrix[23][0] + pstats.matrix[28][0]} & {pstats.matrix[23][1] + pstats.matrix[28][1]} & {pstats.matrix[23][2] + pstats.matrix[28][2]} & {total_table3} & 59\\%\n"
 
 		file.write(table3)
 		file.write("\n\n")
