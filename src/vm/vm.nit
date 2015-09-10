@@ -25,3 +25,4 @@ import model_optimizations
 import preexistence
 import vm_optimizations
 import stats
+import stats_tex
