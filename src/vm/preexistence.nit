@@ -205,6 +205,18 @@ redef class Int
 	end
 end
 
+redef class MOSitePattern
+	# Return true if all sites of this pattern are preexisting, else false
+	fun is_pre: Bool
+	do
+		for site in sites do
+			if not site.expr_recv.is_pre then return false
+		end
+
+		return true
+	end
+end
+
 redef class MOExpr
 	# Allows to trace the preexistence origin of a Site by encoding the following values:
 	# 1: parameter
