@@ -279,7 +279,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(56)
+		var res = new Array[String].with_capacity(59)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -332,7 +332,9 @@ class MOStats
 		res.add("methods with a return,")
 		res.add("methods with a preexisting return,")
 		res.add("methods with a non-preexisting return,")
-
+		res.add("\n")
+		res.add("preexisting patterns,")
+		res.add("non-preexisting patterns,")
 		return res
 	end
 
@@ -461,6 +463,16 @@ class MOStats
 			end
 			file.write("\n")
 		end
+
+		# Go into each pattern to collect statistics on them
+		for pattern in sys.vm.all_patterns do
+			if pattern.is_pre then
+				pstats.matrix[52][0] += 1
+			else
+				pstats.matrix[53][0] += 1
+			end
+		end
+
 		file.close
 	end
 
@@ -709,6 +721,7 @@ redef class MOSite
 	end
 
 	# WARN : this partition is not exclusive
+	# TODO: make it exclusive
 	fun incr_from_site
 	do
 		#TODO: migrate
