@@ -188,8 +188,9 @@ redef class VirtualMachine
 		trace_origin = new Array[Int].filled_with(0, 257)
 
 		# Initialize the matrix of results
-		sys.pstats.matrix = new Array[Array[Int]].with_capacity(58)
-		for i in [0..58[ do
+		var matrix_length = 80
+		sys.pstats.matrix = new Array[Array[Int]].with_capacity(matrix_length)
+		for i in [0..matrix_length[ do
 			sys.pstats.matrix[i] = new Array[Int].filled_with(0, 6)
 		end
 	end
@@ -279,7 +280,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(59)
+		var res = new Array[String].with_capacity(69)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -329,12 +330,21 @@ class MOStats
 		res.add("mo_supers,")
 		res.add("primitive_sites,")
 		res.add("\n,")
+		res.add("procedures,")
 		res.add("methods with a return,")
 		res.add("methods with a preexisting return,")
 		res.add("methods with a non-preexisting return,")
 		res.add("\n")
 		res.add("preexisting patterns,")
 		res.add("non-preexisting patterns,")
+		res.add("no return pattern,")
+		res.add("\n")
+		res.add("from other preexisting,")
+		res.add("from other non-preexisting,")
+		res.add("\n")
+		res.add("sites with return preexisting,")
+		res.add("sites with return non-preexisting,")
+		res.add("no return sites,")
 		return res
 	end
 
@@ -378,6 +388,7 @@ class MOStats
 
 		# Statistics on method returns
 		var nb_method_return = 0 # A method with a return
+		var nb_procedure = 0 # Number of procedures
 		var nb_method_return_pre = 0 # A method with a preexisting return
 		var nb_method_return_npre = 0 # A method with a non-preexisting return
 
@@ -414,6 +425,8 @@ class MOStats
 				else
 					nb_method_return_npre += 1
 				end
+			else
+				nb_procedure += 1
 			end
 		end
 
@@ -440,17 +453,32 @@ class MOStats
 		pstats.matrix[45][0] = sys.vm.mo_supers.length
 		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
 
-		pstats.matrix[48][0] = nb_method_return
-		pstats.matrix[49][0] = nb_method_return_pre
-		pstats.matrix[50][0] = nb_method_return_npre
+		pstats.matrix[48][0] = nb_procedure
+		pstats.matrix[49][0] = nb_method_return
+		pstats.matrix[50][0] = nb_method_return_pre
+		pstats.matrix[51][0] = nb_method_return_npre
 
 		# Print the captions of the statistics file
 		for caption in caption_x do
 			file.write(caption)
 		end
 
+		# Go into each pattern to collect statistics on them
+		for pattern in sys.vm.all_patterns do
+			# If the pattern is a callsitepattern with a return
+			if pattern isa MOCallSitePattern and pattern.gp.intro.msignature.return_mtype != null then
+				if pattern.is_pre then
+					pstats.matrix[53][0] += 1
+				else
+					pstats.matrix[54][0] += 1
+				end
+			else
+				pstats.matrix[55][0] += 1
+			end
+		end
+
 		for i in [0..pstats.matrix.length[ do
-			# Write the caption oh the line if any
+			# Write the caption on the line if any
 			if i < caption_y.length then file.write(caption_y[i])
 
 			# Then print the statistics
@@ -464,14 +492,6 @@ class MOStats
 			file.write("\n")
 		end
 
-		# Go into each pattern to collect statistics on them
-		for pattern in sys.vm.all_patterns do
-			if pattern.is_pre then
-				pstats.matrix[52][0] += 1
-			else
-				pstats.matrix[53][0] += 1
-			end
-		end
 
 		file.close
 	end
@@ -556,7 +576,7 @@ class MOStats
 		new_sites = sys.vm.all_new_sites.length
 		object_sites = sys.vm.all_moentitites.length
 
-		matrix = new Array[Array[Int]].with_capacity(57)
+		matrix = new Array[Array[Int]].with_capacity(counters.matrix.length)
 		for i in [0..counters.matrix.length[ do
 			matrix[i] = counters.matrix[i]
 		end
@@ -664,6 +684,19 @@ redef class MOSite
 
 			# Increment the total for implementation of the previous line
 			incr_total
+
+			# If self isa MOCallsite and call a method with a return
+			if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
+
+				var pre = true
+				if pre then
+					pstats.matrix[59][index_x] += 1
+					pstats.matrix[59][5] += 1
+				else
+					pstats.matrix[60][index_x] += 1
+					pstats.matrix[60][5] += 1
+				end
+			end
 		else
 			# Increment the total of sites with a primitive receiver
 			sys.pstats.nb_primitive_sites += 1
@@ -724,6 +757,8 @@ redef class MOSite
 	# TODO: make it exclusive
 	fun incr_from_site
 	do
+		var from_other = true
+
 		#TODO: migrate
 		if origin.from_new then
 			pstats.matrix[23][index_x] += 1
@@ -736,6 +771,8 @@ redef class MOSite
 				pstats.matrix[25][index_x] += 1
 				pstats.matrix[25][5] += 1
 			end
+
+			from_other = false
 		end
 
 		if origin.from_return then
@@ -759,11 +796,25 @@ redef class MOSite
 				pstats.matrix[30][index_x] += 1
 				pstats.matrix[30][5] += 1
 			end
+
+			from_other = false
 		end
 
 		if origin.from_read then
 			pstats.matrix[31][index_x] += 1
 			pstats.matrix[31][5] += 1
+
+			from_other = false
+		end
+
+		if from_other then
+			if expr_recv.is_pre then
+				pstats.matrix[56][index_x] += 1
+				pstats.matrix[56][5] += 1
+			else
+				pstats.matrix[57][index_x] += 1
+				pstats.matrix[57][5] += 1
+			end
 		end
 	end
 
