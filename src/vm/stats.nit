@@ -632,22 +632,20 @@ redef class MOSite
 	# can be a method, attribute, cast or asnotnull
 	var site_type: String is noinit
 
-	# Non-recursive origin of the dependency
-	var origin: DependencyTrace is noinit
+	# Origin of the dependence encoded with the method `preexistence_origin`
+	var origin: Int is noinit
 
 	# Count the implementation of the site
 	fun stats(vm: VirtualMachine)
 	do
-		origin = new DependencyTrace(expr_recv)
-		origin.trace
-		incr_preexist(vm)
+		expr_recv.expr_preexist
+		origin = expr_recv.preexistence_origin
 
-		if not origin.from_primitive then
+		# If the receiver is not a primitive
+		if not origin.bin_and(16) == 16 then
 			incr_from_site
 			incr_concrete_site
 			incr_self
-
-			# These two categories must be exclusive
 			incr_rst_unloaded(vm)
 
 			if print_site_state then
@@ -655,7 +653,7 @@ redef class MOSite
 				buf += "\tpattern: {pattern2str}\n"
 				buf += "\tlp: {lp.mclassdef.name}::{lp.name}\n"
 				buf += "\tlocation: {ast.location}\n"
-				# TODO: fix that
+				# TODO: fix the mutability of preexistence
 				buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.expr_preexist.bit_npre_immut}\n"
 				buf += "\timpl: {get_impl(vm)}\n"
 				print(buf)
@@ -665,17 +663,8 @@ redef class MOSite
 			sys.vm.receiver_origin[origin] += 1
 			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
 
-			# var recursive = expr_recv.preexistence_origin_recursive
-			# sys.vm.receiver_origin_recursive[recursive] += 1
-			# sys.vm.receiver_origin_recursive[sys.vm.receiver_origin_recursive.length-1] += 1
-
 			# Trace the origin of preexistence of callsites
 			if self isa MOCallSite then
-				if expr_recv.is_pre then
-					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} receiver_origin {expr_recv.preexistence_origin} nb_callees {nb_callees}")
-				else
-					print("{self} trace_origin {trace_origin} receiver_preexistence {expr_recv.expr_preexist} non-preexisting_receiver nb_callees {nb_callees}")
-				end
 				sys.vm.trace_origin[trace_origin] += 1
 				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
 			end
@@ -687,7 +676,6 @@ redef class MOSite
 
 			# If self isa MOCallsite and call a method with a return
 			if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
-
 				var pre = true
 				if pre then
 					pstats.matrix[59][index_x] += 1
@@ -701,33 +689,10 @@ redef class MOSite
 			# Increment the total of sites with a primitive receiver
 			sys.pstats.nb_primitive_sites += 1
 		end
-
-		if print_location_preexist then dump_location_site
 	end
 
 	# Print the pattern (RST/GP or target class for subtype test)
 	fun pattern2str: String is abstract
-
-	# Print location of a site
-	fun dump_location_site
-	do
-		# dump_location is null of first compilation, and set for last compilation
-		if dump_location != null then
-			var from2str = ""
-			if expr_recv.is_pre then
-				if origin.from_new then from2str += " from-new "
-				if origin.from_param then from2str += " from-param "
-				if origin.from_return then from2str += " from-return "
-				if origin.from_primitive then from2str += " from-primitive "
-				if origin.from_literal then from2str += " from-literal "
-				if origin.from_super then from2str += " from-super "
-			else
-				from2str += "non-preexist"
-			end
-
-			dump_location.as(not null).write("{site_type} {ast.location} {from2str}\n")
-		end
-	end
 
 	fun incr_total
 	do
@@ -748,19 +713,11 @@ redef class MOSite
 		end
 	end
 
-	#
-	fun incr_preexist(vm: VirtualMachine)
-	do
-	end
-
-	# WARN : this partition is not exclusive
 	# TODO: make it exclusive
 	fun incr_from_site
 	do
-		var from_other = true
-
-		#TODO: migrate
-		if origin.from_new then
+		# If the receiver comes from a new
+		if origin.bin_and(2) == 2 then
 			pstats.matrix[23][index_x] += 1
 			pstats.matrix[23][5] += 1
 
@@ -771,44 +728,33 @@ redef class MOSite
 				pstats.matrix[25][index_x] += 1
 				pstats.matrix[25][5] += 1
 			end
-
-			from_other = false
 		end
 
-		if origin.from_return then
+		# If the receiver comes from a callsite
+		if origin.bin_and(4) == 4 then
 			# The total of callsites
 			pstats.matrix[26][index_x] += 1
 			pstats.matrix[26][5] += 1
 
-			if origin.cuc_null then
-				pstats.matrix[27][index_x] += 1
-				pstats.matrix[27][5] += 1
-
-				if expr_recv.is_pre then
-					pstats.matrix[28][index_x] += 1
-					pstats.matrix[28][5] += 1
-				else
-					pstats.matrix[29][index_x] += 1
-					pstats.matrix[29][5] += 1
-				end
+			# If preexisting
+			if origin.bin_and(128) == 0 then
+				pstats.matrix[28][index_x] += 1
+				pstats.matrix[28][5] += 1
 			else
-				# Callsites with a positive cuc
-				pstats.matrix[30][index_x] += 1
-				pstats.matrix[30][5] += 1
+				pstats.matrix[29][index_x] += 1
+				pstats.matrix[29][5] += 1
 			end
-
-			from_other = false
 		end
 
-		if origin.from_read then
+		# If the receiver comes from an attribute read
+		if origin.bin_and(256) == 256 then
 			pstats.matrix[31][index_x] += 1
 			pstats.matrix[31][5] += 1
-
-			from_other = false
 		end
 
-		if from_other then
-			if expr_recv.is_pre then
+		# Other cases, a combination of several origins
+		if not origin == 2 and not origin == 4 and not origin == 256 then
+			if origin.bin_and(128) == 128 then
 				pstats.matrix[56][index_x] += 1
 				pstats.matrix[56][5] += 1
 			else
@@ -1041,65 +987,6 @@ redef class MOVar
 			return true
 		else
 			return false
-		end
-	end
-end
-
-# Tell where the expression of a site comes from
-class DependencyTrace
-	# from a new expression
-	var from_new = false
-
-	# from a return method expression
-	var from_return = false
-
-	# from a read attribute expression
-	var from_read = false
-
-	# from a parameter
-	var from_param = false
-
-	# from a literal
-	var from_literal = false
-
-	# from a primitive
-	var from_primitive = false
-
-	# from super
-	var from_super = false
-
-	# The cuc is the number of uncompiled candidate methods is null
-	# A cuc = 0 means all candidates are already compiled
-	var cuc_null = true
-
-	# the expression to trace
-	var expr: MOExpr
-
-	# trace the dependencies (entry point)
-	fun trace do trace_internal(expr)
-
-	# trace the dependencies (internal function)
-	fun trace_internal(expr: MOExpr)
-	do
-		if expr isa MONew then
-			from_new = true
-		else if expr isa MOCallSite then
-			from_return = true
-			if expr.pattern.cuc > 0 then cuc_null = false
-		else if expr isa MOReadSite then
-			from_read = true
-		else if expr isa MOParam then
-			from_param = true
-		else if expr isa MOLit then
-			from_literal = true
-		else if expr isa MOPrimitive or expr isa MOIsaSubtypeSite then
-			from_primitive = true
-		else if expr isa MOSuper then
-			from_super = true
-		else if expr isa MOSSAVar then
-			trace_internal(expr.dependency)
-		else if expr isa MOPhiVar then
-			for dep in expr.dependencies do trace_internal(dep)
 		end
 	end
 end
