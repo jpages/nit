@@ -309,10 +309,10 @@ class MOStats
 		res.add("from new preexist,")
 		res.add("from new no preexist,")
 		res.add("from return,")
-		res.add("from return cuc null,")
-		res.add("from return cuc null preexist,")
-		res.add("from return cuc null no preexist,")
-		res.add("from return cuc pos,")
+		res.add("from return preexist,")
+		res.add("from return non-preexisting,")
+		res.add(",")
+		res.add(",")
 		res.add("from readsite,")
 		res.add("\n,")
 		res.add("callers positive cuc,")
@@ -736,13 +736,13 @@ redef class MOSite
 			pstats.matrix[26][index_x] += 1
 			pstats.matrix[26][5] += 1
 
-			# If preexisting
+			# If the receiver is preexisting
 			if origin.bin_and(128) == 0 then
+				pstats.matrix[27][index_x] += 1
+				pstats.matrix[27][5] += 1
+			else
 				pstats.matrix[28][index_x] += 1
 				pstats.matrix[28][5] += 1
-			else
-				pstats.matrix[29][index_x] += 1
-				pstats.matrix[29][5] += 1
 			end
 		end
 
