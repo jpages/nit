@@ -475,19 +475,6 @@ redef abstract class MOPropSitePattern
 	redef fun get_offset(vm) do return gp.offset
 
 	redef fun get_pic(vm) do return gp.intro_mclassdef.mclass
-
-	redef fun add_lp(lp)
-	do
-		var reset = not callees.has(lp)
-
-		super(lp)
-		if reset then
-			if impl != null and impl.as(not null).is_mutable then impl = null
-			for site in sites do
-				if site.impl != null and site.impl.as(not null).is_mutable then site.impl = null
-			end
-		end
-	end
 end
 
 redef class MOAttrPattern
@@ -502,6 +489,19 @@ redef class MOCallSitePattern
 	redef fun set_static_impl(mutable) do impl = new StaticImplProp(mutable, callees.first)
 
 	redef fun can_be_static do return callees.length == 1
+
+	redef fun add_lp(lp)
+	do
+		var reset = not callees.has(lp)
+
+		super(lp)
+		if reset then
+			if impl != null and impl.as(not null).is_mutable then impl = null
+			for site in sites do
+				if site.impl != null and site.impl.as(not null).is_mutable then site.impl = null
+			end
+		end
+	end
 end
 
 redef abstract class MOSite

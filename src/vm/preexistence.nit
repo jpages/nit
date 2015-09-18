@@ -67,7 +67,11 @@ redef class MPropDef
 		exprs_preexist_mut.clear
 		preexist_mut_exprs.clear
 
-		if not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_preexist
+		if not disable_method_return then
+			for p in callers do
+				p.as(MOCallSitePattern).propage_preexist
+			end
+		end
 	end
 
 	# Drop exprs_npreesit_mut and set unknown state to all expression inside
@@ -202,18 +206,6 @@ redef class Int
 		var bs = bits.reversed
 		for i in [0..23] do bs.shift
 		return bs
-	end
-end
-
-redef class MOSitePattern
-	# Return true if all sites of this pattern are preexisting, else false
-	fun is_pre: Bool
-	do
-		for site in sites do
-			if not site.expr_recv.is_pre then return false
-		end
-
-		return true
 	end
 end
 
@@ -671,6 +663,27 @@ redef class MOCallSitePattern
 				site.lp.preexist_analysed = false
 			end
 		end
+	end
+
+	# Return true if all sites of this pattern are preexisting, else false
+	fun is_pre: Bool
+	do
+		if cuc != 0 then return false
+
+		if callees.length == 0 then
+			print "MOCallSitePattern sans callees {self}"
+			return false
+		end
+
+		for callee in callees do
+			#TODO : le cuc doit être null ici, donc les méthodes avec un return_expr
+			if callee.return_expr != null then
+				if not callee.return_expr.return_preexist.bit_pre then return false
+			end
+		end
+
+
+		return true
 	end
 end
 

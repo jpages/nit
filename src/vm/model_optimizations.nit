@@ -110,16 +110,6 @@ abstract class MOPropSitePattern
 	# Number of calls on uncompiled methods
 	var cuc = 0
 
-	# Add a new method on this pattern
-	fun add_lp(mpropdef: LP)
-	do
-		callees.add(mpropdef)
-		mpropdef.callers.add(self)
-
-		# If the mpropdef is abstract do not count it in uncompiled methods
-		if not mpropdef.as(MMethodDef).is_abstract then cuc += 1
-	end
-
 	fun compatible_site(site: MOPropSite): Bool is abstract
 
 	redef fun trace
@@ -186,6 +176,16 @@ class MOCallSitePattern
 	redef fun compatible_site(site: MOPropSite)
 	do
 		return site isa MOCallSite
+	end
+
+	# Add a new local method to this pattern
+	fun add_lp(mpropdef: LP)
+	do
+		callees.add(mpropdef)
+		mpropdef.callers.add(self)
+
+		# If the mpropdef is abstract do not count it in uncompiled methods
+		if not mpropdef.is_abstract then cuc += 1
 	end
 end
 
@@ -943,7 +943,6 @@ redef class AAsNotnullExpr
 	end
 end
 
-#TODO: associates variables of the two models without using the hashmap
 redef class Variable
 	# The associated MOVar
 	var movar: nullable MOVar
