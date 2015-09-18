@@ -204,14 +204,12 @@ class VirtualMachine super NaiveInterpreter
 	do
 		if mclass.loaded then return
 
-		# Recursively load superclasses
-		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
+		load_class_indirect(mclass)
 
-		if mclass.abstract_loaded then
-			mclass.allocate_vtable(self)
-		else
-			mclass.make_vt(self, true)
-		end
+		# Recursively load superclasses
+		# for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
+
+		mclass.allocate_vtable(self)
 	end
 
 	# This method is called to handle an implicitly loaded class,
@@ -225,6 +223,19 @@ class VirtualMachine super NaiveInterpreter
 		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
 
 		mclass.make_vt(self, false)
+
+		#TODO: comment
+		for mclassdef in mclass.mclassdefs do
+			for lp in mclassdef.mpropdefs do
+				if lp isa MMethodDef then
+					var propdef = lp.mproperty.lookup_first_definition(mainmodule, mclass.intro.bound_mtype)
+
+					if not propdef.mproperty.living_mpropdefs.has(propdef) then
+						propdef.mproperty.add_propdef(propdef)
+					end
+				end
+			end
+		end
 	end
 
 	# Execute `mproperty` for a `args` (where `args[0]` is the receiver).
@@ -642,7 +653,7 @@ redef class MClass
 			methods.push(propdef)
 
 			# Add this methoddef to the corresponding global property
-			if not m.living_mpropdefs.has(propdef) then m.add_propdef(propdef)
+			#if not m.living_mpropdefs.has(propdef) then m.add_propdef(propdef)
 		end
 
 		# Call a method in C to put propdefs of self methods in the vtables

@@ -670,10 +670,7 @@ redef class MOCallSitePattern
 	do
 		if cuc != 0 then return false
 
-		if callees.length == 0 then
-			print "MOCallSitePattern sans callees {self}"
-			return false
-		end
+		if callees.length == 0 then return false
 
 		for callee in callees do
 			#TODO : le cuc doit être null ici, donc les méthodes avec un return_expr

@@ -68,6 +68,9 @@ abstract class MOSitePattern
 	# List of expressions that refers to this pattern
 	var sites = new List[S]
 
+	# True if at least one site of this pattern was executed
+	var is_executed: Bool = false
+
 	fun init_abstract: SELF
 	do
 		sys.vm.all_patterns.add(self)
@@ -109,6 +112,12 @@ abstract class MOPropSitePattern
 
 	# Number of calls on uncompiled methods
 	var cuc = 0
+
+	#TODO: contructeur qui doit gérer l'association GP <-> Pattern
+	init
+	do
+
+	end
 
 	fun compatible_site(site: MOPropSite): Bool is abstract
 
@@ -163,6 +172,7 @@ class MOCallSitePattern
 	do
 		self.gp = gp
 		self.rst = rst
+		self.rsc = rsc
 
 		if not rsc.abstract_loaded then return
 
@@ -185,7 +195,7 @@ class MOCallSitePattern
 		mpropdef.callers.add(self)
 
 		# If the mpropdef is abstract do not count it in uncompiled methods
-		if not mpropdef.is_abstract then cuc += 1
+		if not mpropdef.is_abstract and not mpropdef.is_compiled then cuc += 1
 	end
 end
 
@@ -294,9 +304,7 @@ redef class MMethod
 		var ordering = mpropdef.mclassdef.mclass.ordering
 
 		for pattern in patterns do
-			var rsc = pattern.rst.get_mclass(sys.vm, mpropdef).as(not null)
-
-			if rsc.abstract_loaded and ordering.has(rsc) then
+			if ordering.has(pattern.rsc) or pattern.rsc == mpropdef.mclassdef.mclass then
 				pattern.add_lp(mpropdef)
 			end
 		end
@@ -474,6 +482,15 @@ abstract class MOSite
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
 	var concretes_receivers: nullable List[MClass] is noinit, writable
 
+	# True if the site has been executed
+	var is_executed: Bool = false
+
+	fun set_executed
+	do
+		is_executed = true
+		pattern.is_executed = true
+	end
+
 	fun pattern_factory(rst: MType, gp: MProperty, rsc: MClass): P is abstract
 
 	private fun compute_concretes
@@ -616,6 +633,17 @@ class MOCallSite
 		end
 
 		return callees
+	end
+
+	redef fun set_executed
+	do
+		if is_executed == false then
+			if pattern.callees.length == 0 then
+				print "Pattern without callees, pattern.gp {pattern.gp} pattern.rsc {pattern.rsc}"
+			end
+		end
+
+		super
 	end
 end
 
