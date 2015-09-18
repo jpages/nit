@@ -311,8 +311,8 @@ class MOStats
 		res.add("from return,")
 		res.add("from return preexist,")
 		res.add("from return non-preexisting,")
-		res.add(",")
-		res.add(",")
+		res.add("from other preexisting,")
+		res.add("from other non-preexisting,")
 		res.add("from readsite,")
 		res.add("\n,")
 		res.add("callers positive cuc,")
@@ -336,14 +336,14 @@ class MOStats
 		res.add("methods with a non-preexisting return,")
 		res.add("\n")
 		res.add("preexisting patterns,")
-		res.add("non-preexisting patterns,")
+		res.add("non-preexisting patterns with positive cuc,")
+		res.add("non-preexisting pattern with null cuc,")
 		res.add("no return pattern,")
+		res.add(",")
+		res.add(",")
 		res.add("\n")
-		res.add("from other preexisting,")
-		res.add("from other non-preexisting,")
-		res.add("\n")
-		res.add("sites with return preexisting,")
-		res.add("sites with return non-preexisting,")
+		res.add("sites with preexisting return,")
+		res.add("sites with non-preexisting return,")
 		res.add("no return sites,")
 		return res
 	end
@@ -467,13 +467,18 @@ class MOStats
 		for pattern in sys.vm.all_patterns do
 			# If the pattern is a callsitepattern with a return
 			if pattern isa MOCallSitePattern and pattern.gp.intro.msignature.return_mtype != null then
-				if pattern.is_pre then
+				# A preexisting pattern is a pattern with cuc = 0 and all callees with a preexisting return
+				if pattern.is_pre and pattern.cuc == 0 then
 					pstats.matrix[53][0] += 1
 				else
-					pstats.matrix[54][0] += 1
+					if pattern.cuc > 0 then
+						pstats.matrix[54][0] += 1
+					else
+						pstats.matrix[55][0] += 1
+					end
 				end
 			else
-				pstats.matrix[55][0] += 1
+				pstats.matrix[56][0] += 1
 			end
 		end
 
@@ -676,13 +681,21 @@ redef class MOSite
 
 			# If self isa MOCallsite and call a method with a return
 			if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
-				var pre = true
-				if pre then
-					pstats.matrix[59][index_x] += 1
-					pstats.matrix[59][5] += 1
+				# If the pattern is preexisting, then the site is also preexisting
+				if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
+					pstats.matrix[60][0] += 1
 				else
-					pstats.matrix[60][index_x] += 1
-					pstats.matrix[60][5] += 1
+					# If the site is preexisting with concretes receivers for example, the site is preexisting
+					if compute_preexist.bit_pre then
+						pstats.matrix[60][0] += 1
+					else
+						# For all other cases, the site is non-preexisting
+						pstats.matrix[61][0] += 1
+					end
+				end
+			else
+				if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype == null then
+					pstats.matrix[62][0] += 1
 				end
 			end
 		else
@@ -716,8 +729,8 @@ redef class MOSite
 	# TODO: make it exclusive
 	fun incr_from_site
 	do
-		# If the receiver comes from a new
-		if origin.bin_and(2) == 2 then
+		# If the receiver comes only from a new
+		if origin == 2 or origin == 130 then
 			pstats.matrix[23][index_x] += 1
 			pstats.matrix[23][5] += 1
 
@@ -730,8 +743,8 @@ redef class MOSite
 			end
 		end
 
-		# If the receiver comes from a callsite
-		if origin.bin_and(4) == 4 then
+		# If the receiver comes only from a callsite
+		if origin == 4 or origin == 132 then
 			# The total of callsites
 			pstats.matrix[26][index_x] += 1
 			pstats.matrix[26][5] += 1
@@ -746,20 +759,24 @@ redef class MOSite
 			end
 		end
 
-		# If the receiver comes from an attribute read
-		if origin.bin_and(256) == 256 then
+		# If the receiver comes only from an attribute read
+		if origin == 256 or origin == 384 then
 			pstats.matrix[31][index_x] += 1
 			pstats.matrix[31][5] += 1
 		end
 
-		# Other cases, a combination of several origins
-		if not origin == 2 and not origin == 4 and not origin == 256 then
-			if origin.bin_and(128) == 128 then
-				pstats.matrix[56][index_x] += 1
-				pstats.matrix[56][5] += 1
-			else
-				pstats.matrix[57][index_x] += 1
-				pstats.matrix[57][5] += 1
+		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
+		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 then
+			# We also filter the receiver which come from a parameter or a literal
+			if not origin.bin_and(1) == 1 and not origin.bin_and(8) == 8 then
+				# If the site is preexisting
+				if origin.bin_and(128) == 0 then
+					pstats.matrix[29][index_x] += 1
+					pstats.matrix[29][5] += 1
+				else
+					pstats.matrix[30][index_x] += 1
+					pstats.matrix[30][5] += 1
+				end
 			end
 		end
 	end
