@@ -63,13 +63,12 @@ redef class MPropDef
 	# If the return_expr is in it, recurse on callers
 	fun propage_preexist
 	do
-		for expr in exprs_preexist_mut do expr.preexist_init
-		exprs_preexist_mut.clear
+		for expr in preexist_mut_exprs do expr.preexist_init
 		preexist_mut_exprs.clear
 
 		if not disable_method_return then
 			for p in callers do
-				p.as(MOCallSitePattern).propage_preexist
+				# p.as(MOCallSitePattern).propage_preexist
 			end
 		end
 	end
@@ -78,11 +77,14 @@ redef class MPropDef
 	# If the return_expr is in it, recurse on callers
 	fun propage_npreexist
 	do
-		for expr in exprs_npreexist_mut do expr.preexist_init
-		exprs_npreexist_mut.clear
+		for expr in preexist_mut_exprs do expr.preexist_init
 		preexist_mut_exprs.clear
 
-		if not disable_method_return then for p in callers do p.as(MOCallSitePattern).propage_npreexist
+		if not disable_method_return then
+			for p in callers do
+				p.as(MOCallSitePattern).propage_npreexist
+			end
+		end
 	end
 
 	var recursive_origin: Bool = false
