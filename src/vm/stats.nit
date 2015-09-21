@@ -280,7 +280,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(69)
+		var res = new Array[String].with_capacity(70)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -339,12 +339,13 @@ class MOStats
 		res.add("non-preexisting patterns with positive cuc,")
 		res.add("non-preexisting pattern with null cuc,")
 		res.add("no return pattern,")
-		res.add(",")
-		res.add(",")
+		res.add("patterns without callees,")
+		res.add("not executed patterns,")
 		res.add("\n")
 		res.add("sites with preexisting return,")
 		res.add("sites with non-preexisting return,")
 		res.add("no return sites,")
+		res.add("not executed sites,")
 		return res
 	end
 
@@ -466,19 +467,39 @@ class MOStats
 		# Go into each pattern to collect statistics on them
 		for pattern in sys.vm.all_patterns do
 			# If the pattern is a callsitepattern with a return
-			if pattern isa MOCallSitePattern and pattern.gp.intro.msignature.return_mtype != null then
-				# A preexisting pattern is a pattern with cuc = 0 and all callees with a preexisting return
-				if pattern.is_pre and pattern.cuc == 0 then
-					pstats.matrix[53][0] += 1
+			if not pattern.is_executed then
+				pstats.matrix[58][pattern.index_x] += 1
+			end
+
+			if pattern isa MOCallSitePattern then
+
+				if pattern.callees.length == 0 then
+					pstats.matrix[57][0] += 1
+
+					if pattern.is_executed == true then
+						print "Pattern {pattern.rsc} {pattern.gp} executed but without callees {pattern.gp.living_mpropdefs}"
+					end
 				else
-					if pattern.cuc > 0 then
-						pstats.matrix[54][0] += 1
+					if pattern.gp.intro.msignature.return_mtype == null then
+						pstats.matrix[56][0] += 1
 					else
-						pstats.matrix[55][0] += 1
+						# A preexisting pattern is a pattern with cuc = 0 and all callees with a preexisting return
+						if pattern.is_pre and pattern.cuc == 0 then
+							pstats.matrix[53][0] += 1
+						else
+							if pattern.cuc > 0 then
+								pstats.matrix[54][0] += 1
+							else
+								pstats.matrix[55][0] += 1
+							end
+						end
 					end
 				end
-			else
-				pstats.matrix[56][0] += 1
+			end
+
+			if pattern isa MOSubtypeSitePattern or pattern isa MOCallSitePattern or pattern isa MOAsNotNullPattern then
+				# All patterns are counted here
+				pstats.matrix[58][pattern.index_x] += 1
 			end
 		end
 
@@ -679,8 +700,26 @@ redef class MOSite
 			# Increment the total for implementation of the previous line
 			incr_total
 
-			# If self isa MOCallsite and call a method with a return
-			if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
+			# Increment statistics on callsites
+			incr_stats_sites
+		else
+			# Increment the total of sites with a primitive receiver
+			sys.pstats.nb_primitive_sites += 1
+		end
+	end
+
+	# Print the pattern (RST/GP or target class for subtype test)
+	fun pattern2str: String is abstract
+
+	fun incr_stats_sites
+	do
+		# If self isa MOCallsite and call a method with a return
+		if self isa MOCallSite then
+			if not is_executed then
+				pstats.matrix[63][0] += 1
+			end
+
+			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
 				# If the pattern is preexisting, then the site is also preexisting
 				if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
 					pstats.matrix[60][0] += 1
@@ -694,18 +733,12 @@ redef class MOSite
 					end
 				end
 			else
-				if self isa MOCallSite and pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype == null then
+				if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype == null then
 					pstats.matrix[62][0] += 1
 				end
 			end
-		else
-			# Increment the total of sites with a primitive receiver
-			sys.pstats.nb_primitive_sites += 1
 		end
 	end
-
-	# Print the pattern (RST/GP or target class for subtype test)
-	fun pattern2str: String is abstract
 
 	fun incr_total
 	do
@@ -879,6 +912,26 @@ redef class MOAsNotNullSite
 
 	redef var site_type = "asnotnull"
 
+	redef var index_x = 3
+end
+
+redef class MOSitePattern
+	var index_x: Int = 5
+end
+
+redef class MOCallSitePattern
+	redef var index_x = 0
+end
+
+redef class MOAttrPattern
+	redef var index_x = 1
+end
+
+redef class MOSubtypeSitePattern
+	redef var index_x = 2
+end
+
+redef class MOAsNotNullPattern
 	redef var index_x = 3
 end
 

@@ -137,6 +137,14 @@ class VirtualMachine super NaiveInterpreter
 		return true
 	end
 
+	fun is_subclass(sub: MClass, sup: MClass): Bool
+	do
+		var hierarchy = sub.in_hierarchy(sys.vm.mainmodule)
+
+		return hierarchy.greaters.has(sup)
+		# return inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable)
+	end
+
 	# Subtyping test with perfect hashing
 	# * `id` is the identifier of the target class
 	# * `mask` is the perfect hashing mask of the receiver class

@@ -90,6 +90,13 @@ abstract class MOSitePattern
 	do
 		return "{rst.name} {rsc.name} "
 	end
+
+	# Return true if self.rsc is supertype of mclass
+	fun is_supertype(mclass: MClass): Bool
+	do
+		# return mclass.mclass_type.is_subtype(sys.vm.mainmodule, mclass.mclass_type, rsc.mclass_type)
+		return sys.vm.is_subclass(rsc, mclass)
+	end
 end
 
 # Pattern of properties sites (method call / attribute access)
@@ -116,7 +123,8 @@ abstract class MOPropSitePattern
 	#TODO: contructeur qui doit gérer l'association GP <-> Pattern
 	init
 	do
-
+		super
+		gp.patterns.add(self)
 	end
 
 	fun compatible_site(site: MOPropSite): Bool is abstract
@@ -170,16 +178,17 @@ class MOCallSitePattern
 
 	init(rst: MType, rsc: MClass, gp: MMethod)
 	do
+		super(rst, rsc, gp)
+
 		self.gp = gp
 		self.rst = rst
 		self.rsc = rsc
 
-		if not rsc.abstract_loaded then return
-
 		for lp in gp.living_mpropdefs do
-			if lp.mclassdef.mclass.ordering.has(rsc) then
-				add_lp(lp)
-			end
+			add_lp(lp)
+
+			# if lp.mclassdef.mclass.ordering.has(rsc) or rsc == lp.mclassdef.mclass then
+			# end
 		end
 	end
 
@@ -191,6 +200,10 @@ class MOCallSitePattern
 	# Add a new local method to this pattern
 	fun add_lp(mpropdef: LP)
 	do
+		if not rsc.abstract_loaded then return
+
+		if not is_supertype(mpropdef.mclassdef.mclass) then return
+
 		callees.add(mpropdef)
 		mpropdef.callers.add(self)
 
@@ -304,9 +317,12 @@ redef class MMethod
 		var ordering = mpropdef.mclassdef.mclass.ordering
 
 		for pattern in patterns do
-			if ordering.has(pattern.rsc) or pattern.rsc == mpropdef.mclassdef.mclass then
-				pattern.add_lp(mpropdef)
-			end
+			pattern.add_lp(mpropdef)
+
+			# var is_subtype = mpropdef.mclassdef.mclass.mclass_type.is_subtype(sys.vm.mainmodule, mpropdef.mclassdef.mclass.mclass_type, pattern.rsc.mclass_type)
+			# if ordering.has(pattern.rsc) or pattern.rsc == mpropdef.mclassdef.mclass then
+				# pattern.add_lp(mpropdef)
+			# end
 		end
 	end
 end
@@ -639,7 +655,7 @@ class MOCallSite
 	do
 		if is_executed == false then
 			if pattern.callees.length == 0 then
-				print "Pattern without callees, pattern.gp {pattern.gp} pattern.rsc {pattern.rsc}"
+				# print "Pattern without callees, pattern.gp {pattern.gp} pattern.rsc {pattern.rsc} {pattern.gp.living_mpropdefs}"
 			end
 		end
 
@@ -737,6 +753,7 @@ redef class MClass
 	do
 		var pattern: nullable MOPropSitePattern = null
 
+		# TODO: verifier sites_patterns
 		for p in sites_patterns do
 			if p.gp == gp and p.rst == mclass_type and p.compatible_site(site) then
 				assert p.rsc == self
@@ -746,7 +763,6 @@ redef class MClass
 		end
 
 		if pattern == null then
-			# pattern = site.pattern_factory(mclass_type, gp, mclass)
 			pattern = site.pattern_factory(mclass_type, gp, self)
 			sites_patterns.add(pattern)
 		end
