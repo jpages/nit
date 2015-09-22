@@ -374,12 +374,7 @@ redef class MOCallSite
 				# By default, a method is preexisting
 				prelp = 7
 			else
-				# # If the callee is not compiled, then the site is not preexisting
-				# if not lp.is_compiled then
-				# 	prelp = 8
-				# else
-					prelp = lp.return_expr.return_preexist
-				# end
+				prelp = lp.return_expr.return_preexist
 			end
 
 			if preval == 0 then
