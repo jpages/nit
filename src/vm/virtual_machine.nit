@@ -137,12 +137,14 @@ class VirtualMachine super NaiveInterpreter
 		return true
 	end
 
+	# Return true if `sub` if a subclass of `sup`
 	fun is_subclass(sub: MClass, sup: MClass): Bool
 	do
+		if sub == sup then return true
+
 		var hierarchy = sub.in_hierarchy(sys.vm.mainmodule)
 
 		return hierarchy.greaters.has(sup)
-		# return inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable)
 	end
 
 	# Subtyping test with perfect hashing
@@ -214,9 +216,6 @@ class VirtualMachine super NaiveInterpreter
 
 		load_class_indirect(mclass)
 
-		# Recursively load superclasses
-		# for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
-
 		mclass.allocate_vtable(self)
 	end
 
@@ -228,6 +227,7 @@ class VirtualMachine super NaiveInterpreter
 		# It the class was already implicitly loaded
 		if mclass.abstract_loaded then return
 
+		# Recursively load superclasses
 		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
 
 		mclass.make_vt(self, false)
