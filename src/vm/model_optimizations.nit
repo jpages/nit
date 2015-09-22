@@ -90,13 +90,6 @@ abstract class MOSitePattern
 	do
 		return "{rst.name} {rsc.name} "
 	end
-
-	# Return true if self.rsc is supertype of mclass
-	fun is_supertype(mclass: MClass): Bool
-	do
-		# return mclass.mclass_type.is_subtype(sys.vm.mainmodule, mclass.mclass_type, rsc.mclass_type)
-		return sys.vm.is_subclass(rsc, mclass)
-	end
 end
 
 # Pattern of properties sites (method call / attribute access)
@@ -184,11 +177,20 @@ class MOCallSitePattern
 		self.rst = rst
 		self.rsc = rsc
 
+		var lp_rsc = gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype)
+
+		if not gp.living_mpropdefs.has(lp_rsc) then
+			gp.living_mpropdefs.add(lp_rsc)
+
+			callees.add(lp_rsc)
+			lp_rsc.callers.add(self)
+
+			# If the mpropdef is abstract do not count it in uncompiled methods
+			if not lp_rsc.is_abstract and not lp_rsc.is_compiled then cuc += 1
+		end
+
 		for lp in gp.living_mpropdefs do
 			add_lp(lp)
-
-			# if lp.mclassdef.mclass.ordering.has(rsc) or rsc == lp.mclassdef.mclass then
-			# end
 		end
 	end
 
@@ -200,15 +202,17 @@ class MOCallSitePattern
 	# Add a new local method to this pattern
 	fun add_lp(mpropdef: LP)
 	do
+		if not sys.vm.is_subclass(mpropdef.mclassdef.mclass, rsc) then return
+
 		if not rsc.abstract_loaded then return
 
-		if not is_supertype(mpropdef.mclassdef.mclass) then return
+		if not callees.has(mpropdef) then
+			callees.add(mpropdef)
+			mpropdef.callers.add(self)
 
-		callees.add(mpropdef)
-		mpropdef.callers.add(self)
-
-		# If the mpropdef is abstract do not count it in uncompiled methods
-		if not mpropdef.is_abstract and not mpropdef.is_compiled then cuc += 1
+			# If the mpropdef is abstract do not count it in uncompiled methods
+			if not mpropdef.is_abstract and not mpropdef.is_compiled then cuc += 1
+		end
 	end
 end
 
@@ -314,15 +318,8 @@ redef class MMethod
 	do
 		super
 
-		var ordering = mpropdef.mclassdef.mclass.ordering
-
 		for pattern in patterns do
 			pattern.add_lp(mpropdef)
-
-			# var is_subtype = mpropdef.mclassdef.mclass.mclass_type.is_subtype(sys.vm.mainmodule, mpropdef.mclassdef.mclass.mclass_type, pattern.rsc.mclass_type)
-			# if ordering.has(pattern.rsc) or pattern.rsc == mpropdef.mclassdef.mclass then
-				# pattern.add_lp(mpropdef)
-			# end
 		end
 	end
 end
@@ -698,6 +695,7 @@ end
 
 redef class MClass
 	# List of patterns of MOPropSite
+	#TODO: to debug
 	var sites_patterns = new List[MOPropSitePattern]
 
 	# Pattern of MONew of self
@@ -734,7 +732,7 @@ redef class MClass
 		var pattern: nullable MOSubtypeSitePattern = null
 
 		for p in subtype_pattern do
-			if p.rst == mclass_type and p.target == site.target then
+			if p.rsc == self and p.target == site.target then
 				pattern = p
 				break
 			end
@@ -749,13 +747,13 @@ redef class MClass
 	end
 
 	# Create (if not exists) and set a pattern for objet prop sites
-	fun set_site_pattern(site: MOPropSite, gp: MProperty, mclass: MClass)
+	fun set_site_pattern(site: MOPropSite, gp: MProperty)
 	do
 		var pattern: nullable MOPropSitePattern = null
 
 		# TODO: verifier sites_patterns
 		for p in sites_patterns do
-			if p.gp == gp and p.rst == mclass_type and p.compatible_site(site) then
+			if p.gp == gp and p.rsc == self and p.compatible_site(site) then
 				assert p.rsc == self
 				pattern = p
 				break
@@ -811,6 +809,36 @@ redef class VirtualMachine
 
 	# All MONewPattern
 	var all_new_patterns = new List[MONewPattern]
+
+	redef fun load_class_indirect(mclass: MClass)
+	do
+		super
+
+		for pattern in all_patterns do
+
+			if not pattern isa MOCallSitePattern then continue
+
+			if not pattern.rsc.abstract_loaded then continue
+
+			var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
+
+			if not pattern.gp.living_mpropdefs.has(lp_rsc) then
+				pattern.gp.living_mpropdefs.add(lp_rsc)
+
+				if not mclass.sites_patterns.has(pattern) then
+					print "{mclass} {mclass.sites_patterns}"
+				end
+			end
+
+			if not pattern.callees.has(lp_rsc) then
+				pattern.callees.add(lp_rsc)
+				lp_rsc.callers.add(pattern)
+
+				# If the mpropdef is abstract do not count it in uncompiled methods
+				if not lp_rsc.is_abstract and not lp_rsc.is_compiled then pattern.cuc += 1
+			end
+		end
+	end
 end
 
 redef class MType
@@ -880,7 +908,7 @@ redef class AAttrFormExpr
 		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
-		recv_class.set_site_pattern(attr_site, mproperty.as(not null), mpropdef.mclassdef.mclass)
+		recv_class.set_site_pattern(attr_site, mproperty.as(not null))
 
 		# Associate the MOEntity with the AST node
 		mo_entity = attr_site
@@ -1100,7 +1128,7 @@ redef class ASendExpr
 		end
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
-		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty, mpropdef.mclassdef.mclass)
+		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty)
 
 		return moattr
 	end
@@ -1111,7 +1139,7 @@ redef class ASendExpr
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
 		var mocallsite = new MOCallSite(self, mpropdef)
 
-		recv_class.set_site_pattern(mocallsite, cs.mproperty, mpropdef.mclassdef.mclass)
+		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
 		return mocallsite
 	end
