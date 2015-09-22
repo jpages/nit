@@ -341,7 +341,7 @@ class MOStats
 		res.add("no return pattern,")
 		res.add("patterns without callees,")
 		res.add("not executed patterns,")
-		res.add("\n")
+		res.add("nb_patterns,")
 		res.add("sites with preexisting return,")
 		res.add("sites with non-preexisting return,")
 		res.add("no return sites,")
@@ -497,10 +497,9 @@ class MOStats
 				end
 			end
 
-			if pattern isa MOSubtypeSitePattern or pattern isa MOCallSitePattern or pattern isa MOAsNotNullPattern then
-				# All patterns are counted here
-				pstats.matrix[58][pattern.index_x] += 1
-			end
+			# All patterns are counted here
+			pstats.matrix[59][pattern.index_x] += 1
+			pstats.matrix[59][5] += 1
 		end
 
 		for i in [0..pstats.matrix.length[ do

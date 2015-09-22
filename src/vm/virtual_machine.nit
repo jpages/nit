@@ -217,6 +217,11 @@ class VirtualMachine super NaiveInterpreter
 		load_class_indirect(mclass)
 
 		mclass.allocate_vtable(self)
+
+		# Update `loaded_subclasses` for self
+		for superclass in mclass.in_hierarchy(mainmodule).greaters do
+			superclass.loaded_subclasses.add(mclass)
+		end
 	end
 
 	# This method is called to handle an implicitly loaded class,
@@ -472,6 +477,9 @@ redef class MClass
 
 	# The direct (loaded) subclasses of this class
 	var subclasses = new Array[MClass] is lazy
+
+	# The concretes loaded subclasses (direct and indirect) of this class
+	var loaded_subclasses = new Array[MClass]
 
 	# Allocates a VTable for this class and gives it an id
 	# * `vm` The currently executed VirtualMachine

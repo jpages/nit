@@ -177,20 +177,16 @@ class MOCallSitePattern
 		self.rst = rst
 		self.rsc = rsc
 
-		var lp_rsc = gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype)
+		if rsc.abstract_loaded then
+			for subclass in rsc.loaded_subclasses do
+				var lp_rsc = gp.lookup_first_definition(sys.vm.mainmodule, subclass.intro.bound_mtype)
 
-		if not gp.living_mpropdefs.has(lp_rsc) then
-			gp.living_mpropdefs.add(lp_rsc)
+				if not gp.living_mpropdefs.has(lp_rsc) then
+					gp.living_mpropdefs.add(lp_rsc)
+				end
 
-			callees.add(lp_rsc)
-			lp_rsc.callers.add(self)
-
-			# If the mpropdef is abstract do not count it in uncompiled methods
-			if not lp_rsc.is_abstract and not lp_rsc.is_compiled then cuc += 1
-		end
-
-		for lp in gp.living_mpropdefs do
-			add_lp(lp)
+				add_lp(lp_rsc)
+			end
 		end
 	end
 
@@ -202,10 +198,6 @@ class MOCallSitePattern
 	# Add a new local method to this pattern
 	fun add_lp(mpropdef: LP)
 	do
-		if not sys.vm.is_subclass(mpropdef.mclassdef.mclass, rsc) then return
-
-		if not rsc.abstract_loaded then return
-
 		if not callees.has(mpropdef) then
 			callees.add(mpropdef)
 			mpropdef.callers.add(self)
@@ -751,7 +743,6 @@ redef class MClass
 	do
 		var pattern: nullable MOPropSitePattern = null
 
-		# TODO: verifier sites_patterns
 		for p in sites_patterns do
 			if p.gp == gp and p.rsc == self and p.compatible_site(site) then
 				assert p.rsc == self
@@ -810,32 +801,23 @@ redef class VirtualMachine
 	# All MONewPattern
 	var all_new_patterns = new List[MONewPattern]
 
-	redef fun load_class_indirect(mclass: MClass)
+	redef fun load_class(mclass)
 	do
 		super
 
-		for pattern in all_patterns do
+		# For all superclasses (including self)
+		for superclass in mclass.ordering do
+			for pattern in superclass.sites_patterns do
+				# We only update callsite patterns
+				if not pattern isa MOCallSitePattern then continue
 
-			if not pattern isa MOCallSitePattern then continue
+				var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
 
-			if not pattern.rsc.abstract_loaded then continue
-
-			var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
-
-			if not pattern.gp.living_mpropdefs.has(lp_rsc) then
-				pattern.gp.living_mpropdefs.add(lp_rsc)
-
-				if not mclass.sites_patterns.has(pattern) then
-					print "{mclass} {mclass.sites_patterns}"
+				if not pattern.gp.living_mpropdefs.has(lp_rsc) then
+					pattern.gp.living_mpropdefs.add(lp_rsc)
 				end
-			end
 
-			if not pattern.callees.has(lp_rsc) then
-				pattern.callees.add(lp_rsc)
-				lp_rsc.callers.add(pattern)
-
-				# If the mpropdef is abstract do not count it in uncompiled methods
-				if not lp_rsc.is_abstract and not lp_rsc.is_compiled then pattern.cuc += 1
+				pattern.add_lp(lp_rsc)
 			end
 		end
 	end
