@@ -639,17 +639,6 @@ class MOCallSite
 
 		return callees
 	end
-
-	redef fun set_executed
-	do
-		if is_executed == false then
-			if pattern.callees.length == 0 then
-				# print "Pattern without callees, pattern.gp {pattern.gp} pattern.rsc {pattern.rsc} {pattern.gp.living_mpropdefs}"
-			end
-		end
-
-		super
-	end
 end
 
 # MO of read attribute
@@ -687,7 +676,6 @@ end
 
 redef class MClass
 	# List of patterns of MOPropSite
-	#TODO: to debug
 	var sites_patterns = new List[MOPropSitePattern]
 
 	# Pattern of MONew of self
