@@ -209,20 +209,6 @@ redef class AAttrPropdef
 	var attr_redef_taken_into = false
 end
 
-redef class ASendExpr
-	redef fun ast2mo_method(mpropdef, called_node_ast, is_attribute)
-	do
-		var sup = super
-
-		# It's an accessors (with redefs) dispatch
-		if is_attribute and not called_node_ast.as(AAttrPropdef).attr_redef_taken_into then
-			called_node_ast.as(AAttrPropdef).attr_redef_taken_into = true
-		end
-
-		return sup
-	end
-end
-
 # Stats of the optimizing model
 class MOStats
 	# List of analysed sites
@@ -476,8 +462,10 @@ class MOStats
 				if pattern.callees.length == 0 then
 					pstats.matrix[57][0] += 1
 
+					# The pattern has no callees but was executed
 					if pattern.is_executed == true then
-						print "Pattern {pattern.rsc} {pattern.gp} executed but without callees {pattern.gp.living_mpropdefs}"
+						# Several possibilities: the receiver static class is not loaded or the global property is a particular method like != or ==
+						print "Pattern {pattern.rsc}#{pattern.gp} executed but without callees {pattern.gp.living_mpropdefs}, rsc loaded ? = {pattern.rsc.abstract_loaded}"
 					end
 				else
 					if pattern.gp.intro.msignature.return_mtype == null then
@@ -712,12 +700,12 @@ redef class MOSite
 
 	fun incr_stats_sites
 	do
+		if not is_executed then
+			pstats.matrix[63][index_x] += 1
+		end
+
 		# If self isa MOCallsite and call a method with a return
 		if self isa MOCallSite then
-			if not is_executed then
-				pstats.matrix[63][0] += 1
-			end
-
 			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
 				# If the pattern is preexisting, then the site is also preexisting
 				if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
@@ -758,7 +746,7 @@ redef class MOSite
 		end
 	end
 
-	# TODO: make it exclusive
+	# Trace origins of preexistence
 	fun incr_from_site
 	do
 		# If the receiver comes only from a new
@@ -800,7 +788,7 @@ redef class MOSite
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 then
 			# We also filter the receiver which come from a parameter or a literal
-			if not origin.bin_and(1) == 1 and not origin.bin_and(8) == 8 then
+			if not origin == 1 and not origin == 8 then
 				# If the site is preexisting
 				if origin.bin_and(128) == 0 then
 					pstats.matrix[29][index_x] += 1
@@ -1057,5 +1045,85 @@ redef class MOVar
 		else
 			return false
 		end
+	end
+end
+
+redef class ASendExpr
+	redef fun ast2mo_method(mpropdef, called_node_ast, is_attribute)
+	do
+		var sup = super
+
+		# It's an accessors (with redefs) dispatch
+		if is_attribute and not called_node_ast.as(AAttrPropdef).attr_redef_taken_into then
+			called_node_ast.as(AAttrPropdef).attr_redef_taken_into = true
+		end
+
+		return sup
+	end
+
+	redef fun expr(v)
+	do
+		var res = super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+
+		return res
+	end
+end
+
+redef class AAttrExpr
+	redef fun expr(v)
+	do
+	var res = super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+
+		return res
+	end
+end
+
+redef class AAttrAssignExpr
+	redef fun stmt(v)
+	do
+		super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+	end
+end
+
+redef class AAttrReassignExpr
+	redef fun stmt(v)
+	do
+		super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+	end
+end
+
+redef class AIsaExpr
+	redef fun expr(v)
+	do
+		var res = super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+
+		return res
+	end
+end
+
+redef class AAsCastForm
+	redef fun expr(v)
+	do
+		var res = super
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+
+		return res
 	end
 end

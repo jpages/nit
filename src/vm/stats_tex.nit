@@ -94,9 +94,9 @@ redef class MOStats
 		file.write("%Table 2\n")
 
 		# Line "other",  sites which are not preexisting
-		var other_methods = pstats.matrix[30][0]
-		var other_attributes = pstats.matrix[30][1]
-		var other_casts = pstats.matrix[30][2]
+		var other_methods = pstats.matrix[29][0] + pstats.matrix[30][0]
+		var other_attributes = pstats.matrix[29][1] + pstats.matrix[30][1]
+		var other_casts = pstats.matrix[29][2] + pstats.matrix[30][2]
 		var total_others = other_methods + other_attributes + other_casts
 
 		var total_from_new = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
@@ -131,7 +131,7 @@ redef class MOStats
 	do
 		file.write("%Table 3\n")
 
-		var total_other = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2] + pstats.matrix[30][0] + pstats.matrix[30][1] + pstats.matrix[30][2]
+		var total_other = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
 		var total_callsites = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
 		var total_table3 = total_other + total_callsites
 

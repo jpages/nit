@@ -107,18 +107,6 @@ redef class AAttrFormExpr
 	end
 end
 
-redef class ASendExpr
-	redef fun expr(v)
-	do
-		var res = super
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		return res
-	end
-end
-
 redef class AAttrExpr
 	redef fun expr(v)
 	do
