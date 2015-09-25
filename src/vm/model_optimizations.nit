@@ -88,7 +88,7 @@ abstract class MOSitePattern
 
 	fun trace: String
 	do
-		return "{rst.name} {rsc.name} "
+		return "Pattern {rsc}"
 	end
 end
 
@@ -113,7 +113,6 @@ abstract class MOPropSitePattern
 	# Number of calls on uncompiled methods
 	var cuc = 0
 
-	#TODO: contructeur qui doit gérer l'association GP <-> Pattern
 	init
 	do
 		super
@@ -124,7 +123,7 @@ abstract class MOPropSitePattern
 
 	redef fun trace
 	do
-		return super + "{gp} {gp.name} "
+		return super + "#{gp} nb_callees {callees.length} nb_sites {sites.length}"
 	end
 end
 
@@ -389,13 +388,25 @@ class MOPhiVar
 	# List of expressions that variable depends
 	var dependencies = new List[MOExpr] is writable
 
+	#TODO
 	redef fun compute_concretes(concretes)
 	do
-		for dep in dependencies do
-			concretes = dep.compute_concretes(concretes)
+		if concretes == null then
+			concretes = new List[MClass]
+		end
 
-			# All dependencies must be concrete (from a new)
-			if concretes == null then return null
+		for dep in dependencies do
+			var dependency_concretes = dep.compute_concretes(concretes)
+
+			# All dependencies must be concretes (coming from a new)
+			if dependency_concretes == null then
+				return null
+			else
+				# We merge the concretes with previous values
+				for con in dependency_concretes do
+					if not concretes.has(con) then concretes.add(con)
+				end
+			end
 		end
 
 		return concretes
