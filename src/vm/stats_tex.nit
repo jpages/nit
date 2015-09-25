@@ -100,25 +100,25 @@ redef class MOStats
 		var total_others = other_methods + other_attributes + other_casts
 
 		var total_from_new = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
-		var total_from_callsite = pstats.matrix[26][0] + pstats.matrix[26][1] + pstats.matrix[26][2]
+		var total_from_callsite = pstats.matrix[28][0] + pstats.matrix[28][1] + pstats.matrix[28][2]
 		var total_from_readsite = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
 
 		var general_total = total_from_new + total_from_callsite + total_from_readsite + other_methods + other_attributes + other_casts
 
 		var table2 = "ReadSite & {pstats.matrix[31][0]} & {pstats.matrix[31][1]} & {pstats.matrix[31][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
 		table2 += "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
-		table2 += "CallSite & {pstats.matrix[26][0]} & {pstats.matrix[26][1]} & {pstats.matrix[26][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
+		table2 += "CallSite & {pstats.matrix[28][0]} & {pstats.matrix[28][1]} & {pstats.matrix[28][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
 		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {total_others*100/general_total}\\\\\n"
 		table2 += "\\hline\n"
 
-		improvable_methods = pstats.matrix[26][0] + other_methods
-		improvable_attributes = pstats.matrix[26][1] + other_attributes
-		improvable_casts = pstats.matrix[26][2] + other_casts
+		improvable_methods = pstats.matrix[28][0] + other_methods
+		improvable_attributes = pstats.matrix[28][1] + other_attributes
+		improvable_casts = pstats.matrix[28][2] + other_casts
 		total_improvable = improvable_methods + improvable_attributes + improvable_casts
 
 		table2 += "%improvable total & {improvable_methods} & {improvable_attributes} & {improvable_casts} & {total_improvable} & {total_improvable*100/general_total}\\\\\n"
 
-		table2 += "total & {pstats.matrix[23][0] + pstats.matrix[26][0] + pstats.matrix[31][0] + other_methods} & {pstats.matrix[23][1] + pstats.matrix[26][1] + pstats.matrix[31][1] + other_attributes} & {pstats.matrix[23][2] + pstats.matrix[26][2] + pstats.matrix[31][2] + other_casts} & {general_total} & 100\\\\\n"
+		table2 += "total & {pstats.matrix[23][0] + pstats.matrix[28][0] + pstats.matrix[31][0] + other_methods} & {pstats.matrix[23][1] + pstats.matrix[28][1] + pstats.matrix[31][1] + other_attributes} & {pstats.matrix[23][2] + pstats.matrix[28][2] + pstats.matrix[31][2] + other_casts} & {general_total} & 100\\\\\n"
 
 		file.write(table2)
 		file.write("\n\n")
@@ -132,7 +132,7 @@ redef class MOStats
 		file.write("%Table 3\n")
 
 		var total_other = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
-		var total_callsites = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
+		var total_callsites = pstats.matrix[25][0] + pstats.matrix[25][1] + pstats.matrix[25][2]
 		var total_table3 = total_other + total_callsites
 
 		# Get improvable_methods from table2-original
@@ -141,11 +141,11 @@ redef class MOStats
 		var improvables = lines[6].split('&')
 		reader.close
 
-		var table3 = "CallSite & {pstats.matrix[27][0]} & {pstats.matrix[27][1]} & {pstats.matrix[27][2]} & {total_callsites} & {total_callsites*100/improvables[4].to_i}\\\\\n"
+		var table3 = "CallSite & {pstats.matrix[25][0]} & {pstats.matrix[25][1]} & {pstats.matrix[25][2]} & {total_callsites} & {total_callsites*100/improvables[4].to_i}\\\\\n"
 		table3 += "other & {pstats.matrix[29][0]} & {pstats.matrix[29][1]} & {pstats.matrix[29][2]} & {total_other} & {total_other*100/improvables[4].to_i}\\\\\n"
 
 		table3 += "\\hline\n"
-		table3 += "total improved & {pstats.matrix[27][0] + pstats.matrix[29][0]} & {pstats.matrix[27][1] + pstats.matrix[29][1]} & {pstats.matrix[27][2] + pstats.matrix[29][2]} & {total_table3} & {total_table3*100/improvables[4].to_i}\\\\\n"
+		table3 += "total improved & {pstats.matrix[25][0] + pstats.matrix[29][0]} & {pstats.matrix[25][1] + pstats.matrix[29][1]} & {pstats.matrix[25][2] + pstats.matrix[29][2]} & {total_table3} & {total_table3*100/improvables[4].to_i}\\\\\n"
 		table3 += "improvable total & {improvables[1]} & {improvables[2]} & {improvables[3]} & {improvables[4]} & 100\\\\\n"
 
 		file.write(table3)

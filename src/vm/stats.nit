@@ -51,6 +51,7 @@ redef class ModelBuilder
 			pstats.overview
 
 			pstats.trace_patterns
+			pstats.trace_sites
 		end
 	end
 
@@ -341,6 +342,19 @@ class MOStats
 
 		for pattern in sys.vm.all_patterns do
 			file.write("{pattern.trace} {pattern}\n")
+		end
+
+		file.close
+	end
+
+	fun trace_sites
+	do
+		var file = new FileWriter.open("trace_sites.txt")
+
+		for mosite in sys.vm.all_moentitites do
+			if mosite isa MOSite then
+				file.write("{mosite.trace} {mosite}\n")
+			end
 		end
 
 		file.close
@@ -771,8 +785,10 @@ redef class MOSite
 
 			# If the receiver is preexisting
 			if origin.bin_and(128) == 0 then
-				pstats.matrix[27][index_x] += 1
-				pstats.matrix[27][5] += 1
+				if not sys.disable_preexistence_extensions then
+					pstats.matrix[27][index_x] += 1
+					pstats.matrix[27][5] += 1
+				end
 			else
 				pstats.matrix[28][index_x] += 1
 				pstats.matrix[28][5] += 1
@@ -787,6 +803,8 @@ redef class MOSite
 
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 then
+			#TODO: retourner à l'ast et dumper l'arbre pour vérifier que c'est bien un other
+
 			# We also filter the receiver which come from a parameter or a literal
 			if not origin == 1 and not origin == 8 then
 				# If the site is preexisting
@@ -858,6 +876,15 @@ redef class MOSite
 		expr_recv.pretty_print_expr(file)
 		file.write("\}\}")
 	end
+
+	fun trace: String
+	do
+		if concretes_receivers != null then
+			return "concretes = {concretes_receivers.as(not null)} impl {get_impl(sys.vm)} preexistence {expr_recv.preexistence_origin}"
+		else
+			return "concretes = null impl {get_impl(sys.vm)} preexistence {expr_recv.preexistence_origin}"
+		end
+	end
 end
 
 redef class MOExprSite
@@ -872,6 +899,11 @@ end
 
 redef class MOPropSite
 	redef fun pattern2str do return "{pattern.rst}::{pattern.gp}"
+
+	redef fun trace
+	do
+		return super + "{pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
+	end
 end
 
 redef class MOCallSite
