@@ -53,6 +53,7 @@ redef class ModelBuilder
 			pstats.trace_patterns
 			pstats.trace_sites
 			pstats.trace_global_methods
+			pstats.trace_local_methods
 		end
 	end
 
@@ -364,6 +365,17 @@ class MOStats
 		file.close
 	end
 
+	fun trace_local_methods
+	do
+		var file = new FileWriter.open("trace_local_methods.txt")
+
+		for mpropdef in sys.vm.compiled_mproperties do
+			file.write("{mpropdef.trace}\n")
+		end
+
+		file.close
+	end
+
 	fun trace_global_methods
 	do
 		var file = new FileWriter.open("trace_global_methods.txt")
@@ -564,7 +576,7 @@ class MOStats
 			trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
 
 			if propdef.return_expr != null then
-				trace_model.write("preexistence {propdef.return_expr.return_preexist}\n")
+				trace_model.write("return_expr.preexistence {propdef.return_expr.return_preexist}\n")
 			end
 
 			trace_model.write("Return dependences {node.returnvar.dep_exprs}\n")
@@ -586,21 +598,21 @@ class MOStats
 
 			# Verify that the variables of the two models are equal
 			var i = 0
-			if propdef.variables.length != node.variables.length then
-				print "Problem in {propdef} {node.location}"
-				print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
-			else
-				for variable in node.variables do
-					trace_model.write("MOVAR"+i.to_s+"\n\t")
-					propdef.variables[i].pretty_print_expr(trace_model)
-					trace_model.write("\n")
+			# if propdef.variables.length != node.variables.length then
+			# 	print "Problem in {propdef} {node.location}"
+			# 	print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
+			# else
+			for variable in node.variables do
+				trace_model.write("MOVAR"+i.to_s+ "{variable.name}" + "\n\t")
+				propdef.variables[i].pretty_print_expr(trace_model)
+				trace_model.write("\n")
 
-					trace_model.write("Variable"+i.to_s+"\n\t")
-					variable.pretty_print(trace_model)
-					trace_model.write("\n")
-					i += 1
-				end
+				# trace_model.write("Variable"+i.to_s+"\n\t")
+				# variable.pretty_print(trace_model)
+				# trace_model.write("\n")
+				i += 1
 			end
+			# end
 		end
 	end
 
@@ -894,11 +906,16 @@ redef class MOSite
 
 	fun trace: String
 	do
+		var res = "recv {expr_recv} "
 		if concretes_receivers != null then
-			return "concretes = {concretes_receivers.as(not null)} impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
+			res += "concretes = {concretes_receivers.as(not null)}"
 		else
-			return "concretes = null impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
+			res += "concretes = null"
 		end
+
+		res += " impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
+
+		return res
 	end
 end
 
@@ -925,6 +942,13 @@ redef class MOCallSite
 	redef var index_x = 0
 
 	redef var site_type = "method"
+
+	redef fun trace
+	do
+		var res = " {pattern.rsc}#{pattern.gp} args {given_args}"
+
+		return super + res
+	end
 end
 
 redef class MOAttrSite
@@ -1060,6 +1084,17 @@ redef class MPropDef
 		if self isa MMethodDef then
 			sys.pstats.get_method_return_origin(self)
 		end
+	end
+
+	fun trace: String
+	do
+		var res = "MProperty {mproperty}, self {self}, mosites {mosites.length}, monews {monews.length}, callers {callers.length}"
+
+		if return_expr != null then
+			res += " {return_expr.return_preexist}"
+		end
+
+		return res
 	end
 end
 
