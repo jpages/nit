@@ -351,7 +351,7 @@ redef class MPropDef
 end
 
 redef abstract class MOSitePattern
-	# Implementation of the pattern (used if site as not concerte receivers list)
+	# Implementation of the pattern (used if site as not concrete receivers list)
 	var impl: nullable Implementation is noinit
 
 	# Get implementation, compute it if not exists
@@ -389,7 +389,7 @@ redef abstract class MOSitePattern
 		end
 	end
 
-	# Get the relative offset of the "property" (gp for MOPropPattern, methodblock offset for MOSubtypeSitePattern)
+	# Get the relative offset of the "property" (gp for MOPropPattern, method block offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Get the pic
