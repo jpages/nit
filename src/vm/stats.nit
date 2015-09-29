@@ -52,6 +52,7 @@ redef class ModelBuilder
 
 			pstats.trace_patterns
 			pstats.trace_sites
+			pstats.trace_global_methods
 		end
 	end
 
@@ -353,8 +354,22 @@ class MOStats
 
 		for mosite in sys.vm.all_moentitites do
 			if mosite isa MOSite then
-				file.write("{mosite.trace} {mosite}\n")
+				# Do not print the primitive sites
+				if mosite.expr_recv.preexistence_origin.bin_and(16) != 16 then
+					file.write("{mosite.trace} {mosite}\n")
+				end
 			end
+		end
+
+		file.close
+	end
+
+	fun trace_global_methods
+	do
+		var file = new FileWriter.open("trace_global_methods.txt")
+
+		for mmethod in sys.vm.compiled_global_methods do
+			file.write("{mmethod.trace}\n")
 		end
 
 		file.close
@@ -880,9 +895,9 @@ redef class MOSite
 	fun trace: String
 	do
 		if concretes_receivers != null then
-			return "concretes = {concretes_receivers.as(not null)} impl {get_impl(sys.vm)} preexistence {expr_recv.preexistence_origin}"
+			return "concretes = {concretes_receivers.as(not null)} impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		else
-			return "concretes = null impl {get_impl(sys.vm)} preexistence {expr_recv.preexistence_origin}"
+			return "concretes = null impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		end
 	end
 end
@@ -902,7 +917,7 @@ redef class MOPropSite
 
 	redef fun trace
 	do
-		return super + "{pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
+		return super + " {pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
 	end
 end
 
@@ -1018,6 +1033,14 @@ redef class AVarFormExpr
 	end
 end
 
+redef class MMethod
+
+	fun trace: String
+	do
+		return "{intro_mclassdef.mclass}#{name} nb patterns {patterns.length}"
+	end
+end
+
 redef class MPropDef
 	redef fun compile_mo
 	do
@@ -1095,23 +1118,32 @@ redef class ASendExpr
 
 	redef fun expr(v)
 	do
-		var res = super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
 
-		return res
+		return super
 	end
 end
 
-redef class AAttrExpr
-	redef fun expr(v)
+redef class ASendReassignFormExpr
+	redef fun stmt(v)
 	do
-	var res = super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
 
+		super
+	end
+end
+redef class AAttrExpr
+	redef fun expr(v)
+	do
+		if mo_entity != null then
+			mo_entity.as(MOSite).set_executed
+		end
+
+		var res = super
 		return res
 	end
 end
@@ -1119,31 +1151,31 @@ end
 redef class AAttrAssignExpr
 	redef fun stmt(v)
 	do
-		super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
+		super
 	end
 end
 
 redef class AAttrReassignExpr
 	redef fun stmt(v)
 	do
-		super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
+		super
 	end
 end
 
 redef class AIsaExpr
 	redef fun expr(v)
 	do
-		var res = super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
 
+		var res = super
 		return res
 	end
 end
@@ -1151,11 +1183,11 @@ end
 redef class AAsCastForm
 	redef fun expr(v)
 	do
-		var res = super
 		if mo_entity != null then
 			mo_entity.as(MOSite).set_executed
 		end
 
+		var res = super
 		return res
 	end
 end

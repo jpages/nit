@@ -104,14 +104,14 @@ end
 redef class Int
 	# bit 1 preexistence
 	# bit 2 immutable (si pre)
-	# bit 3 value preexistence
-	# bit 4 non-preexistence
-	# bit 5 immutable (si non-pre)
-	# bit 6 recursif
-	# bit 7 self
-	# bit >7 autres paramètres
-	# bit 1-3 -> and
-	# bit 4-- -> or
+	# bit 4 value preexistence
+	# bit 8 non-preexistence
+	# bit 16 immutable (si non-pre)
+	# bit 32 recursif
+	# bit 64 self
+	# bit >128 autres paramètres
+	# bit 1-4 -> and
+	# bit 8-- -> or
 	fun check_preexist: Bool
 	do
 		# invariant d'une préexistence complètement calculée
@@ -180,7 +180,6 @@ redef class Int
 
 	fun merge(n: Int): Int
 	do
-
 		check_preexist
 		n.check_preexist
 
@@ -202,7 +201,7 @@ redef class Int
 		return high
 	end
 
-	# Display 8 lower bits of preexitence value
+	# Display 8 lower bits of preexistence value
 	fun preexists_bits: Array[Int]
 	do
 		var bs = bits.reversed

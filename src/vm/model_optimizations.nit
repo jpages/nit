@@ -123,7 +123,7 @@ abstract class MOPropSitePattern
 
 	redef fun trace
 	do
-		return super + "#{gp} nb_callees {callees.length} nb_sites {sites.length}"
+		return super + "#{gp} nb_callees {callees.length} nb_sites {sites.length} rsc_loaded = {rsc.abstract_loaded}"
 	end
 end
 
@@ -205,6 +205,11 @@ class MOCallSitePattern
 			if not mpropdef.is_abstract and not mpropdef.is_compiled then cuc += 1
 		end
 	end
+
+	redef fun trace
+	do
+		return super + " cuc = {cuc}"
+	end
 end
 
 # Common subpattern of all attributes (read/write)
@@ -264,6 +269,23 @@ redef class MPropDef
 	# Compile the property
 	fun compile_mo
 	do
+		if self isa MMethodDef then
+			var global_method = mproperty.as(MMethod)
+			if not sys.vm.compiled_global_methods.has(global_method) then
+				sys.vm.compiled_global_methods.add(global_method)
+
+				if global_method.patterns.length == 0 then
+					print "GP sans pattern {global_method.name}"
+
+					for pattern in callers do
+						for mosite in pattern.sites do
+							if mosite.is_executed then print "Executed for {global_method.name} {mosite}"
+						end
+					end
+				end
+			end
+		end
+
 		sys.vm.compiled_mproperties.add(self)
 
 		for pattern in callers do
@@ -438,6 +460,9 @@ class MONew
 
 	# The pattern of this site
 	var pattern: MONewPattern is writable, noinit
+
+	# If any, the associated callsite of the constructor
+	var callsite: nullable MOCallSite
 
 	redef fun compute_concretes(concretes)
 	do
@@ -779,8 +804,11 @@ redef class MClass
 end
 
 redef class VirtualMachine
-	# All living MPropDef
+	# All compiled MPropDef
 	var compiled_mproperties = new List[MPropDef]
+
+	# All living global methods
+	var compiled_global_methods = new List[MMethod]
 
 	# All living new sites
 	var all_new_sites = new List[MONew]
@@ -826,11 +854,17 @@ redef class MType
 	# True if self is a primitive type
 	fun is_primitive_type: Bool
 	do
-		if self.to_s == "Int" then return true
-		if self.to_s == "nullable Int" then return true
-		if self.to_s == "Char" then return true
-		if self.to_s == "nullable Char" then return true
-		if self.to_s == "Bool" then return true
+		if not need_anchor then
+			var superclasses = collect_mtypes(sys.vm.mainmodule)
+
+			for sup in superclasses do
+				if sup.to_s == "Discrete" or sup.to_s == "nullable Discrete" then return true
+				if sup.to_s == "Numeric" or sup.to_s == "nullable Numeric" then return true
+			end
+
+			if self.to_s == "Bool" or self.to_s == "nullable Bool"then return true
+		end
+
 		return false
 	end
 
@@ -1043,8 +1077,34 @@ redef class ANewExpr
 		mpropdef.monews.add(monew)
 		recvtype.as(not null).mclass.set_new_pattern(monew)
 
+		# Create the associated callsite if there is an explicit call to a constructor
+		if callsite != null then
+			var cs = callsite.as(not null)
+
+			# Creation of the MOCallSite
+			var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
+			var mocallsite = new MOCallSite(self, mpropdef)
+
+			recv_class.set_site_pattern(mocallsite, cs.mproperty)
+
+			# Association of the receiver with the new callsite
+			mocallsite.expr_recv = monew
+
+			for arg in n_args.n_exprs do
+				mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
+			end
+
+			# Associate the monew with the callsite
+			monew.callsite = mocallsite
+		end
+
 		mo_entity = monew
 		return monew
+	end
+
+	redef fun get_receiver
+	do
+		return self
 	end
 end
 
@@ -1157,7 +1217,7 @@ redef class ASendExpr
 	end
 
 	# Real method call, and accessors with redefinitions
-	# is_attribute is used only for stats (to kwon if it's a method call because of a redefinition of a attribute)
+	# is_attribute is used only for stats (to know if it's a method call because of a redefinition of a attribute)
 	fun ast2mo_method(mpropdef: MPropDef, called_node_ast: ANode, is_attribute: Bool): MOEntity
 	do
 		var mocallsite = copy_site_method(mpropdef)

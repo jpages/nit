@@ -389,7 +389,7 @@ redef abstract class MOSitePattern
 		end
 	end
 
-	# Get the relative offset of the "property" (gp for MOPropPattern, methodbloc offset for MOSubtypeSitePattern)
+	# Get the relative offset of the "property" (gp for MOPropPattern, methodblock offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Get the pic
