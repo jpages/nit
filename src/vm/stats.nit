@@ -603,7 +603,7 @@ class MOStats
 			# 	print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
 			# else
 			for variable in node.variables do
-				trace_model.write("MOVAR"+i.to_s+ "{variable.name}" + "\n\t")
+				trace_model.write("MOVAR"+i.to_s+ "{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
 				propdef.variables[i].pretty_print_expr(trace_model)
 				trace_model.write("\n")
 
