@@ -139,15 +139,13 @@ class SSA
 	# *`condition` The condition of the if
 	# *`then_branch` The then branch
 	# *`else_branch` The else branch
-	fun generate_if(old_block: BasicBlock, condition: AExpr, then_branch: nullable AExpr, else_branch: nullable AExpr)
+	# *`next_block` The following block to which the if must be linked
+	fun generate_if(old_block: BasicBlock, condition: AExpr, then_branch: nullable AExpr, else_branch: nullable AExpr, next_block: BasicBlock)
 	do
 		# Create a single block for the test of the condition
 		var block_test = new BasicBlock
 
 		block_test.instructions.add(condition)
-
-		# Visit the test of the if
-		condition.generate_basic_blocks(self, old_block)
 
 		old_block.link(block_test)
 
@@ -165,14 +163,20 @@ class SSA
 		block_then.link(successor_block)
 		block_else.link(successor_block)
 
+		# Visit the test of the if
+		condition.generate_basic_blocks(self, old_block, successor_block)
+
+		successor_block.link(next_block)
+
 		# Launch the recursion in two successors if they exist
 		if then_branch != null then
-			then_branch.generate_basic_blocks(self, block_then)
+			then_branch.generate_basic_blocks(self, block_then, successor_block)
 		end
 
 		if else_branch != null then
-			else_branch.generate_basic_blocks(self, block_else)
+			else_branch.generate_basic_blocks(self, block_else, successor_block)
 		end
+
 	end
 end
 
@@ -282,11 +286,10 @@ redef class APropdef
 			dump_tree
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
-
 		end
 
 		rename_variables(ssa)
-		# ssa_destruction(ssa)
+		ssa_destruction(ssa)
 	end
 
 	# Compute the first phase of SSA algorithm: placing phi-functions
@@ -478,12 +481,14 @@ redef class APropdef
 				var var_read = builder.make_var_read(dep.first, dep.first.declared_type.as(not null))
 				var nvar = builder.make_var_assign(dep.first, var_read)
 
-				var block = dep.second.instructions.last.parent
+				# Add the varassign to all predecessor blocks
+				#TODO
+				# var block = dep.second.instructions.last.parent
 
-				# This variable read must be add to a ABlockExpr
-				if block isa ABlockExpr then
-					block.add(nvar)
-				end
+				# # This variable read must be add to a ABlockExpr
+				# if block isa ABlockExpr then
+				# 	block.add(nvar)
+				# end
 
 				propagate_dependences(phi, phi.block)
 				ssa.propdef.variables.add(dep.first)
@@ -538,7 +543,7 @@ redef class AAttrPropdef
 
 		# Recursively goes into the nodes
 		if n_block != null then
-			n_block.generate_basic_blocks(ssa, basic_block.as(not null))
+			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
 			is_generated = true
 		end
 	end
@@ -566,7 +571,7 @@ redef class AMethPropdef
 
 		# Recursively goes into the nodes
 		if n_block != null then
-			n_block.generate_basic_blocks(ssa, basic_block.as(not null))
+			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
 			is_generated = true
 		end
 	end
@@ -649,7 +654,8 @@ redef class AExpr
 	# Generate recursively basic block for this expression
 	# *`ssa` An instance of the SSA class initialized with the enclosing `APropdef`
 	# *`old_block` A basic block not completely filled
-	fun generate_basic_blocks(ssa: SSA, old_block: BasicBlock)
+	# *`new_block` The BasicBlock with all the following instructions inside
+	fun generate_basic_blocks(ssa: SSA, old_block: BasicBlock, new_block: BasicBlock)
 	do
 	end
 end
@@ -660,10 +666,8 @@ redef class AVarFormExpr
 end
 
 redef class AVarExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		self.variable.as(not null).read_blocks.add(old_block)
 		old_block.variables.add(self.variable.as(not null))
 
@@ -675,10 +679,8 @@ redef class AVarExpr
 end
 
 redef class AVardeclExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		var decl = self.variable.as(not null)
 
 		# Add the corresponding variable to the enclosing mpropdef
@@ -690,16 +692,14 @@ redef class AVardeclExpr
 
 		if self.n_expr != null then
 			self.variable.dep_exprs.add(self.n_expr.as(not null))
-			self.n_expr.generate_basic_blocks(ssa, old_block)
+			self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
 end
 
 redef class AVarAssignExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		self.variable.as(not null).assignment_blocks.add(old_block)
 		old_block.variables.add(self.variable.as(not null))
 		self.variable.as(not null).original_variable = self.variable.as(not null)
@@ -710,16 +710,14 @@ redef class AVarAssignExpr
 
 		ssa.propdef.variables.add(self.variable.as(not null))
 
-		self.n_value.generate_basic_blocks(ssa, old_block)
+		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 # TODO, split the two instructions
 redef class AVarReassignExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		self.variable.as(not null).assignment_blocks.add(old_block)
 		old_block.variables.add(self.variable.as(not null))
 		self.variable.as(not null).original_variable = self.variable.as(not null)
@@ -729,7 +727,7 @@ redef class AVarReassignExpr
 		old_block.variables_sites.add(self)
 
 		ssa.propdef.variables.add(self.variable.as(not null))
-		self.n_value.generate_basic_blocks(ssa, old_block)
+		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
@@ -752,10 +750,8 @@ end
 
 # TODO, terminate the previous block and stop the recursion
 redef class AReturnExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		# The return just set the current block and stop the recursion
 		if self.n_expr != null then
 			# TODO, visit this
@@ -765,6 +761,8 @@ redef class AReturnExpr
 			ssa.propdef.returnvar.dep_exprs.add(n_expr.as(not null))
 		end
 
+		# TODO: pas sûr de ça
+		# old_block.link(new_block)
 		old_block.link(ssa.propdef.return_block)
 	end
 end
@@ -878,176 +876,191 @@ end
 # end
 
 redef class AIsaExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AAsCastExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AAsNotnullExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AParExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AOnceExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class ASendExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		# A call does not finish the current block,
 		# because we create intra-procedural basic blocks here
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
 		# Recursively goes into arguments to find variables if any
-		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block)
+		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block, new_block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
+# TODO: transform this in two instructions
 redef class ASendReassignFormExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 
 		ssa.propdef.object_sites.add(self)
 
 		# Recursively goes into arguments to find variables if any
-		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block)
+		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block, new_block)
 
-		self.n_value.generate_basic_blocks(ssa, old_block)
+		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class ASuperExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		# Recursively goes into arguments to find variables if any
-		for arg in self.n_args.n_exprs do arg.generate_basic_blocks(ssa, old_block)
+		for arg in self.n_args.n_exprs do arg.generate_basic_blocks(ssa, old_block, new_block)
 
 		ssa.propdef.object_sites.add(self)
 	end
 end
 
 redef class ANewExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		for e in self.n_args.n_exprs do e.generate_basic_blocks(ssa, old_block)
+		for e in self.n_args.n_exprs do e.generate_basic_blocks(ssa, old_block, new_block)
 
 		ssa.propdef.object_sites.add(self)
 	end
 end
 
 redef class AAttrExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AAttrAssignExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
-		self.n_value.generate_basic_blocks(ssa, old_block)
+		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 # TODO: separate the instructions
 redef class AAttrReassignExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
-		self.n_value.generate_basic_blocks(ssa, old_block)
+		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AIssetAttrExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.instructions.add(self)
-
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block)
+		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class ABlockExpr
-	# The block needs to know if a new block is created
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
+		for expr in n_expr do
+			old_block.instructions.add(expr)
+		end
+
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
-			self.n_expr[i].generate_basic_blocks(ssa, old_block)
-
+			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 			# old_block.instructions.add(n_expr[i])
 		end
 	end
 end
 
 redef class AIfExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
+		if not old_block.instructions.has(self) then old_block.instructions.add(self)
+
+		var index = old_block.instructions.index_of(self)
+		var to_remove = new List[AExpr]
+
+		# Move the instructions after the if to the new block
+		for i in [index..old_block.instructions.length[ do
+			to_remove.add(old_block.instructions[i])
+			new_block.instructions.add(old_block.instructions[i])
+		end
+
+		for instruction in to_remove do
+			old_block.instructions.remove(instruction)
+		end
+
 		# Generate a if structure for the blocks
-		ssa.generate_if(old_block, n_expr, n_then, n_else)
+		ssa.generate_if(old_block, n_expr, n_then, n_else, new_block)
 	end
 end
 
 redef class AIfexprExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
+		if not old_block.instructions.has(self) then old_block.instructions.add(self)
+
+		var index = old_block.instructions.index_of(self)
+		var to_remove = new List[AExpr]
+
+		# Move the instructions after the if to the new block
+		for i in [index..old_block.instructions.length[ do
+			to_remove.add(old_block.instructions[i])
+			new_block.instructions.add(old_block.instructions[i])
+		end
+
+		for instruction in to_remove do
+			old_block.instructions.remove(instruction)
+		end
+
 		# Generate a if structure for the blocks
-		ssa.generate_if(old_block, n_expr, n_then, n_else)
+		ssa.generate_if(old_block, n_expr, n_then, n_else, new_block)
 	end
 end
 
