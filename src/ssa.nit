@@ -74,9 +74,8 @@ class BasicBlock
 		# dominance frontier
 		for successor in block.successors do
 			# If this successor has not already been add to the dominance frontier
-			if not dominance_frontier.has(successor) then
-				add_df(successor)
-			end
+			# if not dominance_frontier.has(successor) then
+			# end
 		end
 	end
 
@@ -284,9 +283,7 @@ redef class APropdef
 
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_phi(ssa)
-
 		rename_variables(ssa)
-		ssa_union(ssa)
 		ssa_destruction(ssa)
 
 		if mpropdef.name == "foo" then
@@ -314,14 +311,13 @@ redef class APropdef
 		for v in variables do
 			var phi_variables = new Array[BasicBlock]
 
-			var read_blocks = new Array[BasicBlock]
-			read_blocks.add_all(v.read_blocks)
-			read_blocks.add_all(v.assignment_blocks)
+			var blocks = new Array[BasicBlock]
+			blocks.add_all(v.assignment_blocks)
 
-			# While we have not treated each part accessing `v`
-			while not read_blocks.is_empty do
+			# While we have not treated each part defining `v`
+			while not blocks.is_empty do
 				# Remove a block from the array
-				var block = read_blocks.shift
+				var block = blocks.shift
 
 				# For each block in the dominance frontier of `block`
 				for df in block.dominance_frontier do
@@ -343,7 +339,7 @@ redef class APropdef
 						# Add a phi-function at the beginning of df for variable v
 						df.phi_functions.add(phi)
 
-						if not v.read_blocks.has(df) or not v.assignment_blocks.has(df) then read_blocks.add(df)
+						if not v.read_blocks.has(df) or not v.assignment_blocks.has(df) then blocks.add(df)
 					end
 				end
 			end
@@ -474,25 +470,6 @@ redef class APropdef
 		return new_version
 	end
 
-	# Union of phi-functions dependences
-	fun ssa_union(ssa: SSA)
-	do
-		for phi in ssa.phi_functions do
-			# Unified their dependences
-			for dep in phi.dependences do
-				for dep_expr in dep.first.dep_exprs do
-					if not phi.dep_exprs.has(dep_expr) then
-						phi.dep_exprs.add(dep_expr)
-					end
-
-					if not phi.original_variable.dep_exprs.has(dep_expr) then
-						phi.original_variable.dep_exprs.add(dep_expr)
-					end
-				end
-			end
-		end
-	end
-
 	# Transform SSA-representation into an executable code (delete phi-functions)
 	# `ssa` Current instance of SSA
 	fun ssa_destruction(ssa: SSA)
@@ -501,7 +478,22 @@ redef class APropdef
 
 		# Iterate over all phi-functions
 		for phi in ssa.phi_functions do
+
+			if ssa.propdef.mpropdef.name == "foo" then
+				print "Destructing the phi function {phi}"
+			end
+
+			# Collect all the dep_exprs of several variables in the phi
+			var phi_deps = new List[AExpr]
+			for dependence in phi.dependences do
+				for dep_expr in dependence.first.dep_exprs do
+					if not phi_deps.has(dep_expr) then phi_deps.add(dep_expr)
+				end
+			end
+
 			for dep in phi.dependences do
+				dep.first.dep_exprs = phi_deps.to_a
+
 				# dep.second is the block where we need to create a varassign
 				var var_read = builder.make_var_read(dep.first, dep.first.declared_type.as(not null))
 				var nvar = builder.make_var_assign(dep.first, var_read)
@@ -510,10 +502,10 @@ redef class APropdef
 				var previous_block = dep.second
 				previous_block.instructions.add(nvar)
 
-				previous_block.variables_sites.add(var_read)
-				previous_block.write_sites.add(nvar)
+				# previous_block.variables_sites.add(var_read)
+				# previous_block.write_sites.add(nvar)
 
-				propagate_dependences(phi, phi.block)
+				propagate_dependences(phi, phi.block, phi_deps)
 				ssa.propdef.variables.add(dep.first)
 			end
 		end
@@ -522,25 +514,19 @@ redef class APropdef
 	# Propagate the dependences of the phi-functions into following variables
 	# `phi` The PhiFunction
 	# `block` Current block where we propagate dependences
-	fun propagate_dependences(phi: PhiFunction, block: BasicBlock)
+	fun propagate_dependences(phi: PhiFunction, block: BasicBlock, dep_exprs: List[AExpr])
 	do
 		# Treat each block once
 		if block.treated_phi.has(phi) then return
 		# if block.treated then return
 
-		#TODO, il faudrait parcourir les instructions dans l'odre jusqu'au write
-
 		# For each variable access site in the block
 		for site in block.variables_sites do
 			if site isa AVarExpr then
 				# Propagate the dependences of the phi-function in variables after the phi
-				for dep in phi.dependences do
-					for expr in dep.first.dep_exprs do
-						if not site.variable.dep_exprs.has(expr) then
-							site.variable.dep_exprs.add(expr)
-						end
-						# if dep.first.original_variable == site.variable.original_variable then
-						# end
+				for expr in dep_exprs do
+					if not site.variable.dep_exprs.has(expr) then
+						site.variable.dep_exprs.add(expr)
 					end
 				end
 			else
@@ -553,7 +539,7 @@ redef class APropdef
 		# block.treated = true
 
 		# If we do not meet a variable write, continue the propagation
-		for b in block.successors do propagate_dependences(phi, b)
+		for b in block.successors do propagate_dependences(phi, b, dep_exprs)
 	end
 end
 
@@ -629,7 +615,7 @@ class BlockDebug
 		# Precise the type and location of the begin and end of current block
 		var s = "block{block.hash.to_s} [shape=record, label="+"\"\{"
 
-		print "Block {block}"
+		print "Block {block} {block.phi_functions}"
 		for instruction in block.instructions do
 			print "\t {instruction}"
 		end
