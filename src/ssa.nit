@@ -96,6 +96,9 @@ class BasicBlock
 	# Used to handle recursions by treating only one time each block
 	var treated: Bool = false
 
+	# Each block must be treated for each phi functions
+	var treated_phi = new HashSet[PhiFunction]
+
 	# Used to dump the BasicBlock to dot
 	var treated_debug: Bool = false
 
@@ -218,10 +221,10 @@ class PhiFunction
 	do
 		# Look in which blocks of DF(block) `v` has been assigned
 		for b in block.predecessors do
-			if v.assignment_blocks.has(b) then
+			# if v.assignment_blocks.has(b) then
 				var dep = new Couple[Variable, BasicBlock](v, b)
 				dependences.add(dep)
-			end
+			# end
 		end
 	end
 
@@ -282,14 +285,18 @@ redef class APropdef
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_phi(ssa)
 
+		rename_variables(ssa)
+		ssa_union(ssa)
+		ssa_destruction(ssa)
+
 		if mpropdef.name == "foo" then
-			dump_tree
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
-		end
 
-		rename_variables(ssa)
-		ssa_destruction(ssa)
+			for v in variables do
+				print "varible {v} with deps {v.dep_exprs}"
+			end
+		end
 	end
 
 	# Compute the first phase of SSA algorithm: placing phi-functions
@@ -467,7 +474,25 @@ redef class APropdef
 		return new_version
 	end
 
-	# TODO: rewrite that
+	# Union of phi-functions dependences
+	fun ssa_union(ssa: SSA)
+	do
+		for phi in ssa.phi_functions do
+			# Unified their dependences
+			for dep in phi.dependences do
+				for dep_expr in dep.first.dep_exprs do
+					if not phi.dep_exprs.has(dep_expr) then
+						phi.dep_exprs.add(dep_expr)
+					end
+
+					if not phi.original_variable.dep_exprs.has(dep_expr) then
+						phi.original_variable.dep_exprs.add(dep_expr)
+					end
+				end
+			end
+		end
+	end
+
 	# Transform SSA-representation into an executable code (delete phi-functions)
 	# `ssa` Current instance of SSA
 	fun ssa_destruction(ssa: SSA)
@@ -482,13 +507,11 @@ redef class APropdef
 				var nvar = builder.make_var_assign(dep.first, var_read)
 
 				# Add the varassign to all predecessor blocks
-				#TODO
-				# var block = dep.second.instructions.last.parent
+				var previous_block = dep.second
+				previous_block.instructions.add(nvar)
 
-				# # This variable read must be add to a ABlockExpr
-				# if block isa ABlockExpr then
-				# 	block.add(nvar)
-				# end
+				previous_block.variables_sites.add(var_read)
+				previous_block.write_sites.add(nvar)
 
 				propagate_dependences(phi, phi.block)
 				ssa.propdef.variables.add(dep.first)
@@ -502,7 +525,10 @@ redef class APropdef
 	fun propagate_dependences(phi: PhiFunction, block: BasicBlock)
 	do
 		# Treat each block once
-		if block.treated then return
+		if block.treated_phi.has(phi) then return
+		# if block.treated then return
+
+		#TODO, il faudrait parcourir les instructions dans l'odre jusqu'au write
 
 		# For each variable access site in the block
 		for site in block.variables_sites do
@@ -510,11 +536,11 @@ redef class APropdef
 				# Propagate the dependences of the phi-function in variables after the phi
 				for dep in phi.dependences do
 					for expr in dep.first.dep_exprs do
-						if site.variable.dep_exprs.has(expr) then break
-
-						if dep.first.original_variable == site.variable.original_variable then
+						if not site.variable.dep_exprs.has(expr) then
 							site.variable.dep_exprs.add(expr)
 						end
+						# if dep.first.original_variable == site.variable.original_variable then
+						# end
 					end
 				end
 			else
@@ -523,7 +549,8 @@ redef class APropdef
 			end
 		end
 
-		block.treated = true
+		block.treated_phi.add(phi)
+		# block.treated = true
 
 		# If we do not meet a variable write, continue the propagation
 		for b in block.successors do propagate_dependences(phi, b)
@@ -611,7 +638,8 @@ class BlockDebug
 		if not block.instructions.is_empty then
 
 			s += "block" + block.to_s.escape_to_dot
-			s += "|\{" + block.instructions.first.location.file.filename.to_s + block.instructions.first.location.line_start.to_s
+			# s += "|\{" + block.instructions.first.location.file.filename.to_s + block.instructions.first.location.line_start.to_s
+			s += "|\{" + block.instructions.first.to_s
 			s += " | " + block.instructions.first.to_s.escape_to_dot
 
 			# Print phi-functions if any
@@ -619,7 +647,9 @@ class BlockDebug
 				s += " | " + phi.to_s.escape_to_dot + " "
 			end
 
-			s += "}|\{" + block.instructions.last.location.file.filename.to_s + block.instructions.last.location.line_start.to_s
+			# s += "}|\{" + block.instructions.last.location.file.filename.to_s + block.instructions.last.location.line_start.to_s
+			s += "}|\{" + block.instructions.last.to_s
+
 			s += " | " + block.instructions.last.to_s.escape_to_dot + "}}\"];"+ "\n"
 		else
 			s += "block" + block.to_s.escape_to_dot
@@ -754,15 +784,12 @@ redef class AReturnExpr
 	do
 		# The return just set the current block and stop the recursion
 		if self.n_expr != null then
-			# TODO, visit this
-			# self.n_expr.generate_basic_blocks(ssa, old_block)
+			self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 
 			# Store the return expression in the dependences of the dedicated returnvar
 			ssa.propdef.returnvar.dep_exprs.add(n_expr.as(not null))
 		end
 
-		# TODO: pas sûr de ça
-		# old_block.link(new_block)
 		old_block.link(ssa.propdef.return_block)
 	end
 end
