@@ -37,21 +37,21 @@ redef class MOStats
 		var dir = "output_latex"
 		dir.mkdir
 
-		table1(new FileWriter.open("{dir}/table1-{lbl}.tex"))
+		# table1(new FileWriter.open("{dir}/table1-{lbl}.tex"))
 
-		# Do not generate table2 with extended preexistence
-		if sys.disable_preexistence_extensions then
-			table2(new FileWriter.open("{dir}/table2-{lbl}.tex"))
-		end
+		# # Do not generate table2 with extended preexistence
+		# if sys.disable_preexistence_extensions then
+		# 	table2(new FileWriter.open("{dir}/table2-{lbl}.tex"))
+		# end
 
-		# Do not generate table3 in original preexistence
-		if not sys.disable_preexistence_extensions then
-			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
-		end
+		# # Do not generate table3 in original preexistence
+		# if not sys.disable_preexistence_extensions then
+		# 	table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
+		# end
 
-		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
+		# table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 
-		table6(new FileWriter.open("{dir}/table6-{lbl}.tex"))
+		# table6(new FileWriter.open("{dir}/table6-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
