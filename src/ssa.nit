@@ -51,18 +51,53 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
-		# TODO: handle the PhiFunction at the beginning of the block
+		# By default, clone a predecessor environment
+		environment = predecessors.first.clone_environment
 
-		for instruction in instructions do
-			# TODO: handle AVarReassignExpr
-			if instruction isa AVarAssignExpr then
-				# We need to create a new version of the variable
-				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+		# Handle the PhiFunction
+		for phi in phi_functions do
+			# For each phi, merge dependencies
+			for dependence in phi.dependences do
+				# For each variable in dependence, copy its value in a previous block and put it inside current environment
+				environment[dependence.first] = new Array[AExpr]
+
+				if dependence.second.environment.has_key(dependence.first) then
+					environment[dependence.first].add_all(dependence.second.environment[dependence.first])
+				else
+					# TODO: Problem
+				end
 			end
 		end
 
-		#For each part of ast in variable Site, change the variable by their appropriate version
+		print "coucou"
+		# Add all new variables to the environment
+		for instruction in instructions do
+			if instruction isa AVardeclExpr then
+				# Add a new Variable to the environment
+				environment[instruction.variable.as(not null)] = new Array[AExpr]
 
+				# If there is an initial value
+				if instruction.n_expr != null then
+					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
+				end
+			end
+		end
+
+		for site in variables_sites do
+			if site isa AVarAssignExpr then
+				# We need to create a new version of the variable
+				var new_version = site.variable.original_variable.generate_version(site, ssa)
+
+				# Then we replace the old version by the new one in the environment
+				environment[site.variable.as(not null)].remove_all
+				environment[site.variable.as(not null)].add(site.n_value)
+			else if site isa AVarExpr then
+				# Just copy the value inside the environment in the variable
+				site.variable.dep_exprs = environment[site.variable].clone
+			end
+		end
+
+		# Finally, launch the recursion in successors block
 		for block in successors do
 			block.compute_environment(ssa)
 		end
