@@ -41,9 +41,45 @@ class BasicBlock
 	# Parts of AST that contain a variable access (read or write)
 	var variables_sites = new Array[AExpr]
 
+	# The environment is linked to each BasicBlock, it represents the latest versions of variables
+	var environment = new HashMap[Variable, Array[AExpr]]
+
 	# The iterated dominance frontier of this block
 	# i.e. the set of blocks this block dominate directly or indirectly
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
+
+	# Compute the environment of the current block
+	fun compute_environment(ssa: SSA)
+	do
+		# TODO: handle the PhiFunction at the beginning of the block
+
+		for instruction in instructions do
+			# TODO: handle AVarReassignExpr
+			if instruction isa AVarAssignExpr then
+				# We need to create a new version of the variable
+				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+			end
+		end
+
+		#For each part of ast in variable Site, change the variable by their appropriate version
+
+		for block in successors do
+			block.compute_environment(ssa)
+		end
+	end
+
+	# Return a new environment which is a copy of the current one
+	fun clone_environment: HashMap[Variable, Array[AExpr]]
+	do
+		var clone = new HashMap[Variable, Array[AExpr]]
+
+		for variable, values in environment do
+			clone[variable] = new Array[AExpr]
+			clone[variable].add_all(values)
+		end
+
+		return clone
+	end
 
 	# Self is the old block to link to the new,
 	# The two blocks are not linked if the current ends with a `AReturnExpr` or `ABreakExpr`
@@ -65,20 +101,6 @@ class BasicBlock
 		successor.predecessors.add(self)
 	end
 
-	# Add the `block` to the dominance frontier of this block
-	fun add_df(block: BasicBlock)
-	do
-		dominance_frontier.add(block)
-
-		# Add this block recursively in super-blocks to compute the iterated
-		# dominance frontier
-		for successor in block.successors do
-			# If this successor has not already been add to the dominance frontier
-			# if not dominance_frontier.has(successor) then
-			# end
-		end
-	end
-
 	# Compute recursively the dominance frontier of self block and its successors
 	private fun compute_df
 	do
@@ -86,7 +108,7 @@ class BasicBlock
 		df_computed = true
 
 		for s in successors do
-			add_df(s)
+			dominance_frontier.add(s)
 
 			if not s.df_computed then s.compute_df
 		end
@@ -200,6 +222,29 @@ redef class Variable
 
 	# If true, this variable is a parameter of a method
 	var parameter: Bool = false
+
+	# Used for generate versions of variables
+	var counter = 0
+
+	# Generate a new version of the self `v` and return it
+	# *`expr` The AST node in which the assignment of v is made
+	# *`ssa` Current instance of ssa
+	fun generate_version(expr: ANode, ssa: SSA): Variable
+	do
+		# Create a new version of Variable
+		var new_version = new Variable(name + counter.to_s)
+		new_version.declared_type = expr.as(AVarFormExpr).variable.declared_type
+		ssa.propdef.variables.add(new_version)
+
+		# Recopy the fields into the new version
+		new_version.location = expr.location
+		new_version.original_variable = original_variable.as(not null)
+
+		# Increment the counter
+		counter += 1
+
+		return new_version
+	end
 end
 
 # A PhiFunction is a kind of Variable used in SSA-construction,
@@ -266,6 +311,14 @@ redef class APropdef
 	# The basic block of all returns in the method
 	var return_block: BasicBlock = new BasicBlock
 
+	# Initialize the environment of the root basic block
+	fun init_environment(root_block: BasicBlock)
+	do
+		for v in variables do
+			root_block.environment[v] = new Array[AExpr]
+		end
+	end
+
 	# Compute the three steps of SSA-algorithm
 	# `ssa` A new instance of SSA class initialized with `self`
 	fun compute_ssa(ssa: SSA)
@@ -283,8 +336,9 @@ redef class APropdef
 
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_phi(ssa)
-		rename_variables(ssa)
-		ssa_destruction(ssa)
+		compute_environment(ssa)
+
+		# ssa_destruction(ssa)
 
 		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
@@ -293,6 +347,14 @@ redef class APropdef
 			for v in variables do
 				print "variable {v} with deps {v.dep_exprs}"
 			end
+		end
+	end
+
+	fun compute_environment(ssa: SSA)
+	do
+		# The environment of the root block is already computed
+		for block in basic_block.successors do
+			block.compute_environment(ssa)
 		end
 	end
 
@@ -349,96 +411,6 @@ redef class APropdef
 		end
 	end
 
-	# Compute the second phase of SSA algorithm: renaming variables
-	# NOTE: `compute_phi` must has been called before
-	fun rename_variables(ssa: SSA)
-	do
-		# A counter for each variable
-		# The key is the variable, the value the number of assignment into the variable
-		var counter = new HashMap[Variable, Int]
-
-		for v in variables do
-			counter[v] = 0
-			v.stack.push(v)
-		end
-
-		for phi in ssa.phi_functions do counter[phi] = 0
-
-		# Launch the recursive renaming from the root block
-		rename(basic_block.as(not null), counter, ssa)
-	end
-
-	# Recursively rename each variable from `block`
-	# *`block` The starting basic block
-	# *`counter` The key is the variable, the value the number of assignment into the variable
-	fun rename(block: BasicBlock, counter: HashMap[Variable, Int], ssa: SSA)
-	do
-		if block.is_renaming then return
-
-		block.is_renaming = true
-
-		# For each phi-function of this block
-		for phi in block.phi_functions do
-			if not block.instructions.is_empty != 0 then
-				generate_name(phi, counter, block.instructions.first, ssa)
-
-				# Replace the phi into the block
-				block.phi_functions[block.phi_functions.index_of(phi)] = phi.original_variable.stack.last.as(PhiFunction)
-			end
-		end
-
-		# For each variable read in `block`
-		for vread in block.read_sites do
-			# Replace the old variable in AST
-			vread.variable = vread.variable.original_variable.stack.last
-		end
-
-		# For each variable write
-		for vwrite in block.write_sites do
-			generate_name(vwrite.variable.as(not null), counter, vwrite, ssa)
-
-			var new_version = vwrite.variable.original_variable.stack.last
-
-			# Set dependence of the new variable
-			if vwrite isa AVarReassignExpr then
-				new_version.dep_exprs.add(vwrite.n_value)
-			else if vwrite isa AVarAssignExpr then
-				new_version.dep_exprs.add(vwrite.n_value)
-			end
-
-			# Replace the old variable by the last created
-			vwrite.variable = new_version
-		end
-
-		# Rename occurrence of old names in phi-function
-		for successor in block.dominance_frontier do
-			for sphi in successor.phi_functions do
-				# Go over the couples in the phi dependences to rename variables
-				for couple in sphi.dependences do
-					if couple.second == block then
-						# Rename this variable
-						couple.first = couple.first.original_variable.stack.last
-					end
-				end
-			end
-		end
-
-		# Recurse in successor blocks
-		for successor in block.successors do
-			rename(successor, counter, ssa)
-		end
-
-		# Pop old names off the stack for each phi-function
-		for phi in block.phi_functions do
-			if not phi.stack.is_empty then phi.stack.pop
-		end
-	end
-
-	# Generate a new version of the variable `v` and return it
-	# *`v` The variable for which we generate a name
-	# *`counter` The key is the variable, the value the number of assignment into the variable
-	# *`expr` The AST node in which the assignment of v is made
-	# *`ssa` The instance of SSA
 	fun generate_name(v: Variable, counter: HashMap[Variable, Int], expr: ANode, ssa: SSA): Variable
 	do
 		var original_variable = v.original_variable.as(not null)
@@ -500,7 +472,6 @@ redef class APropdef
 				# previous_block.variables_sites.add(var_read)
 				# previous_block.write_sites.add(nvar)
 
-				print "Propagate the dependences {phi_deps} in block {phi.block} for {dep.first}"
 				propagate_dependences(dep.first, phi.block, phi_deps)
 				ssa.propdef.variables.add(dep.first)
 			end
@@ -548,6 +519,8 @@ redef class AAttrPropdef
 		# Add the return variable
 		variables.add(returnvar)
 
+		init_environment(basic_block.as(not null))
+
 		# Recursively goes into the nodes
 		if n_block != null then
 			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
@@ -575,6 +548,8 @@ redef class AMethPropdef
 
 		# Add the return variable
 		variables.add(returnvar)
+
+		init_environment(basic_block.as(not null))
 
 		# Recursively goes into the nodes
 		if n_block != null then
