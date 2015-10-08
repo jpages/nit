@@ -95,8 +95,8 @@ class BasicBlock
 	# Used to handle recursions by treating only one time each block
 	var treated: Bool = false
 
-	# Each block must be treated for each phi functions
-	var treated_phi = new HashSet[PhiFunction]
+	# Each block must be treated for each version of Variable
+	var treated_phi = new HashSet[Variable]
 
 	# Used to dump the BasicBlock to dot
 	var treated_debug: Bool = false
@@ -291,7 +291,7 @@ redef class APropdef
 			debug.dump(basic_block.as(not null))
 
 			for v in variables do
-				print "varible {v} with deps {v.dep_exprs}"
+				print "variable {v} with deps {v.dep_exprs}"
 			end
 		end
 	end
@@ -478,11 +478,6 @@ redef class APropdef
 
 		# Iterate over all phi-functions
 		for phi in ssa.phi_functions do
-
-			if ssa.propdef.mpropdef.name == "foo" then
-				print "Destructing the phi function {phi}"
-			end
-
 			# Collect all the dep_exprs of several variables in the phi
 			var phi_deps = new List[AExpr]
 			for dependence in phi.dependences do
@@ -505,7 +500,8 @@ redef class APropdef
 				# previous_block.variables_sites.add(var_read)
 				# previous_block.write_sites.add(nvar)
 
-				propagate_dependences(phi, phi.block, phi_deps)
+				print "Propagate the dependences {phi_deps} in block {phi.block} for {dep.first}"
+				propagate_dependences(dep.first, phi.block, phi_deps)
 				ssa.propdef.variables.add(dep.first)
 			end
 		end
@@ -514,11 +510,10 @@ redef class APropdef
 	# Propagate the dependences of the phi-functions into following variables
 	# `phi` The PhiFunction
 	# `block` Current block where we propagate dependences
-	fun propagate_dependences(phi: PhiFunction, block: BasicBlock, dep_exprs: List[AExpr])
+	fun propagate_dependences(variable: Variable, block: BasicBlock, dep_exprs: List[AExpr])
 	do
 		# Treat each block once
-		if block.treated_phi.has(phi) then return
-		# if block.treated then return
+		if block.treated_phi.has(variable) then return
 
 		# For each variable access site in the block
 		for site in block.variables_sites do
@@ -535,11 +530,10 @@ redef class APropdef
 			end
 		end
 
-		block.treated_phi.add(phi)
-		# block.treated = true
+		block.treated_phi.add(variable)
 
 		# If we do not meet a variable write, continue the propagation
-		for b in block.successors do propagate_dependences(phi, b, dep_exprs)
+		for b in block.successors do propagate_dependences(variable, b, dep_exprs)
 	end
 end
 
