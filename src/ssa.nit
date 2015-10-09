@@ -35,9 +35,6 @@ class BasicBlock
 	# Parts of AST that contain a read to a variable
 	var read_sites = new Array[AVarFormExpr]
 
-	# Parts of AST that contain a write to a variable
-	var write_sites = new Array[AVarFormExpr]
-
 	# Parts of AST that contain a variable access (read or write)
 	var variables_sites = new Array[AExpr]
 
@@ -51,25 +48,32 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
-		# By default, clone a predecessor environment
-		environment = predecessors.first.clone_environment
+		# By default, clone a predecessor environment,
+		# If there is no predecessor, this is the root_block and just initialize it
+		if not predecessors.is_empty then
+			environment = predecessors.first.clone_environment
+		end
 
-		# Handle the PhiFunction
-		for phi in phi_functions do
-			# For each phi, merge dependencies
-			for dependence in phi.dependences do
-				# For each variable in dependence, copy its value in a previous block and put it inside current environment
-				environment[dependence.first] = new Array[AExpr]
+		# #DEBUG
+		print "environment of {self} {instructions}"
+		for key,value in environment do
+			print "\t {key} -> {value}"
+		end
 
-				if dependence.second.environment.has_key(dependence.first) then
-					environment[dependence.first].add_all(dependence.second.environment[dependence.first])
-				else
-					# TODO: Problem
+		var other_predecessors = new Array[BasicBlock]
+		other_predecessors.add_all(predecessors)
+		other_predecessors.remove_at(0)
+
+		# Then add all variables the cloned environment does not have
+		for other in other_predecessors do
+			for key, value in other.environment do
+				if not environment.has_key(key) then
+					environment[key] = new Array[AExpr]
+					environment[key].add_all(value)
 				end
 			end
 		end
 
-		print "coucou"
 		# Add all new variables to the environment
 		for instruction in instructions do
 			if instruction isa AVardeclExpr then
@@ -83,6 +87,28 @@ class BasicBlock
 			end
 		end
 
+		# Handle the PhiFunction
+		for phi in phi_functions do
+			# For each phi, merge dependences
+			for dependence in phi.dependences do
+				# For each variable in dependence, copy its value in a previous block and put it inside current environment
+				if not environment.has_key(dependence.first) then
+					environment[dependence.first] = new Array[AExpr]
+				end
+
+				if dependence.second.environment.has_key(dependence.first) then
+					environment[dependence.first].add_all(dependence.second.environment[dependence.first])
+				else
+					# TODO: Problem
+					print "Problem with {dependence.second.environment} {dependence.first}"
+
+					for key, value in dependence.second.environment do
+						print "\t {key} -> {value}"
+					end
+				end
+			end
+		end
+
 		for site in variables_sites do
 			if site isa AVarAssignExpr then
 				# We need to create a new version of the variable
@@ -91,7 +117,15 @@ class BasicBlock
 				# Then we replace the old version by the new one in the environment
 				environment[site.variable.as(not null)].remove_all
 				environment[site.variable.as(not null)].add(site.n_value)
+
+				# TODO: essayer d'ajouter la nouvelle version à l'environnement
+				environment[new_version] = new_version.dep_exprs
 			else if site isa AVarExpr then
+				if not environment.has_key(site.variable) then
+					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+
+					ssa.propdef.dump_tree
+				end
 				# Just copy the value inside the environment in the variable
 				site.variable.dep_exprs = environment[site.variable].clone
 			end
@@ -269,6 +303,8 @@ redef class Variable
 		# Create a new version of Variable
 		var new_version = new Variable(name + counter.to_s)
 		new_version.declared_type = expr.as(AVarFormExpr).variable.declared_type
+		new_version.dep_exprs.add(expr.as(AVarAssignExpr).n_value)
+
 		ssa.propdef.variables.add(new_version)
 
 		# Recopy the fields into the new version
@@ -373,7 +409,7 @@ redef class APropdef
 		compute_phi(ssa)
 		compute_environment(ssa)
 
-		# ssa_destruction(ssa)
+		ssa_destruction(ssa)
 
 		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
@@ -387,10 +423,7 @@ redef class APropdef
 
 	fun compute_environment(ssa: SSA)
 	do
-		# The environment of the root block is already computed
-		for block in basic_block.successors do
-			block.compute_environment(ssa)
-		end
+		basic_block.compute_environment(ssa)
 	end
 
 	# Compute the first phase of SSA algorithm: placing phi-functions
@@ -707,7 +740,7 @@ redef class AVardeclExpr
 		ssa.propdef.variables.add(decl)
 
 		decl.original_variable = decl
-		decl.assignment_blocks.add(old_block)
+		# decl.assignment_blocks.add(old_block)
 		old_block.variables.add(decl)
 
 		if self.n_expr != null then
@@ -724,8 +757,6 @@ redef class AVarAssignExpr
 		old_block.variables.add(self.variable.as(not null))
 		self.variable.as(not null).original_variable = self.variable.as(not null)
 
-		# Save this write site in the block
-		old_block.write_sites.add(self)
 		old_block.variables_sites.add(self)
 
 		ssa.propdef.variables.add(self.variable.as(not null))
@@ -743,7 +774,6 @@ redef class AVarReassignExpr
 		self.variable.as(not null).original_variable = self.variable.as(not null)
 
 		# Save this write site in the block
-		old_block.write_sites.add(self)
 		old_block.variables_sites.add(self)
 
 		ssa.propdef.variables.add(self.variable.as(not null))
@@ -1030,7 +1060,6 @@ redef class ABlockExpr
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
-			# old_block.instructions.add(n_expr[i])
 		end
 	end
 end
@@ -1043,6 +1072,7 @@ redef class AIfExpr
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
 
+		print "Old_block = {old_block.instructions} to_remove {to_remove}"
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
 			to_remove.add(old_block.instructions[i])
