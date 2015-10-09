@@ -46,6 +46,7 @@ class BasicBlock
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
 
 	# Compute the environment of the current block
+	#TODO: handle cycles
 	fun compute_environment(ssa: SSA)
 	do
 		# By default, clone a predecessor environment,
@@ -269,7 +270,41 @@ class SSA
 		if else_branch != null then
 			else_branch.generate_basic_blocks(self, block_else, successor_block)
 		end
+	end
 
+	# Generate a BasicBlock structure for a while instruction
+	# This method constructs a block for the body of the loop and the appropriate structure
+	# returns the successor block of the if
+	# *`old_block` The old_block which is terminated by the while
+	# *`condition` The condition of the loop
+	# *`while_block` The block inside the while (if the test is true)
+	# *`next_block` The following block to which the if must be linked
+	fun generate_while(old_block: BasicBlock, condition: AExpr, while_block: nullable AExpr, next_block: BasicBlock)
+	do
+		# Create a single block for the test of the loop
+		var block_test = new BasicBlock
+
+		block_test.instructions.add(condition)
+
+		old_block.link(block_test)
+
+		# We start a block for the body
+		var block_body = new BasicBlock
+		block_test.link(block_body)
+		block_body.link(block_test)
+
+		# The block after the while (if the test is false)
+		var successor_block = new BasicBlock
+
+		block_test.link(successor_block)
+
+		# Visit the test of the if
+		condition.generate_basic_blocks(self, old_block, successor_block)
+
+		# Launch the recursion in two successors if they exist
+		if while_block != null then
+			while_block.generate_basic_blocks(self, block_body, block_test)
+		end
 	end
 end
 
@@ -1126,36 +1161,30 @@ end
 # 	end
 # end
 
-# redef class AWhileExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		old_block.last = self
+redef class AWhileExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		if not old_block.instructions.has(self) then old_block.instructions.add(self)
 
-# 		# The beginning of the block is the test of the while
-# 		var block = new BasicBlock
-# 		block.first = self.n_expr
-# 		block.last = self.n_block.as(not null)
+		var index = old_block.instructions.index_of(self)
+		var to_remove = new List[AExpr]
 
-# 		old_block.link(block)
+		print "AWhilExpr Old_block = {old_block.instructions} to_remove {to_remove}"
 
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		self.n_block.generate_basic_blocks(ssa, block)
+		# Move the instructions after the if to the new block
+		for i in [index..old_block.instructions.length[ do
+			to_remove.add(old_block.instructions[i])
+			new_block.instructions.add(old_block.instructions[i])
+		end
 
-# 		# Link the inside of the block to the previous block
-# 		block.link_special(old_block)
+		for instruction in to_remove do
+			old_block.instructions.remove(instruction)
+		end
 
-# 		# Create a new Block after the while
-# 		var new_block = new BasicBlock
-# 		new_block.first = self
-# 		new_block.last = self
-# 		new_block.need_update = true
-# 		new_block.need_link = true
-
-# 		old_block.link_special(new_block)
-
-# 		return new_block
-# 	end
-# end
+		# Generate a while structure
+		ssa.generate_while(old_block, n_expr, n_block, new_block)
+	end
+end
 
 # redef class ALoopExpr
 # 	redef fun generate_basic_blocks(ssa, old_block)
