@@ -49,21 +49,21 @@ class BasicBlock
 	#TODO: handle cycles
 	fun compute_environment(ssa: SSA)
 	do
-		# By default, clone a predecessor environment,
-		# If there is no predecessor, this is the root_block and just initialize it
-		if not predecessors.is_empty then
-			environment = predecessors.first.clone_environment
+		if treated then
+			# We need to handle cycles here
+		else
+			treated = true
 		end
 
-		# #DEBUG
-		print "environment of {self} {instructions}"
-		for key,value in environment do
-			print "\t {key} -> {value}"
+		# By default, clone a predecessor environment,
+		# If there is no predecessor, this is the root_block and just initialize it
+		if not predecessors.is_empty and not treated then
+			environment = predecessors.first.clone_environment
 		end
 
 		var other_predecessors = new Array[BasicBlock]
 		other_predecessors.add_all(predecessors)
-		other_predecessors.remove_at(0)
+		if not treated then other_predecessors.remove_at(0)
 
 		# Then add all variables the cloned environment does not have
 		for other in other_predecessors do
@@ -109,6 +109,8 @@ class BasicBlock
 				end
 			end
 		end
+
+		if treated then return
 
 		for site in variables_sites do
 			if site isa AVarAssignExpr then
@@ -195,12 +197,6 @@ class BasicBlock
 
 	# If true, the iterated dominance frontier of this block has been computed
 	var df_computed: Bool = false
-
-	# Indicate the BasicBlock is newly created and needs to be updated
-	var need_update: Bool = false
-
-	# Indicates the BasicBlock needs to be linked to a successor
-	var need_link: Bool = false
 
 	# Indicate if the variables renaming step has been made for this block
 	var is_renaming: Bool = false
@@ -1107,7 +1103,6 @@ redef class AIfExpr
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
 
-		print "Old_block = {old_block.instructions} to_remove {to_remove}"
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
 			to_remove.add(old_block.instructions[i])
@@ -1168,8 +1163,6 @@ redef class AWhileExpr
 
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
-
-		print "AWhilExpr Old_block = {old_block.instructions} to_remove {to_remove}"
 
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
