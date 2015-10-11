@@ -46,15 +46,8 @@ class BasicBlock
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
 
 	# Compute the environment of the current block
-	#TODO: handle cycles
 	fun compute_environment(ssa: SSA)
 	do
-		if treated then
-			# We need to handle cycles here
-		else
-			treated = true
-		end
-
 		# By default, clone a predecessor environment,
 		# If there is no predecessor, this is the root_block and just initialize it
 		if not predecessors.is_empty and not treated then
@@ -101,7 +94,7 @@ class BasicBlock
 					environment[dependence.first].add_all(dependence.second.environment[dependence.first])
 				else
 					# TODO: Problem
-					print "Problem with {dependence.second.environment} {dependence.first}"
+					print "Problem with {dependence.second.environment} in {dependence.first}"
 
 					for key, value in dependence.second.environment do
 						print "\t {key} -> {value}"
@@ -110,8 +103,13 @@ class BasicBlock
 			end
 		end
 
-		if treated then return
+		if treated then
+			return
+		else
+			treated = true
+		end
 
+		#TODO: AVarReassignExpr to handle
 		for site in variables_sites do
 			if site isa AVarAssignExpr then
 				# We need to create a new version of the variable
@@ -127,10 +125,11 @@ class BasicBlock
 				if not environment.has_key(site.variable) then
 					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
 
-					ssa.propdef.dump_tree
+					# ssa.propdef.dump_tree
+				else
+					# Just copy the value inside the environment in the variable
+					site.variable.dep_exprs = environment[site.variable].clone
 				end
-				# Just copy the value inside the environment in the variable
-				site.variable.dep_exprs = environment[site.variable].clone
 			end
 		end
 
@@ -438,10 +437,10 @@ redef class APropdef
 
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_phi(ssa)
+
 		compute_environment(ssa)
 
 		ssa_destruction(ssa)
-
 		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
@@ -784,6 +783,10 @@ end
 redef class AVarAssignExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
+		if not old_block.instructions.has(self) then
+			old_block.instructions.add(self)
+		end
+
 		self.variable.as(not null).assignment_blocks.add(old_block)
 		old_block.variables.add(self.variable.as(not null))
 		self.variable.as(not null).original_variable = self.variable.as(not null)
@@ -829,7 +832,6 @@ end
 # 	end
 # end
 
-# TODO, terminate the previous block and stop the recursion
 redef class AReturnExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
