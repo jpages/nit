@@ -84,23 +84,47 @@ class BasicBlock
 		# Handle the PhiFunction
 		for phi in phi_functions do
 			# For each phi, merge dependences
-			for dependence in phi.dependences do
-				# For each variable in dependence, copy its value in a previous block and put it inside current environment
-				if not environment.has_key(dependence.first) then
-					environment[dependence.first] = new Array[AExpr]
-				end
+			# for dependence in phi.dependences do
+			# 	# For each variable in dependence, copy its value in a previous block and put it inside current environment
+			# 	if not environment.has_key(dependence.first) then
+			# 		environment[dependence.first] = new Array[AExpr]
+			# 	end
 
-				if dependence.second.environment.has_key(dependence.first) then
-					environment[dependence.first].add_all(dependence.second.environment[dependence.first])
-				else
-					# TODO: Problem
-					print "Problem with {dependence.second.environment} in {dependence.first}"
+			# 	if dependence.second.environment.has_key(dependence.first) then
+			# 		environment[dependence.first].add_all(dependence.second.environment[dependence.first])
+			# 	else
+			# 		# TODO: Problem
+			# 		print "Problem with {dependence.second.environment} in {dependence.first}"
 
-					for key, value in dependence.second.environment do
-						print "\t {key} -> {value}"
+			# 		for key, value in dependence.second.environment do
+			# 			print "\t {key} -> {value}"
+			# 		end
+			# 	end
+			# end
+
+			# Create the array of environment
+			if not environment.has_key(phi.original_variable) then
+				environment[phi.original_variable.as(not null)] = new Array[AExpr]
+			end
+
+			print "Before the phi {phi} {environment[phi.original_variable]} in block {self}"
+			# Search and merge the values of the phi
+			for block in predecessors do
+				if block.environment.has_key(phi.original_variable) then
+					for expr in block.environment[phi.original_variable] do
+						if not environment[phi.original_variable].has(expr) then
+							environment[phi.original_variable].add(expr)
+						end
 					end
 				end
 			end
+
+			#Propagate the dependencies for each versions of the same variable
+			for variable in phi.original_variable.versions do
+				environment[variable] = environment[phi.original_variable].clone
+				print "After the phi for {variable} {environment[variable]}"
+			end
+			print "After the phi {phi} {environment[phi.original_variable]}"
 		end
 
 		if treated then
@@ -116,19 +140,22 @@ class BasicBlock
 				var new_version = site.variable.original_variable.generate_version(site, ssa)
 
 				# Then we replace the old version by the new one in the environment
-				environment[site.variable.as(not null)].remove_all
+				# environment[site.variable.as(not null)].remove_all
 				environment[site.variable.as(not null)].add(site.n_value)
+				environment[site.variable.original_variable].add(site.n_value)
+
+				new_version.dep_exprs.add_all(environment[site.variable.original_variable])
 
 				# TODO: essayer d'ajouter la nouvelle version à l'environnement
-				environment[new_version] = new_version.dep_exprs
+				environment[new_version] = new_version.dep_exprs.clone
 			else if site isa AVarExpr then
 				if not environment.has_key(site.variable) then
 					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-
-					# ssa.propdef.dump_tree
 				else
 					# Just copy the value inside the environment in the variable
+					print "Before for {site.variable.to_s} = {site.variable.dep_exprs}"
 					site.variable.dep_exprs = environment[site.variable].clone
+					print "After for {site.variable.to_s} = {site.variable.dep_exprs}"
 				end
 			end
 		end
@@ -319,6 +346,9 @@ redef class Variable
 	# The original Variable in case of renaming
 	var original_variable: nullable Variable = self
 
+	# All the versions of this Variable in case of renaming
+	var versions = new Array[Variable] is lazy
+
 	# If true, this variable is a parameter of a method
 	var parameter: Bool = false
 
@@ -340,6 +370,9 @@ redef class Variable
 		# Recopy the fields into the new version
 		new_version.location = expr.location
 		new_version.original_variable = original_variable.as(not null)
+
+		# Add this new version to the original variable
+		original_variable.versions.add(new_version)
 
 		# Increment the counter
 		counter += 1
@@ -366,10 +399,10 @@ class PhiFunction
 	do
 		# Look in which blocks of DF(block) `v` has been assigned
 		for b in block.predecessors do
-			# if v.assignment_blocks.has(b) then
+			if v.assignment_blocks.has(b) then
 				var dep = new Couple[Variable, BasicBlock](v, b)
 				dependences.add(dep)
-			# end
+			end
 		end
 	end
 
@@ -440,7 +473,7 @@ redef class APropdef
 
 		compute_environment(ssa)
 
-		ssa_destruction(ssa)
+		# ssa_destruction(ssa)
 		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
@@ -489,7 +522,7 @@ redef class APropdef
 						var phi = new PhiFunction("phi", df)
 						phi.add_dependences(df, v)
 						phi.block = df
-						phi.original_variable = phi
+						phi.original_variable = v
 						phi.declared_type = v.declared_type
 
 						# Indicate this phi-function is assigned in this block
@@ -546,6 +579,26 @@ redef class APropdef
 	do
 		var builder = new ASTBuilder(mpropdef.mclassdef.mmodule, mpropdef.mclassdef.bound_mtype)
 
+		# for phi in ssa.phi_functions do
+		# 	# For each phi, merge dependences
+		# 	for dependence in phi.dependences do
+		# 		# For each variable in dependence, copy its value in a previous block and put it inside current environment
+		# 		if dependence.second.environment.has_key(dependence.first) then
+		# 			environment[dependence.first].add_all(dependence.second.environment[dependence.first])
+		# 		end
+		# 	end
+		# end
+
+		# for site in variables_sites do
+		# 	if site isa AVarExpr then
+		# 		if environment.has_key(site.variable) then
+		# 			site.variable.dep_exprs = environment[site.variable].clone
+		# 		else
+		# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+		# 		end
+		# 	end
+		# end
+
 		# Iterate over all phi-functions
 		for phi in ssa.phi_functions do
 			# Collect all the dep_exprs of several variables in the phi
@@ -567,8 +620,7 @@ redef class APropdef
 				var previous_block = dep.second
 				previous_block.instructions.add(nvar)
 
-				# previous_block.variables_sites.add(var_read)
-				# previous_block.write_sites.add(nvar)
+				previous_block.variables_sites.add(var_read)
 
 				propagate_dependences(dep.first, phi.block, phi_deps)
 				ssa.propdef.variables.add(dep.first)
@@ -770,7 +822,6 @@ redef class AVardeclExpr
 		ssa.propdef.variables.add(decl)
 
 		decl.original_variable = decl
-		# decl.assignment_blocks.add(old_block)
 		old_block.variables.add(decl)
 
 		if self.n_expr != null then
