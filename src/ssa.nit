@@ -45,18 +45,28 @@ class BasicBlock
 	# i.e. the set of blocks this block dominate directly or indirectly
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
 
+	# The list of BasicBlock which called `compute_environment` for this block,
+	# used to handle circuits and recursions in computation of environments
+	var callers_blocks = new Array[BasicBlock]
+
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
+		print "Before computing environment of {ssa.propdef.location} for block {self}"
+		for key,value in environment do
+			print "{key} -> {value}"
+		end
+
 		# By default, clone a predecessor environment,
 		# If there is no predecessor, this is the root_block and just initialize it
-		if not predecessors.is_empty and not treated then
+		if not predecessors.is_empty then
 			environment = predecessors.first.clone_environment
 		end
 
 		var other_predecessors = new Array[BasicBlock]
 		other_predecessors.add_all(predecessors)
-		if not treated then other_predecessors.remove_at(0)
+
+		other_predecessors.remove_at(0)
 
 		# Then add all variables the cloned environment does not have
 		for other in other_predecessors do
@@ -83,25 +93,6 @@ class BasicBlock
 
 		# Handle the PhiFunction
 		for phi in phi_functions do
-			# For each phi, merge dependences
-			# for dependence in phi.dependences do
-			# 	# For each variable in dependence, copy its value in a previous block and put it inside current environment
-			# 	if not environment.has_key(dependence.first) then
-			# 		environment[dependence.first] = new Array[AExpr]
-			# 	end
-
-			# 	if dependence.second.environment.has_key(dependence.first) then
-			# 		environment[dependence.first].add_all(dependence.second.environment[dependence.first])
-			# 	else
-			# 		# TODO: Problem
-			# 		print "Problem with {dependence.second.environment} in {dependence.first}"
-
-			# 		for key, value in dependence.second.environment do
-			# 			print "\t {key} -> {value}"
-			# 		end
-			# 	end
-			# end
-
 			# Create the array of environment
 			if not environment.has_key(phi.original_variable) then
 				environment[phi.original_variable.as(not null)] = new Array[AExpr]
@@ -127,12 +118,6 @@ class BasicBlock
 			print "After the phi {phi} {environment[phi.original_variable]}"
 		end
 
-		if treated then
-			return
-		else
-			treated = true
-		end
-
 		#TODO: AVarReassignExpr to handle
 		for site in variables_sites do
 			if site isa AVarAssignExpr then
@@ -141,19 +126,24 @@ class BasicBlock
 
 				# Then we replace the old version by the new one in the environment
 				# environment[site.variable.as(not null)].remove_all
-				environment[site.variable.as(not null)].add(site.n_value)
-				environment[site.variable.original_variable].add(site.n_value)
+				if site.variable != site.variable.original_variable then
+					environment[site.variable.as(not null)].add(site.n_value)
+				end
+
+				if not environment.has_key(site.variable.original_variable.as(not null)) then
+					environment[site.variable.original_variable.as(not null)] = new Array[AExpr]
+					environment[site.variable.original_variable.as(not null)].add(site.n_value)
+				end
 
 				new_version.dep_exprs.add_all(environment[site.variable.original_variable])
 
-				# TODO: essayer d'ajouter la nouvelle version à l'environnement
-				environment[new_version] = new_version.dep_exprs.clone
+				environment[new_version] = new_version.dep_exprs
 			else if site isa AVarExpr then
 				if not environment.has_key(site.variable) then
 					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
 				else
 					# Just copy the value inside the environment in the variable
-					print "Before for {site.variable.to_s} = {site.variable.dep_exprs}"
+					print "Before for {site.variable.to_s} = {site.variable.dep_exprs} in {self}"
 					site.variable.dep_exprs = environment[site.variable].clone
 					print "After for {site.variable.to_s} = {site.variable.dep_exprs}"
 				end
@@ -162,7 +152,15 @@ class BasicBlock
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
-			block.compute_environment(ssa)
+			if not block.callers_blocks.has(self) then
+				block.callers_blocks.add(self)
+				block.compute_environment(ssa)
+			end
+		end
+
+		print "After computing environment of {ssa.propdef.location} for block {self}"
+		for key,value in environment do
+			print "{key} -> {value}"
 		end
 	end
 
@@ -232,6 +230,18 @@ class BasicBlock
 
 	# The PhiFunction this block contains at the beginning
 	var phi_functions = new Array[PhiFunction] is lazy
+end
+
+# A particular BasicBlock which is the test of a loop (for, while)
+class TestLoopBlock
+	super BasicBlock
+
+end
+
+# A BasicBlock which is inside a loop
+class BodyLoopBlock
+	super BasicBlock
+
 end
 
 # Contain the currently analyzed propdef
