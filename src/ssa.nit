@@ -52,10 +52,237 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
-		print "Before computing environment of {ssa.propdef.location} for block {self}"
+		if ssa.propdef.mpropdef.name == "foo" then
+			print "Before computing environment of {ssa.propdef.location} for block {self}"
+			for key,value in environment do
+				print "{key} -> {value}"
+			end
+		end
+
+		# By default, clone a predecessor environment,
+		# If there is no predecessor, this is the root_block and just initialize it
+		if not predecessors.is_empty then
+			environment = predecessors.first.clone_environment
+		end
+
+		var other_predecessors = new Array[BasicBlock]
+		other_predecessors.add_all(predecessors)
+
+		other_predecessors.remove_at(0)
+
+		# Then add all variables the cloned environment does not have
+		for other in other_predecessors do
+			for key, value in other.environment do
+				if not environment.has_key(key) then
+					environment[key] = new Array[AExpr]
+					environment[key].add_all(value)
+				end
+			end
+		end
+
+		# # Handle the PhiFunction
+		# for phi in phi_functions do
+		# 	# Create the array of environment
+		# 	if not environment.has_key(phi.original_variable) then
+		# 		environment[phi.original_variable.as(not null)] = new Array[AExpr]
+		# 	end
+
+		# 	print "Before the phi {phi} {environment[phi.original_variable]} in block {self}"
+		# 	# Search and merge the values of the phi
+		# 	for block in predecessors do
+		# 		# if block.environment.has_key(phi.original_variable) then
+		# 			for expr in block.environment[phi.original_variable] do
+		# 				if not environment[phi.original_variable].has(expr) then
+		# 					environment[phi.original_variable].add(expr)
+		# 				end
+		# 			end
+		# 		# end
+		# 	end
+
+		# 	#Propagate the dependencies for each versions of the same variable
+		# 	# for variable in phi.original_variable.versions do
+		# 	# 	environment[variable] = environment[phi.original_variable].clone
+		# 	# end
+		# 	print "After the phi {phi} {environment[phi.original_variable]}"
+		# end
+
+		# Handle the PhiFunction
+		for variable in ssa.propdef.variables do
+			if not environment.has_key(variable.original_variable) then
+				environment[variable.original_variable.as(not null)] = new Array[AExpr]
+			end
+
+			# Search and merge the values of the variable
+			for block in predecessors do
+				if block.environment.has_key(variable.original_variable) then
+					for expr in block.environment[variable.original_variable] do
+						if not environment[variable.original_variable].has(expr) then
+							environment[variable.original_variable].add(expr)
+						end
+					end
+				end
+			end
+
+			#Propagate the dependencies for each versions of the same variable
+			# for variable in phi.original_variable.versions do
+			# 	environment[variable] = environment[phi.original_variable].clone
+			# end
+		end
+
+		# Add all new variables to the environment
+		for instruction in instructions do
+			# Visit the instruction to collect variables sites
+			variables_sites.remove_all
+			instruction.visit_expression(ssa, self)
+
+			if instruction isa AVardeclExpr then
+				# Add a new Variable to the environment
+				environment[instruction.variable.as(not null)] = new Array[AExpr]
+
+				# If there is an initial value
+				if instruction.n_expr != null then
+					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
+				end
+			end
+
+			if instruction isa AVarAssignExpr then
+				# We need to create a new version of the variable
+				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+
+				environment[instruction.variable.original_variable.as(not null)].remove_all
+				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
+
+				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
+			end
+
+			for site in variables_sites do
+				if site isa AVarExpr then
+					if not environment.has_key(site.variable) then
+						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+					else
+						# Just copy the value inside the environment in the variable
+						site.variable.dep_exprs = environment[site.variable.original_variable].clone
+					end
+				end
+			end
+		end
+
+
+		#TODO: AVarReassignExpr to handle
+		# for site in variables_sites do
+		# 	if site isa AVarAssignExpr then
+		# 		# We need to create a new version of the variable
+		# 		var new_version = site.variable.original_variable.generate_version(site, ssa)
+
+		# 		environment[site.variable.original_variable.as(not null)].remove_all
+		# 		environment[site.variable.original_variable.as(not null)].add(site.n_value)
+
+		# 		# if not environment.has_key(site.variable.original_variable.as(not null)) then
+		# 		# 	environment[site.variable.original_variable.as(not null)] = new Array[AExpr]
+		# 		# 	environment[site.variable.original_variable.as(not null)].add(site.n_value)
+		# 		# end
+
+		# 		new_version.dep_exprs.add_all(environment[site.variable.original_variable])
+
+		# 		# environment[new_version] = new_version.dep_exprs
+		# 	else if site isa AVarExpr then
+		# 		if not environment.has_key(site.variable) then
+		# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+		# 		else
+		# 			# Just copy the value inside the environment in the variable
+		# 			site.variable.dep_exprs = environment[site.variable.original_variable].clone
+		# 		end
+		# 	end
+		# end
+
+		# Finally, launch the recursion in successors block
+		for block in successors do
+			if not block.callers_blocks.has(self) then
+				block.callers_blocks.add(self)
+				block.compute_environment(ssa)
+			end
+		end
+
+		if ssa.propdef.mpropdef.name == "foo" then
+			print "After computing environment of {ssa.propdef.location} for block {self}"
+			for key,value in environment do
+				print "{key} -> {value}"
+			end
+		end
+	end
+
+	# Return a new environment which is a copy of the current one
+	fun clone_environment: HashMap[Variable, Array[AExpr]]
+	do
+		var clone = new HashMap[Variable, Array[AExpr]]
+
+		for variable, values in environment do
+			clone[variable] = new Array[AExpr]
+			clone[variable].add_all(values)
+		end
+
+		return clone
+	end
+
+	# Self is the old block to link to the new,
+	# The two blocks are not linked if the current ends with a `AReturnExpr` or `ABreakExpr`
+	# i.e. self is the predecessor of `successor`
+	# `successor` The successor block
+	fun link(successor: BasicBlock)
+	do
+		successors.add(successor)
+		successor.predecessors.add(self)
+	end
+
+	# Self is the old block to link to the new
+	# i.e. self is the predecessor of `successor`
+	# `successor` The successor block
+	fun link_special(successor: BasicBlock)
+	do
+		# Link the two blocks even if the current block ends with a return or a break
+		successors.add(successor)
+		successor.predecessors.add(self)
+	end
+
+	# Compute recursively the dominance frontier of self block and its successors
+	private fun compute_df
+	do
+		# Treat each block only one time
+		df_computed = true
+
+		for s in successors do
+			dominance_frontier.add(s)
+
+			if not s.df_computed then s.compute_df
+		end
+	end
+	# Used to dump the BasicBlock to dot
+	var treated_debug: Bool = false
+
+	# If true, the iterated dominance frontier of this block has been computed
+	var df_computed: Bool = false
+
+	# Indicate if the variables renaming step has been made for this block
+	var is_renaming: Bool = false
+
+	# The variables that are accessed in this block
+	var variables = new Array[Variable] is lazy
+
+	# The PhiFunction this block contains at the beginning
+	var phi_functions = new Array[PhiFunction] is lazy
+
+	# The number of times this block was treated by `compute_envirnoment`
+	var nb_treated = 0
+
+	fun compute_environment_loop(ssa: SSA)
+	do
+		print "Before computing for a test loop block environment of {ssa.propdef.location} for block {self}"
 		for key,value in environment do
 			print "{key} -> {value}"
 		end
+
+		if nb_treated == 2 then return
+		nb_treated += 1
 
 		# By default, clone a predecessor environment,
 		# If there is no predecessor, this is the root_block and just initialize it
@@ -138,6 +365,8 @@ class BasicBlock
 				new_version.dep_exprs.add_all(environment[site.variable.original_variable])
 
 				environment[new_version] = new_version.dep_exprs
+
+				#TODO: remplacer l'ancienne version de la variable par la nouvelle
 			else if site isa AVarExpr then
 				if not environment.has_key(site.variable) then
 					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
@@ -163,85 +392,26 @@ class BasicBlock
 			print "{key} -> {value}"
 		end
 	end
-
-	# Return a new environment which is a copy of the current one
-	fun clone_environment: HashMap[Variable, Array[AExpr]]
-	do
-		var clone = new HashMap[Variable, Array[AExpr]]
-
-		for variable, values in environment do
-			clone[variable] = new Array[AExpr]
-			clone[variable].add_all(values)
-		end
-
-		return clone
-	end
-
-	# Self is the old block to link to the new,
-	# The two blocks are not linked if the current ends with a `AReturnExpr` or `ABreakExpr`
-	# i.e. self is the predecessor of `successor`
-	# `successor` The successor block
-	fun link(successor: BasicBlock)
-	do
-		successors.add(successor)
-		successor.predecessors.add(self)
-	end
-
-	# Self is the old block to link to the new
-	# i.e. self is the predecessor of `successor`
-	# `successor` The successor block
-	fun link_special(successor: BasicBlock)
-	do
-		# Link the two blocks even if the current block ends with a return or a break
-		successors.add(successor)
-		successor.predecessors.add(self)
-	end
-
-	# Compute recursively the dominance frontier of self block and its successors
-	private fun compute_df
-	do
-		# Treat each block only one time
-		df_computed = true
-
-		for s in successors do
-			dominance_frontier.add(s)
-
-			if not s.df_computed then s.compute_df
-		end
-	end
-
-	# Used to handle recursions by treating only one time each block
-	var treated: Bool = false
-
-	# Each block must be treated for each version of Variable
-	var treated_phi = new HashSet[Variable]
-
-	# Used to dump the BasicBlock to dot
-	var treated_debug: Bool = false
-
-	# If true, the iterated dominance frontier of this block has been computed
-	var df_computed: Bool = false
-
-	# Indicate if the variables renaming step has been made for this block
-	var is_renaming: Bool = false
-
-	# The variables that are accessed in this block
-	var variables = new Array[Variable] is lazy
-
-	# The PhiFunction this block contains at the beginning
-	var phi_functions = new Array[PhiFunction] is lazy
 end
 
 # A particular BasicBlock which is the test of a loop (for, while)
 class TestLoopBlock
 	super BasicBlock
 
+	redef fun compute_environment(ssa: SSA)
+	do
+		compute_environment_loop(ssa)
+	end
 end
 
 # A BasicBlock which is inside a loop
 class BodyLoopBlock
 	super BasicBlock
 
+	redef fun compute_environment(ssa: SSA)
+	do
+		compute_environment_loop(ssa)
+	end
 end
 
 # Contain the currently analyzed propdef
@@ -479,8 +649,8 @@ redef class APropdef
 		if not is_generated then return
 
 		# Once basic blocks were generated, compute SSA algorithm
-		compute_phi(ssa)
-
+		# compute_environment(ssa)
+		# compute_phi(ssa)
 		compute_environment(ssa)
 
 		# ssa_destruction(ssa)
@@ -585,87 +755,87 @@ redef class APropdef
 
 	# Transform SSA-representation into an executable code (delete phi-functions)
 	# `ssa` Current instance of SSA
-	fun ssa_destruction(ssa: SSA)
-	do
-		var builder = new ASTBuilder(mpropdef.mclassdef.mmodule, mpropdef.mclassdef.bound_mtype)
+	# fun ssa_destruction(ssa: SSA)
+	# do
+	# 	var builder = new ASTBuilder(mpropdef.mclassdef.mmodule, mpropdef.mclassdef.bound_mtype)
 
-		# for phi in ssa.phi_functions do
-		# 	# For each phi, merge dependences
-		# 	for dependence in phi.dependences do
-		# 		# For each variable in dependence, copy its value in a previous block and put it inside current environment
-		# 		if dependence.second.environment.has_key(dependence.first) then
-		# 			environment[dependence.first].add_all(dependence.second.environment[dependence.first])
-		# 		end
-		# 	end
-		# end
+	# 	# for phi in ssa.phi_functions do
+	# 	# 	# For each phi, merge dependences
+	# 	# 	for dependence in phi.dependences do
+	# 	# 		# For each variable in dependence, copy its value in a previous block and put it inside current environment
+	# 	# 		if dependence.second.environment.has_key(dependence.first) then
+	# 	# 			environment[dependence.first].add_all(dependence.second.environment[dependence.first])
+	# 	# 		end
+	# 	# 	end
+	# 	# end
 
-		# for site in variables_sites do
-		# 	if site isa AVarExpr then
-		# 		if environment.has_key(site.variable) then
-		# 			site.variable.dep_exprs = environment[site.variable].clone
-		# 		else
-		# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-		# 		end
-		# 	end
-		# end
+	# 	# for site in variables_sites do
+	# 	# 	if site isa AVarExpr then
+	# 	# 		if environment.has_key(site.variable) then
+	# 	# 			site.variable.dep_exprs = environment[site.variable].clone
+	# 	# 		else
+	# 	# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+	# 	# 		end
+	# 	# 	end
+	# 	# end
 
-		# Iterate over all phi-functions
-		for phi in ssa.phi_functions do
-			# Collect all the dep_exprs of several variables in the phi
-			var phi_deps = new List[AExpr]
-			for dependence in phi.dependences do
-				for dep_expr in dependence.first.dep_exprs do
-					if not phi_deps.has(dep_expr) then phi_deps.add(dep_expr)
-				end
-			end
+	# 	# Iterate over all phi-functions
+	# 	for phi in ssa.phi_functions do
+	# 		# Collect all the dep_exprs of several variables in the phi
+	# 		var phi_deps = new List[AExpr]
+	# 		for dependence in phi.dependences do
+	# 			for dep_expr in dependence.first.dep_exprs do
+	# 				if not phi_deps.has(dep_expr) then phi_deps.add(dep_expr)
+	# 			end
+	# 		end
 
-			for dep in phi.dependences do
-				dep.first.dep_exprs = phi_deps.to_a
+	# 		for dep in phi.dependences do
+	# 			dep.first.dep_exprs = phi_deps.to_a
 
-				# dep.second is the block where we need to create a varassign
-				var var_read = builder.make_var_read(dep.first, dep.first.declared_type.as(not null))
-				var nvar = builder.make_var_assign(dep.first, var_read)
+	# 			# dep.second is the block where we need to create a varassign
+	# 			var var_read = builder.make_var_read(dep.first, dep.first.declared_type.as(not null))
+	# 			var nvar = builder.make_var_assign(dep.first, var_read)
 
-				# Add the varassign to all predecessor blocks
-				var previous_block = dep.second
-				previous_block.instructions.add(nvar)
+	# 			# Add the varassign to all predecessor blocks
+	# 			var previous_block = dep.second
+	# 			previous_block.instructions.add(nvar)
 
-				previous_block.variables_sites.add(var_read)
+	# 			previous_block.variables_sites.add(var_read)
 
-				propagate_dependences(dep.first, phi.block, phi_deps)
-				ssa.propdef.variables.add(dep.first)
-			end
-		end
-	end
+	# 			propagate_dependences(dep.first, phi.block, phi_deps)
+	# 			ssa.propdef.variables.add(dep.first)
+	# 		end
+	# 	end
+	# end
 
 	# Propagate the dependences of the phi-functions into following variables
 	# `phi` The PhiFunction
 	# `block` Current block where we propagate dependences
-	fun propagate_dependences(variable: Variable, block: BasicBlock, dep_exprs: List[AExpr])
-	do
-		# Treat each block once
-		if block.treated_phi.has(variable) then return
+	# fun propagate_dependences(variable: Variable, block: BasicBlock, dep_exprs: List[AExpr])
+	# do
+	# 	# Treat each block once
+	# 	if block.treated_phi.has(variable) then return
 
-		# For each variable access site in the block
-		for site in block.variables_sites do
-			if site isa AVarExpr then
-				# Propagate the dependences of the phi-function in variables after the phi
-				for expr in dep_exprs do
-					if not site.variable.dep_exprs.has(expr) then
-						site.variable.dep_exprs.add(expr)
-					end
-				end
-			else
-				# The site is a variable write, we stop the propagation
-				return
-			end
-		end
+	# 	# For each variable access site in the block
+	# 	for site in block.variables_sites do
+	# 		if site isa AVarExpr then
+	# 			# Propagate the dependences of the phi-function in variables after the phi
+	# 			for expr in dep_exprs do
+	# 				if not site.variable.dep_exprs.has(expr) then
+	# 					site.variable.dep_exprs.add(expr)
+	# 				end
+	# 			end
+	# 		else
+	# 			# The site is a variable write, we stop the propagation
+	# 			return
+	# 		end
+	# 	end
 
-		block.treated_phi.add(variable)
+	# 	block.treated_phi.add(variable)
 
-		# If we do not meet a variable write, continue the propagation
-		for b in block.successors do propagate_dependences(variable, b, dep_exprs)
-	end
+	# 	# If we do not meet a variable write, continue the propagation
+	# 	for b in block.successors do propagate_dependences(variable, b, dep_exprs)
+	# end
 end
 
 redef class AAttrPropdef
@@ -803,6 +973,12 @@ redef class AExpr
 	fun generate_basic_blocks(ssa: SSA, old_block: BasicBlock, new_block: BasicBlock)
 	do
 	end
+
+	# Visit an expression in a sequence to get variables acces and object-oriented sites
+	# *`ssa` The current instance of SSA
+	# *`block` The block in which self is included
+	fun visit_expression(ssa: SSA, block: BasicBlock)
+	do end
 end
 
 redef class AVarFormExpr
@@ -811,20 +987,21 @@ redef class AVarFormExpr
 end
 
 redef class AVarExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
-		self.variable.as(not null).read_blocks.add(old_block)
-		old_block.variables.add(self.variable.as(not null))
+		self.variable.as(not null).read_blocks.add(block)
+		block.variables.add(self.variable.as(not null))
 
 		self.variable.as(not null).original_variable = self.variable.as(not null)
+
 		# Save this read site in the block
-		old_block.read_sites.add(self)
-		old_block.variables_sites.add(self)
+		block.read_sites.add(self)
+		block.variables_sites.add(self)
 	end
 end
 
 redef class AVardeclExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		var decl = self.variable.as(not null)
 
@@ -832,47 +1009,64 @@ redef class AVardeclExpr
 		ssa.propdef.variables.add(decl)
 
 		decl.original_variable = decl
-		old_block.variables.add(decl)
+		block.variables.add(decl)
 
 		if self.n_expr != null then
 			self.variable.dep_exprs.add(self.n_expr.as(not null))
-			self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+			self.n_expr.visit_expression(ssa, block)
 		end
 	end
-end
 
-redef class AVarAssignExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		if not old_block.instructions.has(self) then
 			old_block.instructions.add(self)
 		end
-
-		self.variable.as(not null).assignment_blocks.add(old_block)
-		old_block.variables.add(self.variable.as(not null))
-		self.variable.as(not null).original_variable = self.variable.as(not null)
-
-		old_block.variables_sites.add(self)
-
-		ssa.propdef.variables.add(self.variable.as(not null))
-
-		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
-# TODO, split the two instructions
-redef class AVarReassignExpr
+redef class AVarAssignExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.variable.as(not null).assignment_blocks.add(block)
+		block.variables.add(self.variable.as(not null))
+		self.variable.as(not null).original_variable = self.variable.as(not null)
+
+		block.variables_sites.add(self)
+
+		ssa.propdef.variables.add(self.variable.as(not null))
+
+		self.n_value.visit_expression(ssa, block)
+	end
+
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		self.variable.as(not null).assignment_blocks.add(old_block)
-		old_block.variables.add(self.variable.as(not null))
+		if not old_block.instructions.has(self) then
+			old_block.instructions.add(self)
+		end
+	end
+end
+
+redef class AVarReassignExpr
+	# TODO, split the two instructions
+	redef fun visit_expression(ssa, block)
+	do
+		self.variable.as(not null).assignment_blocks.add(block)
+		block.variables.add(self.variable.as(not null))
 		self.variable.as(not null).original_variable = self.variable.as(not null)
 
 		# Save this write site in the block
-		old_block.variables_sites.add(self)
+		block.variables_sites.add(self)
 
 		ssa.propdef.variables.add(self.variable.as(not null))
-		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_value.visit_expression(ssa, block)
+	end
+
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		if not old_block.instructions.has(self) then
+			old_block.instructions.add(self)
+		end
 	end
 end
 
@@ -896,15 +1090,20 @@ end
 redef class AReturnExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		# The return just set the current block and stop the recursion
 		if self.n_expr != null then
-			self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
-
 			# Store the return expression in the dependences of the dedicated returnvar
 			ssa.propdef.returnvar.dep_exprs.add(n_expr.as(not null))
 		end
 
 		old_block.link(ssa.propdef.return_block)
+	end
+
+	redef fun visit_expression(ssa, block)
+	do
+		# TODO: faire un set des returnvars ici ?
+		if self.n_expr != null then
+			self.n_expr.visit_expression(ssa, block)
+		end
 	end
 end
 
@@ -1017,57 +1216,55 @@ end
 # end
 
 redef class AIsaExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AAsCastExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AAsNotnullExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AParExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AOnceExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class ASendExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
-		# A call does not finish the current block,
-		# because we create intra-procedural basic blocks here
 		ssa.propdef.object_sites.add(self)
 
 		# Recursively goes into arguments to find variables if any
-		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block, new_block)
+		for e in self.raw_arguments do e.visit_expression(ssa, block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
@@ -1097,50 +1294,50 @@ redef class ASuperExpr
 end
 
 redef class ANewExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
-		for e in self.n_args.n_exprs do e.generate_basic_blocks(ssa, old_block, new_block)
+		for e in self.n_args.n_exprs do e.visit_expression(ssa, block)
 
 		ssa.propdef.object_sites.add(self)
 	end
 end
 
 redef class AAttrExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AAttrAssignExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
-		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_value.visit_expression(ssa, block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
-# TODO: separate the instructions
 redef class AAttrReassignExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	# TODO: separate the instructions
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
-		self.n_value.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_value.visit_expression(ssa, block)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
 redef class AIssetAttrExpr
-	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	redef fun visit_expression(ssa, block)
 	do
 		ssa.propdef.object_sites.add(self)
 
-		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		self.n_expr.visit_expression(ssa, block)
 	end
 end
 
@@ -1165,10 +1362,13 @@ redef class AIfExpr
 
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
+		old_block.instructions.remove(self)
 
+		#TODO: remove the if
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
 			to_remove.add(old_block.instructions[i])
+			new_block.variables_sites.add_all(old_block.variables_sites)
 			new_block.instructions.add(old_block.instructions[i])
 		end
 
@@ -1188,6 +1388,7 @@ redef class AIfexprExpr
 
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
+		old_block.instructions.remove(self)
 
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
