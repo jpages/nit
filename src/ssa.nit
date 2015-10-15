@@ -57,6 +57,8 @@ class BasicBlock
 			for key,value in environment do
 				print "{key} -> {value}"
 			end
+		else
+			print "Compute environment normal {self}"
 		end
 
 		# By default, clone a predecessor environment,
@@ -270,16 +272,12 @@ class BasicBlock
 	# The PhiFunction this block contains at the beginning
 	var phi_functions = new Array[PhiFunction] is lazy
 
-	# The number of times this block was treated by `compute_envirnoment`
+	# The number of times this block was treated by `compute_environment`
 	var nb_treated = 0
 
 	fun compute_environment_loop(ssa: SSA)
 	do
-		print "Before computing for a test loop block environment of {ssa.propdef.location} for block {self}"
-		for key,value in environment do
-			print "{key} -> {value}"
-		end
-
+		print "compute_envirnoment loop {self}"
 		if nb_treated == 2 then return
 		nb_treated += 1
 
@@ -304,8 +302,29 @@ class BasicBlock
 			end
 		end
 
-		# Add all new variables to the environment
+		# Handle the PhiFunction
+		for variable in ssa.propdef.variables do
+			if not environment.has_key(variable.original_variable) then
+				environment[variable.original_variable.as(not null)] = new Array[AExpr]
+			end
+
+			# Search and merge the values of the variable
+			for block in predecessors do
+				if block.environment.has_key(variable.original_variable) then
+					for expr in block.environment[variable.original_variable] do
+						if not environment[variable.original_variable].has(expr) then
+							environment[variable.original_variable].add(expr)
+						end
+					end
+				end
+			end
+		end
+
 		for instruction in instructions do
+			# Visit the instruction to collect variables sites
+			# variables_sites.remove_all
+			instruction.visit_expression(ssa, self)
+
 			if instruction isa AVardeclExpr then
 				# Add a new Variable to the environment
 				environment[instruction.variable.as(not null)] = new Array[AExpr]
@@ -315,66 +334,26 @@ class BasicBlock
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
 				end
 			end
-		end
 
-		# Handle the PhiFunction
-		for phi in phi_functions do
-			# Create the array of environment
-			if not environment.has_key(phi.original_variable) then
-				environment[phi.original_variable.as(not null)] = new Array[AExpr]
-			end
-
-			print "Before the phi {phi} {environment[phi.original_variable]} in block {self}"
-			# Search and merge the values of the phi
-			for block in predecessors do
-				if block.environment.has_key(phi.original_variable) then
-					for expr in block.environment[phi.original_variable] do
-						if not environment[phi.original_variable].has(expr) then
-							environment[phi.original_variable].add(expr)
-						end
+			for site in variables_sites do
+				if site isa AVarExpr then
+					if not environment.has_key(site.variable) then
+						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+					else
+						# Just copy the value inside the environment in the variable
+						site.variable.dep_exprs = environment[site.variable.original_variable].clone
 					end
 				end
 			end
 
-			#Propagate the dependencies for each versions of the same variable
-			for variable in phi.original_variable.versions do
-				environment[variable] = environment[phi.original_variable].clone
-				print "After the phi for {variable} {environment[variable]}"
-			end
-			print "After the phi {phi} {environment[phi.original_variable]}"
-		end
-
-		#TODO: AVarReassignExpr to handle
-		for site in variables_sites do
-			if site isa AVarAssignExpr then
+			if instruction isa AVarAssignExpr then
 				# We need to create a new version of the variable
-				var new_version = site.variable.original_variable.generate_version(site, ssa)
+				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
 
-				# Then we replace the old version by the new one in the environment
-				# environment[site.variable.as(not null)].remove_all
-				if site.variable != site.variable.original_variable then
-					environment[site.variable.as(not null)].add(site.n_value)
-				end
+				environment[instruction.variable.original_variable.as(not null)].remove_all
+				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
 
-				if not environment.has_key(site.variable.original_variable.as(not null)) then
-					environment[site.variable.original_variable.as(not null)] = new Array[AExpr]
-					environment[site.variable.original_variable.as(not null)].add(site.n_value)
-				end
-
-				new_version.dep_exprs.add_all(environment[site.variable.original_variable])
-
-				environment[new_version] = new_version.dep_exprs
-
-				#TODO: remplacer l'ancienne version de la variable par la nouvelle
-			else if site isa AVarExpr then
-				if not environment.has_key(site.variable) then
-					print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-				else
-					# Just copy the value inside the environment in the variable
-					print "Before for {site.variable.to_s} = {site.variable.dep_exprs} in {self}"
-					site.variable.dep_exprs = environment[site.variable].clone
-					print "After for {site.variable.to_s} = {site.variable.dep_exprs}"
-				end
+				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
 			end
 		end
 
@@ -384,11 +363,6 @@ class BasicBlock
 				block.callers_blocks.add(self)
 				block.compute_environment(ssa)
 			end
-		end
-
-		print "After computing environment of {ssa.propdef.location} for block {self}"
-		for key,value in environment do
-			print "{key} -> {value}"
 		end
 	end
 end
@@ -512,6 +486,9 @@ end
 redef class Variable
 	# The expressions of AST of this variable depends
 	var dep_exprs = new Array[AExpr]
+
+	# The logical dependences between variables
+	var dep_variables = new Array[Variable]
 
 	# The blocks in which this variable is assigned
 	var assignment_blocks: Array[BasicBlock] = new Array[BasicBlock] is lazy
@@ -637,6 +614,7 @@ redef class APropdef
 	fun compute_ssa(ssa: SSA)
 	do
 		if is_generated then return
+		print "Beginning of computation for {mpropdef.to_s}"
 
 		# The returnvar is the only variable of the return block
 		return_block.variables.add(returnvar)
@@ -660,6 +638,7 @@ redef class APropdef
 				print "variable {v} with deps {v.dep_exprs}"
 			end
 		end
+		print "End of computation for {mpropdef.to_s}"
 	end
 
 	fun compute_environment(ssa: SSA)
@@ -976,7 +955,9 @@ redef class AExpr
 	# *`ssa` The current instance of SSA
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
-	do end
+	do
+		print "NYI {self}"
+	end
 end
 
 redef class AVarFormExpr
@@ -1003,9 +984,6 @@ redef class AVardeclExpr
 	do
 		var decl = self.variable.as(not null)
 
-		# Add the corresponding variable to the enclosing mpropdef
-		ssa.propdef.variables.add(decl)
-
 		decl.original_variable = decl
 		block.variables.add(decl)
 
@@ -1020,6 +998,8 @@ redef class AVardeclExpr
 		if not old_block.instructions.has(self) then
 			old_block.instructions.add(self)
 		end
+
+		ssa.propdef.variables.add(variable.as(not null))
 	end
 end
 
@@ -1068,15 +1048,13 @@ redef class AVarReassignExpr
 	end
 end
 
-# redef class ABreakExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		# Finish the old block
-# 		old_block.last = self
-
-# 		return old_block
-# 	end
-# end
+redef class ABreakExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		# Link the old block to the successor one
+		old_block.link(new_block)
+	end
+end
 
 # redef class AContinueExpr
 # 	redef fun generate_basic_blocks(ssa, old_block)
@@ -1138,80 +1116,78 @@ end
 # 	end
 # end
 
-# redef class AOrExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class AOrExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
-# redef class AImpliesExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class AImpliesExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
-# redef class AAndExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class AAndExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
-# redef class ANotExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		return self.n_expr.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class ANotExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+	end
+end
 
-# redef class AOrElseExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class AOrElseExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
-# redef class AArrayExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		for nexpr in self.n_exprs do
-# 			old_block = nexpr.generate_basic_blocks(ssa, old_block)
-# 		end
+redef class AArrayExpr
+	redef fun visit_expression(ssa, block)
+	do
+		for nexpr in self.n_exprs do
+			nexpr.visit_expression(ssa, block)
+		end
+	end
+end
 
-# 		return old_block
-# 	end
-# end
+redef class ASuperstringExpr
+	redef fun visit_expression(ssa, block)
+	do
+		for nexpr in self.n_exprs do
+			nexpr.visit_expression(ssa, block)
+		end
+	end
+end
 
-# redef class ASuperstringExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		for nexpr in self.n_exprs do old_block = nexpr.generate_basic_blocks(ssa, old_block)
+redef class ACrangeExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
-# 		return old_block
-# 	end
-# end
-
-# redef class ACrangeExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
-
-# redef class AOrangeExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
-# 		return self.n_expr2.generate_basic_blocks(ssa, old_block)
-# 	end
-# end
+redef class AOrangeExpr
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+	end
+end
 
 redef class AIsaExpr
 	redef fun visit_expression(ssa, block)
@@ -1362,7 +1338,6 @@ redef class AIfExpr
 		var to_remove = new List[AExpr]
 		old_block.instructions.remove(self)
 
-		#TODO: remove the if
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
 			to_remove.add(old_block.instructions[i])
@@ -1425,6 +1400,7 @@ redef class AWhileExpr
 
 		var index = old_block.instructions.index_of(self)
 		var to_remove = new List[AExpr]
+		old_block.instructions.remove(self)
 
 		# Move the instructions after the if to the new block
 		for i in [index..old_block.instructions.length[ do
@@ -1441,52 +1417,48 @@ redef class AWhileExpr
 	end
 end
 
-redef class ALoopExpr
-	redef fun generate_basic_blocks(ssa, old_block)
-	do
-		old_block.last = self
-
-		# The beginning of the block is the first instruction
-		var block = new BasicBlock
-		block.first = self.n_block.as(not null)
-		block.last = self.n_block.as(not null)
-
-		old_block.link(block)
-		self.n_block.generate_basic_blocks(ssa, block)
-
-		return block
-	end
-end
-
-# redef class AForExpr
+# redef class ALoopExpr
 # 	redef fun generate_basic_blocks(ssa, old_block)
 # 	do
 # 		old_block.last = self
 
 # 		# The beginning of the block is the first instruction
 # 		var block = new BasicBlock
-# 		block.first = self.n_expr
+# 		block.first = self.n_block.as(not null)
 # 		block.last = self.n_block.as(not null)
 
-# 		# Visit the test of the if
-# 		self.n_expr.generate_basic_blocks(ssa, block)
-
-# 		# Collect the variables declared in the for
-# 		for v in variables do
-# 			ssa.propdef.variables.add(v)
-# 		end
-
 # 		old_block.link(block)
+# 		self.n_block.generate_basic_blocks(ssa, block)
 
-# 		block.link(old_block)
-
-# 		var new_block = new BasicBlock
-# 		new_block.first = self
-# 		new_block.last = self
-
-# 		new_block.need_update = true
-# 		new_block.need_link = true
-
-# 		return new_block
+# 		return block
 # 	end
 # end
+
+redef class AForExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		if not old_block.instructions.has(self) then old_block.instructions.add(self)
+
+		var index = old_block.instructions.index_of(self)
+		var to_remove = new List[AExpr]
+		old_block.instructions.remove(self)
+
+		# Move the instructions after the if to the new block
+		for i in [index..old_block.instructions.length[ do
+			to_remove.add(old_block.instructions[i])
+			new_block.instructions.add(old_block.instructions[i])
+		end
+
+		for instruction in to_remove do
+			old_block.instructions.remove(instruction)
+		end
+
+		# Collect the variables declared in the for
+		for v in variables do
+			ssa.propdef.variables.add(v)
+		end
+
+		# Generate a for structure (similar to a while loop)
+		ssa.generate_while(old_block, n_expr, n_block, new_block)
+	end
+end
