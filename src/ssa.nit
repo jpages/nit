@@ -145,16 +145,6 @@ class BasicBlock
 				end
 			end
 
-			if instruction isa AVarAssignExpr then
-				# We need to create a new version of the variable
-				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
-
-				environment[instruction.variable.original_variable.as(not null)].remove_all
-				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
-
-				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
-			end
-
 			for site in variables_sites do
 				if site isa AVarExpr then
 					if not environment.has_key(site.variable) then
@@ -165,8 +155,17 @@ class BasicBlock
 					end
 				end
 			end
-		end
 
+			if instruction isa AVarAssignExpr then
+				# We need to create a new version of the variable
+				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+
+				environment[instruction.variable.original_variable.as(not null)].remove_all
+				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
+
+				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
+			end
+		end
 
 		#TODO: AVarReassignExpr to handle
 		# for site in variables_sites do
@@ -484,14 +483,14 @@ class SSA
 	fun generate_while(old_block: BasicBlock, condition: AExpr, while_block: nullable AExpr, next_block: BasicBlock)
 	do
 		# Create a single block for the test of the loop
-		var block_test = new BasicBlock
+		var block_test = new TestLoopBlock
 
 		block_test.instructions.add(condition)
 
 		old_block.link(block_test)
 
 		# We start a block for the body
-		var block_body = new BasicBlock
+		var block_body = new BodyLoopBlock
 		block_test.link(block_body)
 		block_body.link(block_test)
 
@@ -649,7 +648,6 @@ redef class APropdef
 		if not is_generated then return
 
 		# Once basic blocks were generated, compute SSA algorithm
-		# compute_environment(ssa)
 		# compute_phi(ssa)
 		compute_environment(ssa)
 
@@ -1443,22 +1441,22 @@ redef class AWhileExpr
 	end
 end
 
-# redef class ALoopExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		old_block.last = self
+redef class ALoopExpr
+	redef fun generate_basic_blocks(ssa, old_block)
+	do
+		old_block.last = self
 
-# 		# The beginning of the block is the first instruction
-# 		var block = new BasicBlock
-# 		block.first = self.n_block.as(not null)
-# 		block.last = self.n_block.as(not null)
+		# The beginning of the block is the first instruction
+		var block = new BasicBlock
+		block.first = self.n_block.as(not null)
+		block.last = self.n_block.as(not null)
 
-# 		old_block.link(block)
-# 		self.n_block.generate_basic_blocks(ssa, block)
+		old_block.link(block)
+		self.n_block.generate_basic_blocks(ssa, block)
 
-# 		return block
-# 	end
-# end
+		return block
+	end
+end
 
 # redef class AForExpr
 # 	redef fun generate_basic_blocks(ssa, old_block)
