@@ -1061,8 +1061,9 @@ redef class Variable
 			var mophi = new MOPhiVar(mpropdef, self, position)
 			movar = mophi
 
-			for dep in dep_exprs do mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
-
+			for dep in dep_exprs do
+				mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
+			end
 			return mophi
 		end
 	end

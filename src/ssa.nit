@@ -144,6 +144,7 @@ class BasicBlock
 				# If there is an initial value
 				if instruction.n_expr != null then
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
+					instruction.variable.update_logical_dependences
 				end
 			end
 
@@ -154,10 +155,12 @@ class BasicBlock
 					else
 						# Just copy the value inside the environment in the variable
 						site.variable.dep_exprs = environment[site.variable.original_variable].clone
+						site.variable.update_logical_dependences
 					end
 				end
 			end
 
+			# TODO, move this before handle variables_sites ?
 			if instruction isa AVarAssignExpr then
 				# We need to create a new version of the variable
 				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
@@ -166,35 +169,9 @@ class BasicBlock
 				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
 
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
+				new_version.update_logical_dependences
 			end
 		end
-
-		#TODO: AVarReassignExpr to handle
-		# for site in variables_sites do
-		# 	if site isa AVarAssignExpr then
-		# 		# We need to create a new version of the variable
-		# 		var new_version = site.variable.original_variable.generate_version(site, ssa)
-
-		# 		environment[site.variable.original_variable.as(not null)].remove_all
-		# 		environment[site.variable.original_variable.as(not null)].add(site.n_value)
-
-		# 		# if not environment.has_key(site.variable.original_variable.as(not null)) then
-		# 		# 	environment[site.variable.original_variable.as(not null)] = new Array[AExpr]
-		# 		# 	environment[site.variable.original_variable.as(not null)].add(site.n_value)
-		# 		# end
-
-		# 		new_version.dep_exprs.add_all(environment[site.variable.original_variable])
-
-		# 		# environment[new_version] = new_version.dep_exprs
-		# 	else if site isa AVarExpr then
-		# 		if not environment.has_key(site.variable) then
-		# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-		# 		else
-		# 			# Just copy the value inside the environment in the variable
-		# 			site.variable.dep_exprs = environment[site.variable.original_variable].clone
-		# 		end
-		# 	end
-		# end
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
@@ -277,7 +254,7 @@ class BasicBlock
 
 	fun compute_environment_loop(ssa: SSA)
 	do
-		print "compute_envirnoment loop {self}"
+		print "compute_environment loop {self}"
 		if nb_treated == 2 then return
 		nb_treated += 1
 
@@ -488,7 +465,11 @@ redef class Variable
 	var dep_exprs = new Array[AExpr]
 
 	# The logical dependences between variables
-	var dep_variables = new Array[Variable]
+	var dep_variables: nullable Array[Variable]
+
+	# All primitives AST-expressions of this variables, no AVarExpr in the collection
+	# except for parameters
+	var primitive_deps: Array[AExpr] is noinit
 
 	# The blocks in which this variable is assigned
 	var assignment_blocks: Array[BasicBlock] = new Array[BasicBlock] is lazy
@@ -534,6 +515,18 @@ redef class Variable
 		counter += 1
 
 		return new_version
+	end
+
+	# Update the logical dependences of self
+	fun update_logical_dependences
+	do
+		dep_variables = new Array[Variable]
+
+		for dep in dep_exprs do
+			if dep isa AVarExpr then
+				dep_variables.add(dep.variable.as(not null))
+			end
+		end
 	end
 end
 
