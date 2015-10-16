@@ -658,23 +658,23 @@ redef class MOExpr
 end
 
 redef class MOSSAVar
-	redef fun pretty_print_expr(file)
-	do
-		super
-		file.write(" {self.variable.name} with dep ")
-		dependency.pretty_print(file)
-	end
+	# redef fun pretty_print_expr(file)
+	# do
+	# 	super
+	# 	file.write(" {self.variable.name} with dep ")
+	# 	dependency.pretty_print(file)
+	# end
 end
 
 redef class MOPhiVar
-	redef fun pretty_print_expr(file)
-	do
-		super
-		file.write(" {self.variable.name} with deps ")
-		for dep in dependencies do
-			dep.pretty_print_expr(file)
-		end
-	end
+	# redef fun pretty_print_expr(file)
+	# do
+	# 	super
+	# 	file.write(" {self.variable.name} with deps ")
+	# 	for dep in dependencies do
+	# 		dep.pretty_print_expr(file)
+	# 	end
+	# end
 end
 
 redef class MOSite
@@ -1041,11 +1041,11 @@ redef class Variable
 
 		for dep in dep_exprs do
 			file.write(" ")
-			if dep isa AVarFormExpr then
-				file.write(dep.variable.name)
-			else
-				dep.pretty_print(file)
-			end
+			# if dep isa AVarFormExpr then
+			# 	file.write(dep.variable.name)
+			# else
+			# 	dep.pretty_print(file)
+			# end
 		end
 	end
 end
