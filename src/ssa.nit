@@ -254,7 +254,6 @@ class BasicBlock
 
 	fun compute_environment_loop(ssa: SSA)
 	do
-		print "compute_environment loop {self}"
 		if nb_treated == 2 then return
 		nb_treated += 1
 
@@ -336,8 +335,9 @@ class BasicBlock
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
-			if not block.callers_blocks.has(self) then
-				block.callers_blocks.add(self)
+			if block isa BodyLoopBlock then
+				block.compute_environment_loop(ssa)
+			else
 				block.compute_environment(ssa)
 			end
 		end
@@ -358,10 +358,10 @@ end
 class BodyLoopBlock
 	super BasicBlock
 
-	redef fun compute_environment(ssa: SSA)
-	do
-		compute_environment_loop(ssa)
-	end
+	# redef fun compute_environment(ssa: SSA)
+	# do
+	# 	compute_environment_loop(ssa)
+	# end
 end
 
 # Contain the currently analyzed propdef

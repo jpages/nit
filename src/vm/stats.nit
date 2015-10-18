@@ -603,7 +603,7 @@ class MOStats
 			# 	print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
 			# else
 			for variable in node.variables do
-				trace_model.write("MOVAR"+i.to_s+ "{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
+				trace_model.write("{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
 				propdef.variables[i].pretty_print_expr(trace_model)
 				trace_model.write("\n")
 
@@ -658,23 +658,23 @@ redef class MOExpr
 end
 
 redef class MOSSAVar
-	# redef fun pretty_print_expr(file)
-	# do
-	# 	super
-	# 	file.write(" {self.variable.name} with dep ")
-	# 	dependency.pretty_print(file)
-	# end
+	redef fun pretty_print_expr(file)
+	do
+		super
+		file.write(" {self.variable.name} with dep ")
+		dependency.pretty_print(file)
+	end
 end
 
 redef class MOPhiVar
-	# redef fun pretty_print_expr(file)
-	# do
-	# 	super
-	# 	file.write(" {self.variable.name} with deps ")
-	# 	for dep in dependencies do
-	# 		dep.pretty_print_expr(file)
-	# 	end
-	# end
+	redef fun pretty_print_expr(file)
+	do
+		super
+		file.write(" {self.variable.name} with deps ")
+		for dep in dependencies do
+			dep.pretty_print_expr(file)
+		end
+	end
 end
 
 redef class MOSite
