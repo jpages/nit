@@ -41,6 +41,9 @@ class BasicBlock
 	# The environment is linked to each BasicBlock, it represents the latest versions of variables
 	var environment = new HashMap[Variable, Array[AExpr]]
 
+	# Represents the latest versions of variables, for each original variable, its last version
+	var variables_versions = new HashMap[Variable, Variable]
+
 	# The iterated dominance frontier of this block
 	# i.e. the set of blocks this block dominate directly or indirectly
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
@@ -74,6 +77,27 @@ class BasicBlock
 
 		# Then add all variables the cloned environment does not have
 		for other in other_predecessors do
+			for key, value in other.variables_versions do
+				if variables_versions.has_key(key) then
+					# If the two versions differs
+					if value != variables_versions[key] then
+						# Place a phi-functions at the beginning of the block
+						var phi = new PhiFunction("phi", self)
+						phi.add_dependences(other, value)
+						phi.block = self
+						phi.original_variable = value.original_variable
+						phi.declared_type = value.original_variable.declared_type
+
+						# Indicate this phi-function is assigned in this block
+						phi.assignment_blocks.add(self)
+						ssa.phi_functions.add(phi)
+					end
+				else
+					# We need to add this variable to the current environment
+					variables_versions[key] = value
+				end
+			end
+
 			for key, value in other.environment do
 				if not environment.has_key(key) then
 					environment[key] = new Array[AExpr]
@@ -146,6 +170,14 @@ class BasicBlock
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
 					instruction.variable.update_logical_dependences
 				end
+				variables_versions[instruction.variable.as(not null)] = instruction.variable.as(not null)
+			end
+
+			if instruction isa AIfExpr then
+				instruction.parent.dump_tree
+				for i in instructions do
+					print "\t{i}"
+				end
 			end
 
 			for site in variables_sites do
@@ -154,6 +186,7 @@ class BasicBlock
 						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
 					else
 						# Just copy the value inside the environment in the variable
+						# TODO: replace version inside the ast
 						site.variable.dep_exprs = environment[site.variable.original_variable].clone
 						site.variable.update_logical_dependences
 					end
@@ -170,7 +203,21 @@ class BasicBlock
 
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
 				new_version.update_logical_dependences
+
+				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
 			end
+		end
+
+		var variables = new List[Variable]
+		# Detect cycles in variable dependences
+		for key, value in environment do
+			variables.add(key)
+		end
+
+		var cycle = detect_cycles(variables)
+		if cycle != null then
+			#Merge the cycle
+			print "CYCLE DETECTED"
 		end
 
 		# Finally, launch the recursion in successors block
@@ -193,10 +240,15 @@ class BasicBlock
 	fun clone_environment: HashMap[Variable, Array[AExpr]]
 	do
 		var clone = new HashMap[Variable, Array[AExpr]]
+		var clone_versions = new HashMap[Variable, Variable]
 
 		for variable, values in environment do
 			clone[variable] = new Array[AExpr]
 			clone[variable].add_all(values)
+		end
+
+		for var1, var2 in variables_versions do
+			clone_versions[var1] = var2
 		end
 
 		return clone
@@ -252,9 +304,81 @@ class BasicBlock
 	# The number of times this block was treated by `compute_environment`
 	var nb_treated = 0
 
+	# Detect cycles in `variable dependences`
+	# Return the list composed of variables which form a cycle or null if there is no cycle
+	fun detect_cycles(variables: List[Variable]): nullable List[Variable]
+	do
+		#Detect cycles in dependences of variables
+		while not variables.is_empty do
+			var variable = variables.shift
+
+			var stack = new List[Variable]
+			stack.push(variable)
+			while not stack.is_empty do
+				var top = stack.shift
+
+				# top.update_indirect_dependences
+				# for node in top.indirect_dependences do
+				# 	if stack.has(node) then
+				# 		# Return the inside of the stack
+				# 		var res = new List[Variable]
+				# 		for i in [stack.index_of(node)..stack.length] do
+				# 			res.add(stack[i])
+				# 		end
+				# 		return res
+				# 	end
+
+				# 	if variables.has(node) then
+				# 		stack.add(node)
+				# 		variables.remove(node)
+				# 		break
+				# 	else
+				# 		if not stack.is_empty then node = stack.shift
+				# 	end
+				# end
+				top.update_logical_dependences
+				top.dep_variables.add(top)
+				for node in top.dep_variables do
+					if stack.has(node) then
+						# Return the inside of the stack
+						var res = new List[Variable]
+						for i in [stack.index_of(node)..stack.length] do
+							res.add(stack[i])
+						end
+						return res
+					end
+
+					if variables.has(node) then
+						stack.add(node)
+						variables.remove(node)
+						break
+					else
+						if not stack.is_empty then node = stack.shift
+					end
+				end
+			end
+		end
+
+		return null
+	end
+
 	fun compute_environment_loop(ssa: SSA)
 	do
-		if nb_treated == 2 then return
+		if nb_treated == 2 then
+			return
+		end
+		var variables = new List[Variable]
+		# Detect cycles in variable dependences
+		for key, value in environment do
+			variables.add(key)
+		end
+
+		var cycle = detect_cycles(variables)
+		if cycle != null then
+			#Merge the cycle
+			print "CYCLE DETECTED"
+		end
+
 		nb_treated += 1
 
 		# By default, clone a predecessor environment,
@@ -270,6 +394,27 @@ class BasicBlock
 
 		# Then add all variables the cloned environment does not have
 		for other in other_predecessors do
+			for key, value in other.variables_versions do
+				if variables_versions.has_key(key) then
+					# If the two versions differs
+					if value != variables_versions[key] then
+						# Place a phi-functions at the beginning of the block
+						var phi = new PhiFunction("phi", self)
+						phi.add_dependences(other, value)
+						phi.block = self
+						phi.original_variable = value.original_variable
+						phi.declared_type = value.original_variable.declared_type
+
+						# Indicate this phi-function is assigned in this block
+						phi.assignment_blocks.add(self)
+						ssa.phi_functions.add(phi)
+					end
+				else
+					# We need to add this variable to the current environment
+					variables_versions[key] = value
+				end
+			end
+
 			for key, value in other.environment do
 				if not environment.has_key(key) then
 					environment[key] = new Array[AExpr]
@@ -309,6 +454,7 @@ class BasicBlock
 				if instruction.n_expr != null then
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
 				end
+				variables_versions[instruction.variable.as(not null)] = instruction.variable.as(not null)
 			end
 
 			for site in variables_sites do
@@ -330,6 +476,7 @@ class BasicBlock
 				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
 
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
+				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
 			end
 		end
 
@@ -357,11 +504,6 @@ end
 # A BasicBlock which is inside a loop
 class BodyLoopBlock
 	super BasicBlock
-
-	# redef fun compute_environment(ssa: SSA)
-	# do
-	# 	compute_environment_loop(ssa)
-	# end
 end
 
 # Contain the currently analyzed propdef
@@ -416,10 +558,12 @@ class SSA
 
 		# Launch the recursion in two successors if they exist
 		if then_branch != null then
+			if not then_branch isa ABlockExpr then block_then.instructions.add(then_branch)
 			then_branch.generate_basic_blocks(self, block_then, successor_block)
 		end
 
 		if else_branch != null then
+			if not else_branch isa ABlockExpr then block_else.instructions.add(else_branch)
 			else_branch.generate_basic_blocks(self, block_else, successor_block)
 		end
 	end
@@ -455,6 +599,7 @@ class SSA
 
 		# Launch the recursion in two successors if they exist
 		if while_block != null then
+			if not while_block isa ABlockExpr then block_body.instructions.add(while_block)
 			while_block.generate_basic_blocks(self, block_body, block_test)
 		end
 	end
@@ -466,6 +611,9 @@ redef class Variable
 
 	# The logical dependences between variables
 	var dep_variables: nullable Array[Variable]
+
+	# The indirect dependences of self
+	var indirect_dependences: Array[AExpr] is noinit
 
 	# All primitives AST-expressions of this variables, no AVarExpr in the collection
 	# except for parameters
@@ -518,15 +666,35 @@ redef class Variable
 	end
 
 	# Update the logical dependences of self
-	fun update_logical_dependences
+	fun update_logical_dependences: nullable Array[Variable]
 	do
 		dep_variables = new Array[Variable]
-
 		for dep in dep_exprs do
-			if dep isa AVarExpr then
+			if dep isa AVarExpr and not dep.variable.parameter then
 				dep_variables.add(dep.variable.as(not null))
+
+				var dep_dep_variables = dep.variable.update_logical_dependences
+				for dep_dep in dep_dep_variables do
+					dep_variables.add(dep_dep)
+				end
 			end
 		end
+
+		return dep_variables
+	end
+
+	fun update_indirect_dependences: Array[AExpr]
+	do
+		indirect_dependences = new Array[AExpr]
+		for dep in dep_exprs do
+			if dep isa AVarExpr and not dep.variable.parameter then
+				indirect_dependences.add_all(dep.variable.update_indirect_dependences)
+			else
+				indirect_dependences.add(dep)
+			end
+		end
+
+		return indirect_dependences
 	end
 end
 
@@ -543,16 +711,16 @@ class PhiFunction
 
 	# Set the dependences for the phi-function
 	# *`block` BasicBlock in which we go through the dominance-frontier
-	# *`v` The variable to looking for
+	# *`v` The variable to look for
 	fun add_dependences(block: BasicBlock, v: Variable)
 	do
 		# Look in which blocks of DF(block) `v` has been assigned
-		for b in block.predecessors do
-			if v.assignment_blocks.has(b) then
-				var dep = new Couple[Variable, BasicBlock](v, b)
+		# for b in block.predecessors do
+		# 	if v.assignment_blocks.has(b) then
+				var dep = new Couple[Variable, BasicBlock](v, block)
 				dependences.add(dep)
-			end
-		end
+		# 	end
+		# end
 	end
 
 	# Print the PhiFunction with all its dependences
@@ -619,10 +787,10 @@ redef class APropdef
 		if not is_generated then return
 
 		# Once basic blocks were generated, compute SSA algorithm
-		# compute_phi(ssa)
 		compute_environment(ssa)
 
-		# ssa_destruction(ssa)
+		ssa_destruction(ssa)
+
 		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
@@ -640,57 +808,57 @@ redef class APropdef
 	end
 
 	# Compute the first phase of SSA algorithm: placing phi-functions
-	fun compute_phi(ssa: SSA)
-	do
-		var root_block = basic_block.as(not null)
+	# fun compute_phi(ssa: SSA)
+	# do
+	# 	var root_block = basic_block.as(not null)
 
-		# Compute the iterated dominance frontier of the graph of basic blocks
-		root_block.compute_df
+	# 	# Compute the iterated dominance frontier of the graph of basic blocks
+	# 	root_block.compute_df
 
-		# Places where a phi-function is added per variable
-		var phi_blocks = new HashMap[Variable, Array[BasicBlock]]
+	# 	# Places where a phi-function is added per variable
+	# 	var phi_blocks = new HashMap[Variable, Array[BasicBlock]]
 
-		# For each variables in the propdef
-		for v in variables do
-			var phi_variables = new Array[BasicBlock]
+	# 	# For each variables in the propdef
+	# 	for v in variables do
+	# 		var phi_variables = new Array[BasicBlock]
 
-			var blocks = new Array[BasicBlock]
-			blocks.add_all(v.assignment_blocks)
+	# 		var blocks = new Array[BasicBlock]
+	# 		blocks.add_all(v.assignment_blocks)
 
-			# While we have not treated each part defining `v`
-			while not blocks.is_empty do
-				# Remove a block from the array
-				var block = blocks.shift
+	# 		# While we have not treated each part defining `v`
+	# 		while not blocks.is_empty do
+	# 			# Remove a block from the array
+	# 			var block = blocks.shift
 
-				# For each block in the dominance frontier of `block`
-				for df in block.dominance_frontier do
-					# If we have not yet put a phi-function at the beginning of this block
-					if not phi_variables.has(df) then
-						phi_variables.add(df)
+	# 			# For each block in the dominance frontier of `block`
+	# 			for df in block.dominance_frontier do
+	# 				# If we have not yet put a phi-function at the beginning of this block
+	# 				if not phi_variables.has(df) then
+	# 					phi_variables.add(df)
 
-						# Create a new phi-function and set its dependences
-						var phi = new PhiFunction("phi", df)
-						phi.add_dependences(df, v)
-						phi.block = df
-						phi.original_variable = v
-						phi.declared_type = v.declared_type
+	# 					# Create a new phi-function and set its dependences
+	# 					var phi = new PhiFunction("phi", df)
+	# 					phi.add_dependences(df, v)
+	# 					phi.block = df
+	# 					phi.original_variable = v
+	# 					phi.declared_type = v.declared_type
 
-						# Indicate this phi-function is assigned in this block
-						phi.assignment_blocks.add(block)
-						ssa.phi_functions.add(phi)
+	# 					# Indicate this phi-function is assigned in this block
+	# 					phi.assignment_blocks.add(block)
+	# 					ssa.phi_functions.add(phi)
 
-						# Add a phi-function at the beginning of df for variable v
-						df.phi_functions.add(phi)
+	# 					# Add a phi-function at the beginning of df for variable v
+	# 					df.phi_functions.add(phi)
 
-						if not v.read_blocks.has(df) or not v.assignment_blocks.has(df) then blocks.add(df)
-					end
-				end
-			end
+	# 					if not v.read_blocks.has(df) or not v.assignment_blocks.has(df) then blocks.add(df)
+	# 				end
+	# 			end
+	# 		end
 
-			# Add `phi-variables` to the global map
-			phi_blocks[v] = phi_variables
-		end
-	end
+	# 		# Add `phi-variables` to the global map
+	# 		phi_blocks[v] = phi_variables
+	# 	end
+	# end
 
 	fun generate_name(v: Variable, counter: HashMap[Variable, Int], expr: ANode, ssa: SSA): Variable
 	do
@@ -721,6 +889,20 @@ redef class APropdef
 		counter[v] = i + 1
 
 		return new_version
+	end
+
+	# `ssa` Current instance of SSA
+	fun ssa_destruction(ssa: SSA)
+	do
+		for v in variables do
+			v.update_indirect_dependences
+			v.dep_exprs = v.indirect_dependences
+			for dep in v.indirect_dependences do
+				while v.indirect_dependences.count(dep) > 1 do
+					v.dep_exprs.remove(dep)
+				end
+			end
+		end
 	end
 
 	# Transform SSA-representation into an executable code (delete phi-functions)
@@ -893,8 +1075,8 @@ class BlockDebug
 		if not block.instructions.is_empty then
 
 			s += "block" + block.to_s.escape_to_dot
-			# s += "|\{" + block.instructions.first.location.file.filename.to_s + block.instructions.first.location.line_start.to_s
-			s += "|\{" + block.instructions.first.to_s
+			s += "|\{" + block.instructions.first.location.file.filename.to_s + block.instructions.first.location.line_start.to_s
+			# s += "|\{" + block.instructions.first.to_s
 			s += " | " + block.instructions.first.to_s.escape_to_dot
 
 			# Print phi-functions if any
@@ -902,8 +1084,8 @@ class BlockDebug
 				s += " | " + phi.to_s.escape_to_dot + " "
 			end
 
-			# s += "}|\{" + block.instructions.last.location.file.filename.to_s + block.instructions.last.location.line_start.to_s
-			s += "}|\{" + block.instructions.last.to_s
+			s += "}|\{" + block.instructions.last.location.file.filename.to_s + block.instructions.last.location.line_start.to_s
+			# s += "}|\{" + block.instructions.last.to_s
 
 			s += " | " + block.instructions.last.to_s.escape_to_dot + "}}\"];"+ "\n"
 		else
@@ -1317,6 +1499,7 @@ redef class ABlockExpr
 
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
+			# old_block.instructions.add(n_expr[i])
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
@@ -1371,20 +1554,12 @@ redef class AIfexprExpr
 	end
 end
 
-# redef class ADoExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		old_block.last = self
-
-# 		# The beginning of the block is the first instruction
-# 		var block = new BasicBlock
-# 		block.first = self.n_block.as(not null)
-# 		block.last = self.n_block.as(not null)
-
-# 		old_block.link(block)
-# 		return self.n_block.generate_basic_blocks(ssa, block)
-# 	end
-# end
+redef class ADoExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
+	end
+end
 
 redef class AWhileExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
@@ -1410,22 +1585,12 @@ redef class AWhileExpr
 	end
 end
 
-# redef class ALoopExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		old_block.last = self
-
-# 		# The beginning of the block is the first instruction
-# 		var block = new BasicBlock
-# 		block.first = self.n_block.as(not null)
-# 		block.last = self.n_block.as(not null)
-
-# 		old_block.link(block)
-# 		self.n_block.generate_basic_blocks(ssa, block)
-
-# 		return block
-# 	end
-# end
+redef class ALoopExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
+	end
+end
 
 redef class AForExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)

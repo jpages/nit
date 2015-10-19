@@ -313,6 +313,7 @@ end
 redef class MOPhiVar
 	redef fun compute_preexist
 	do
+		print "compute_preexist for {self} {dependencies}"
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then
