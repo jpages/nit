@@ -315,7 +315,7 @@ redef class MOPhiVar
 	redef fun compute_preexist
 	do
 		count += 1
-		if count == 100 then return 0
+		if count == 15 then return 0
 		print "compute_preexist for {self} {dependencies}"
 		var preval = 0
 		for dep in dependencies do
@@ -347,13 +347,15 @@ redef class MOSite
 end
 
 redef class MOCallSite
+	var counter = 0
 	redef fun compute_preexist
 	do
-		print "compute_preexist for {self} {ast}"
 		# If the preexistence extension is deactivated, the callsite is not preexistant
-		if disable_preexistence_extensions or disable_method_return then
+		if disable_preexistence_extensions or disable_method_return or counter == 20 then
 			return 8
 		end
+
+		counter += 1
 
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
