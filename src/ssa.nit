@@ -148,11 +148,6 @@ class BasicBlock
 					end
 				end
 			end
-
-			#Propagate the dependencies for each versions of the same variable
-			# for variable in phi.original_variable.versions do
-			# 	environment[variable] = environment[phi.original_variable].clone
-			# end
 		end
 
 		# Add all new variables to the environment
@@ -173,11 +168,18 @@ class BasicBlock
 				variables_versions[instruction.variable.as(not null)] = instruction.variable.as(not null)
 			end
 
-			if instruction isa AIfExpr then
-				instruction.parent.dump_tree
-				for i in instructions do
-					print "\t{i}"
-				end
+			# TODO, move this before handle variables_sites ?
+			if instruction isa AVarAssignExpr then
+				# We need to create a new version of the variable
+				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+
+				environment[instruction.variable.original_variable.as(not null)].remove_all
+				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
+
+				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
+				new_version.update_logical_dependences
+
+				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
 			end
 
 			for site in variables_sites do
@@ -191,20 +193,6 @@ class BasicBlock
 						site.variable.update_logical_dependences
 					end
 				end
-			end
-
-			# TODO, move this before handle variables_sites ?
-			if instruction isa AVarAssignExpr then
-				# We need to create a new version of the variable
-				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
-
-				environment[instruction.variable.original_variable.as(not null)].remove_all
-				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
-
-				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
-				new_version.update_logical_dependences
-
-				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
 			end
 		end
 
@@ -612,6 +600,39 @@ redef class Variable
 	# The logical dependences between variables
 	var dep_variables: nullable Array[Variable]
 
+	# Used to detect cycles
+	var dep_cycles: nullable List[Variable]
+
+	fun detect_cycles: nullable List[Variable]
+	do
+		update_indirect_dependences
+		var deps_copy = dep_exprs.clone
+
+		if dep_cycles == null then
+			dep_cycles = new List[Variable]
+		end
+
+		while not deps_copy.is_empty do
+			# Take the first element
+			var current = deps_copy.first
+
+			if current isa AVarExpr then
+				current.variable.detect_cycles
+				dep_cycles.add(current.variable.as(not null))
+
+				if current.variable.detect_cycles.has(self) then
+					# Cycle detected, merge the two cycles
+					dep_cycles.add_all(current.variable.dep_cycles.as(not null))
+					current.variable.dep_cycles = self.dep_cycles
+					print "cycle detected"
+				end
+			end
+			# Delete current element
+			deps_copy.remove(current)
+		end
+
+		return dep_cycles
+	end
 	# The indirect dependences of self
 	var indirect_dependences: Array[AExpr] is noinit
 
@@ -788,10 +809,12 @@ redef class APropdef
 
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_environment(ssa)
+		var vars = new List[Variable]
+		vars.add_all(variables)
 
 		ssa_destruction(ssa)
 
-		if mpropdef.name == "foo" then
+		if mpropdef.name == "action" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
 
@@ -805,6 +828,14 @@ redef class APropdef
 	fun compute_environment(ssa: SSA)
 	do
 		basic_block.compute_environment(ssa)
+	end
+
+	fun detect_cycles(block: BasicBlock)
+	do
+		for v in variables do
+			v.update_logical_dependences
+			v.detect_cycles
+		end
 	end
 
 	# Compute the first phase of SSA algorithm: placing phi-functions

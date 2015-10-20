@@ -1041,11 +1041,11 @@ redef class Variable
 
 		for dep in dep_exprs do
 			file.write(" ")
-			# if dep isa AVarFormExpr then
-			# 	file.write(dep.variable.name)
-			# else
-			# 	dep.pretty_print(file)
-			# end
+			if dep isa AVarFormExpr then
+				file.write(dep.variable.name)
+			else
+				dep.pretty_print(file)
+			end
 		end
 	end
 end

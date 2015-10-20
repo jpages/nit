@@ -311,8 +311,11 @@ redef class MOSSAVar
 end
 
 redef class MOPhiVar
+	var count = 0
 	redef fun compute_preexist
 	do
+		count += 1
+		if count == 100 then return 0
 		print "compute_preexist for {self} {dependencies}"
 		var preval = 0
 		for dep in dependencies do
@@ -346,6 +349,7 @@ end
 redef class MOCallSite
 	redef fun compute_preexist
 	do
+		print "compute_preexist for {self} {ast}"
 		# If the preexistence extension is deactivated, the callsite is not preexistant
 		if disable_preexistence_extensions or disable_method_return then
 			return 8

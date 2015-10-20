@@ -653,11 +653,11 @@ class MOCallSite
 		super
 		file.write(" MOCallSite given_args = ")
 		for arg in given_args do
-			if arg isa MOVar then
-				file.write("{arg.variable.name} ")
-			else
+			# if arg isa MOVar then
+			# 	file.write("{arg.variable.name} ")
+			# else
 				file.write("{arg} ")
-			end
+			# end
 		end
 	end
 
