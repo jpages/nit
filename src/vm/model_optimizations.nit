@@ -439,11 +439,11 @@ class MOPhiVar
 		super
 		file.write("deps = ")
 		for dep in dependencies do
-			if dep isa MOVar then
-				file.write("{dep.variable.name}")
-			else
-				file.write("{dep.to_s}")
-			end
+			# if dep isa MOVar then
+			# 	file.write("{dep.variable.name}")
+			# else
+			# 	file.write("{dep.to_s}")
+			# end
 		end
 		file.write("\n")
 	end

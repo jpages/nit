@@ -1,3 +1,4 @@
+
 # Statistics of the VM (implementations, preexistence...)
 module stats
 
@@ -567,7 +568,7 @@ class MOStats
 			for v in node.variables do
 				trace_file.write("\t")
 
-				v.pretty_print(trace_file)
+				# v.pretty_print(trace_file)
 				trace_file.write("\n")
 			end
 			trace_file.write("\n")
@@ -584,7 +585,7 @@ class MOStats
 			for site in propdef.mosites do
 				trace_model.write("\t")
 
-				site.pretty_print(trace_model)
+				# site.pretty_print(trace_model)
 
 				if site isa MOCallSite then
 					if site.trace_origin == 32 and site.expr_recv.preexistence_origin == 3 then
@@ -604,7 +605,7 @@ class MOStats
 			# else
 			for variable in node.variables do
 				trace_model.write("{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
-				propdef.variables[i].pretty_print_expr(trace_model)
+				# propdef.variables[i].pretty_print_expr(trace_model)
 				trace_model.write("\n")
 
 				# trace_model.write("Variable"+i.to_s+"\n\t")

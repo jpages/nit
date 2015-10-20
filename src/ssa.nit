@@ -41,9 +41,6 @@ class BasicBlock
 	# The environment is linked to each BasicBlock, it represents the latest versions of variables
 	var environment = new HashMap[Variable, Array[AExpr]]
 
-	# Represents the latest versions of variables, for each original variable, its last version
-	var variables_versions = new HashMap[Variable, Variable]
-
 	# The iterated dominance frontier of this block
 	# i.e. the set of blocks this block dominate directly or indirectly
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
@@ -55,15 +52,19 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
-		if ssa.propdef.mpropdef.name == "foo" then
-			print "Before computing environment of {ssa.propdef.location} for block {self}"
-			for key,value in environment do
-				print "{key} -> {value}"
-			end
-		else
-			print "Compute environment normal {self}"
-		end
+		fill_environment(ssa)
 
+		# Finally, launch the recursion in successors block
+		for block in successors do
+			if not block.callers_blocks.has(self) then
+				block.callers_blocks.add(self)
+				block.compute_environment(ssa)
+			end
+		end
+	end
+
+	fun fill_environment(ssa: SSA)
+	do
 		# By default, clone a predecessor environment,
 		# If there is no predecessor, this is the root_block and just initialize it
 		if not predecessors.is_empty then
@@ -75,29 +76,7 @@ class BasicBlock
 
 		other_predecessors.remove_at(0)
 
-		# Then add all variables the cloned environment does not have
 		for other in other_predecessors do
-			for key, value in other.variables_versions do
-				if variables_versions.has_key(key) then
-					# If the two versions differs
-					if value != variables_versions[key] then
-						# Place a phi-functions at the beginning of the block
-						var phi = new PhiFunction("phi", self)
-						phi.add_dependences(other, value)
-						phi.block = self
-						phi.original_variable = value.original_variable
-						phi.declared_type = value.original_variable.declared_type
-
-						# Indicate this phi-function is assigned in this block
-						phi.assignment_blocks.add(self)
-						ssa.phi_functions.add(phi)
-					end
-				else
-					# We need to add this variable to the current environment
-					variables_versions[key] = value
-				end
-			end
-
 			for key, value in other.environment do
 				if not environment.has_key(key) then
 					environment[key] = new Array[AExpr]
@@ -105,32 +84,6 @@ class BasicBlock
 				end
 			end
 		end
-
-		# # Handle the PhiFunction
-		# for phi in phi_functions do
-		# 	# Create the array of environment
-		# 	if not environment.has_key(phi.original_variable) then
-		# 		environment[phi.original_variable.as(not null)] = new Array[AExpr]
-		# 	end
-
-		# 	print "Before the phi {phi} {environment[phi.original_variable]} in block {self}"
-		# 	# Search and merge the values of the phi
-		# 	for block in predecessors do
-		# 		# if block.environment.has_key(phi.original_variable) then
-		# 			for expr in block.environment[phi.original_variable] do
-		# 				if not environment[phi.original_variable].has(expr) then
-		# 					environment[phi.original_variable].add(expr)
-		# 				end
-		# 			end
-		# 		# end
-		# 	end
-
-		# 	#Propagate the dependencies for each versions of the same variable
-		# 	# for variable in phi.original_variable.versions do
-		# 	# 	environment[variable] = environment[phi.original_variable].clone
-		# 	# end
-		# 	print "After the phi {phi} {environment[phi.original_variable]}"
-		# end
 
 		# Handle the PhiFunction
 		for variable in ssa.propdef.variables do
@@ -165,61 +118,38 @@ class BasicBlock
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
 					instruction.variable.update_logical_dependences
 				end
-				variables_versions[instruction.variable.as(not null)] = instruction.variable.as(not null)
+				instruction.variable.as(not null).versions = new Array[Variable]
+				instruction.variable.as(not null).versions.add(instruction.variable.as(not null))
 			end
 
-			# TODO, move this before handle variables_sites ?
+			for site in variables_sites do
+				if site isa AVarExpr then
+					if not environment.has_key(site.variable.original_variable) then
+						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+					else
+						# Just copy the value inside the environment in the variable
+						# TODO: replace version inside the ast
+						if not site.variable.original_variable.versions.is_empty then
+							# site.variable = site.variable.original_variable.versions.last
+						end
+						site.variable.dep_exprs = environment[site.variable.original_variable].clone
+						site.variable.update_logical_dependences
+					end
+				end
+			end
+
 			if instruction isa AVarAssignExpr then
 				# We need to create a new version of the variable
 				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
+
+				# Replace by the new version in the AST-site
+				# instruction.variable = new_version
 
 				environment[instruction.variable.original_variable.as(not null)].remove_all
 				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
 
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
 				new_version.update_logical_dependences
-
-				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
-			end
-
-			for site in variables_sites do
-				if site isa AVarExpr then
-					if not environment.has_key(site.variable) then
-						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-					else
-						# Just copy the value inside the environment in the variable
-						# TODO: replace version inside the ast
-						site.variable.dep_exprs = environment[site.variable.original_variable].clone
-						site.variable.update_logical_dependences
-					end
-				end
-			end
-		end
-
-		var variables = new List[Variable]
-		# Detect cycles in variable dependences
-		for key, value in environment do
-			variables.add(key)
-		end
-
-		var cycle = detect_cycles(variables)
-		if cycle != null then
-			#Merge the cycle
-			print "CYCLE DETECTED"
-		end
-
-		# Finally, launch the recursion in successors block
-		for block in successors do
-			if not block.callers_blocks.has(self) then
-				block.callers_blocks.add(self)
-				block.compute_environment(ssa)
-			end
-		end
-
-		if ssa.propdef.mpropdef.name == "foo" then
-			print "After computing environment of {ssa.propdef.location} for block {self}"
-			for key,value in environment do
-				print "{key} -> {value}"
 			end
 		end
 	end
@@ -228,15 +158,10 @@ class BasicBlock
 	fun clone_environment: HashMap[Variable, Array[AExpr]]
 	do
 		var clone = new HashMap[Variable, Array[AExpr]]
-		var clone_versions = new HashMap[Variable, Variable]
 
 		for variable, values in environment do
 			clone[variable] = new Array[AExpr]
 			clone[variable].add_all(values)
-		end
-
-		for var1, var2 in variables_versions do
-			clone_versions[var1] = var2
 		end
 
 		return clone
@@ -292,181 +217,15 @@ class BasicBlock
 	# The number of times this block was treated by `compute_environment`
 	var nb_treated = 0
 
-	# Detect cycles in `variable dependences`
-	# Return the list composed of variables which form a cycle or null if there is no cycle
-	fun detect_cycles(variables: List[Variable]): nullable List[Variable]
-	do
-		#Detect cycles in dependences of variables
-		while not variables.is_empty do
-			var variable = variables.shift
-
-			var stack = new List[Variable]
-			stack.push(variable)
-			while not stack.is_empty do
-				var top = stack.shift
-
-				# top.update_indirect_dependences
-				# for node in top.indirect_dependences do
-				# 	if stack.has(node) then
-				# 		# Return the inside of the stack
-				# 		var res = new List[Variable]
-				# 		for i in [stack.index_of(node)..stack.length] do
-				# 			res.add(stack[i])
-				# 		end
-				# 		return res
-				# 	end
-
-				# 	if variables.has(node) then
-				# 		stack.add(node)
-				# 		variables.remove(node)
-				# 		break
-				# 	else
-				# 		if not stack.is_empty then node = stack.shift
-				# 	end
-				# end
-				top.update_logical_dependences
-				top.dep_variables.add(top)
-				for node in top.dep_variables do
-					if stack.has(node) then
-						# Return the inside of the stack
-						var res = new List[Variable]
-						for i in [stack.index_of(node)..stack.length] do
-							res.add(stack[i])
-						end
-						return res
-					end
-
-					if variables.has(node) then
-						stack.add(node)
-						variables.remove(node)
-						break
-					else
-						if not stack.is_empty then node = stack.shift
-					end
-				end
-			end
-		end
-
-		return null
-	end
-
 	fun compute_environment_loop(ssa: SSA)
 	do
 		if nb_treated == 2 then
 			return
 		end
-		var variables = new List[Variable]
-		# Detect cycles in variable dependences
-		for key, value in environment do
-			variables.add(key)
-		end
-
-		var cycle = detect_cycles(variables)
-		if cycle != null then
-			#Merge the cycle
-			print "CYCLE DETECTED"
-		end
 
 		nb_treated += 1
 
-		# By default, clone a predecessor environment,
-		# If there is no predecessor, this is the root_block and just initialize it
-		if not predecessors.is_empty then
-			environment = predecessors.first.clone_environment
-		end
-
-		var other_predecessors = new Array[BasicBlock]
-		other_predecessors.add_all(predecessors)
-
-		other_predecessors.remove_at(0)
-
-		# Then add all variables the cloned environment does not have
-		for other in other_predecessors do
-			for key, value in other.variables_versions do
-				if variables_versions.has_key(key) then
-					# If the two versions differs
-					if value != variables_versions[key] then
-						# Place a phi-functions at the beginning of the block
-						var phi = new PhiFunction("phi", self)
-						phi.add_dependences(other, value)
-						phi.block = self
-						phi.original_variable = value.original_variable
-						phi.declared_type = value.original_variable.declared_type
-
-						# Indicate this phi-function is assigned in this block
-						phi.assignment_blocks.add(self)
-						ssa.phi_functions.add(phi)
-					end
-				else
-					# We need to add this variable to the current environment
-					variables_versions[key] = value
-				end
-			end
-
-			for key, value in other.environment do
-				if not environment.has_key(key) then
-					environment[key] = new Array[AExpr]
-					environment[key].add_all(value)
-				end
-			end
-		end
-
-		# Handle the PhiFunction
-		for variable in ssa.propdef.variables do
-			if not environment.has_key(variable.original_variable) then
-				environment[variable.original_variable.as(not null)] = new Array[AExpr]
-			end
-
-			# Search and merge the values of the variable
-			for block in predecessors do
-				if block.environment.has_key(variable.original_variable) then
-					for expr in block.environment[variable.original_variable] do
-						if not environment[variable.original_variable].has(expr) then
-							environment[variable.original_variable].add(expr)
-						end
-					end
-				end
-			end
-		end
-
-		for instruction in instructions do
-			# Visit the instruction to collect variables sites
-			# variables_sites.remove_all
-			instruction.visit_expression(ssa, self)
-
-			if instruction isa AVardeclExpr then
-				# Add a new Variable to the environment
-				environment[instruction.variable.as(not null)] = new Array[AExpr]
-
-				# If there is an initial value
-				if instruction.n_expr != null then
-					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
-				end
-				variables_versions[instruction.variable.as(not null)] = instruction.variable.as(not null)
-			end
-
-			for site in variables_sites do
-				if site isa AVarExpr then
-					if not environment.has_key(site.variable) then
-						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-					else
-						# Just copy the value inside the environment in the variable
-						site.variable.dep_exprs = environment[site.variable.original_variable].clone
-					end
-				end
-			end
-
-			if instruction isa AVarAssignExpr then
-				# We need to create a new version of the variable
-				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
-
-				environment[instruction.variable.original_variable.as(not null)].remove_all
-				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
-
-				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
-				variables_versions[instruction.variable.original_variable.as(not null)] = new_version
-			end
-		end
+		fill_environment(ssa)
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
@@ -633,21 +392,15 @@ redef class Variable
 
 		return dep_cycles
 	end
+
 	# The indirect dependences of self
 	var indirect_dependences: Array[AExpr] is noinit
-
-	# All primitives AST-expressions of this variables, no AVarExpr in the collection
-	# except for parameters
-	var primitive_deps: Array[AExpr] is noinit
 
 	# The blocks in which this variable is assigned
 	var assignment_blocks: Array[BasicBlock] = new Array[BasicBlock] is lazy
 
 	# Part of the program where this variable is read
 	var read_blocks: Array[BasicBlock] = new Array[BasicBlock] is lazy
-
-	# The stack of this variable, used for SSA renaming
-	var stack = new Array[Variable] is lazy
 
 	# The original Variable in case of renaming
 	var original_variable: nullable Variable = self
@@ -678,7 +431,7 @@ redef class Variable
 		new_version.original_variable = original_variable.as(not null)
 
 		# Add this new version to the original variable
-		original_variable.versions.add(new_version)
+		original_variable.versions.push(new_version)
 
 		# Increment the counter
 		counter += 1
@@ -787,6 +540,8 @@ redef class APropdef
 	fun init_environment(root_block: BasicBlock)
 	do
 		for v in variables do
+			v.versions = new Array[Variable]
+			v.versions.add(v)
 			root_block.environment[v] = new Array[AExpr]
 		end
 	end
@@ -796,7 +551,6 @@ redef class APropdef
 	fun compute_ssa(ssa: SSA)
 	do
 		if is_generated then return
-		print "Beginning of computation for {mpropdef.to_s}"
 
 		# The returnvar is the only variable of the return block
 		return_block.variables.add(returnvar)
@@ -814,7 +568,7 @@ redef class APropdef
 
 		ssa_destruction(ssa)
 
-		if mpropdef.name == "action" then
+		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
 
@@ -822,7 +576,6 @@ redef class APropdef
 				print "variable {v} with deps {v.dep_exprs}"
 			end
 		end
-		print "End of computation for {mpropdef.to_s}"
 	end
 
 	fun compute_environment(ssa: SSA)
@@ -891,36 +644,36 @@ redef class APropdef
 	# 	end
 	# end
 
-	fun generate_name(v: Variable, counter: HashMap[Variable, Int], expr: ANode, ssa: SSA): Variable
-	do
-		var original_variable = v.original_variable.as(not null)
+	# fun generate_name(v: Variable, counter: HashMap[Variable, Int], expr: ANode, ssa: SSA): Variable
+	# do
+	# 	var original_variable = v.original_variable.as(not null)
 
-		var i = counter[original_variable]
+	# 	var i = counter[original_variable]
 
-		var new_version: Variable
+	# 	var new_version: Variable
 
-		# Create a new version of Variable
-		if original_variable isa PhiFunction then
-			var block = original_variable.block
-			new_version = new PhiFunction(original_variable.name + i.to_s, block)
-			new_version.dependences.add_all(original_variable.dependences)
-			ssa.phi_functions.add(new_version)
-		else
-			new_version = new Variable(original_variable.name + i.to_s)
-			new_version.declared_type = expr.as(AVarFormExpr).variable.declared_type
-			variables.add(new_version)
-		end
+	# 	# Create a new version of Variable
+	# 	if original_variable isa PhiFunction then
+	# 		var block = original_variable.block
+	# 		new_version = new PhiFunction(original_variable.name + i.to_s, block)
+	# 		new_version.dependences.add_all(original_variable.dependences)
+	# 		ssa.phi_functions.add(new_version)
+	# 	else
+	# 		new_version = new Variable(original_variable.name + i.to_s)
+	# 		new_version.declared_type = expr.as(AVarFormExpr).variable.declared_type
+	# 		variables.add(new_version)
+	# 	end
 
-		# Recopy the fields into the new version
-		new_version.location = expr.location
-		new_version.original_variable = original_variable
+	# 	# Recopy the fields into the new version
+	# 	new_version.location = expr.location
+	# 	new_version.original_variable = original_variable
 
-		# Push a new version on the stack
-		original_variable.stack.add(new_version)
-		counter[v] = i + 1
+	# 	# Push a new version on the stack
+	# 	original_variable.stack.add(new_version)
+	# 	counter[v] = i + 1
 
-		return new_version
-	end
+	# 	return new_version
+	# end
 
 	# `ssa` Current instance of SSA
 	fun ssa_destruction(ssa: SSA)
@@ -1282,7 +1035,6 @@ redef class AReturnExpr
 
 	redef fun visit_expression(ssa, block)
 	do
-		# TODO: faire un set des returnvars ici ?
 		if self.n_expr != null then
 			self.n_expr.visit_expression(ssa, block)
 		end

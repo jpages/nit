@@ -46,14 +46,16 @@ redef class APropdef
 		# Generate basic_blocks and compute SSA-algorithm for this propdef
 		compute_ssa(ssa)
 	end
+end
 
+redef class Variable
 	# Redef to add the same position to a new version of a Variable than the original variable
-	redef fun generate_name(v, counter, expr, ssa)
+	redef fun generate_version(expr, ssa)
 	do
 		var new_version = super
 
 		# All versions of a variable have the same position in the environment
-		new_version.position = v.original_variable.position
+		new_version.position = original_variable.position
 
 		return new_version
 	end
