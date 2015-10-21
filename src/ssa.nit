@@ -915,7 +915,7 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		print "NYI {self}"
+		# print "NYI {self}"
 	end
 end
 
