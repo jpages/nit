@@ -316,7 +316,6 @@ redef class MOPhiVar
 	do
 		count += 1
 		if count == 15 then return 0
-		print "compute_preexist for {self} {dependencies}"
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then

@@ -609,7 +609,7 @@ class MOStats
 				trace_model.write("\n")
 
 				# trace_model.write("Variable"+i.to_s+"\n\t")
-				# variable.pretty_print(trace_model)
+				variable.pretty_print(trace_model)
 				# trace_model.write("\n")
 				i += 1
 			end

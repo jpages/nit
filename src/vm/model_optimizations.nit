@@ -439,11 +439,11 @@ class MOPhiVar
 		super
 		file.write("deps = ")
 		for dep in dependencies do
-			# if dep isa MOVar then
-			# 	file.write("{dep.variable.name}")
-			# else
-			# 	file.write("{dep.to_s}")
-			# end
+			if dep isa MOVar then
+				file.write("{dep.variable.name}")
+			else
+				file.write("{dep.to_s}")
+			end
 		end
 		file.write("\n")
 	end
@@ -653,11 +653,11 @@ class MOCallSite
 		super
 		file.write(" MOCallSite given_args = ")
 		for arg in given_args do
-			# if arg isa MOVar then
-			# 	file.write("{arg.variable.name} ")
-			# else
+			if arg isa MOVar then
+				file.write("{arg.variable.name} ")
+			else
 				file.write("{arg} ")
-			# end
+			end
 		end
 	end
 
