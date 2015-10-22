@@ -915,7 +915,7 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		# print "NYI {self}"
+		print "NYI {self}"
 	end
 end
 
@@ -1286,6 +1286,13 @@ redef class ABlockExpr
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		for expr in n_expr do
+			expr.visit_expression(ssa, block)
+		end
+	end
 end
 
 redef class AIfExpr
@@ -1311,6 +1318,13 @@ redef class AIfExpr
 		# Generate a if structure for the blocks
 		ssa.generate_if(old_block, n_expr, n_then, n_else, new_block)
 	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		n_expr.visit_expression(ssa, block)
+		if n_then != null then n_then.visit_expression(ssa, block)
+		if n_else != null then n_else.visit_expression(ssa, block)
+	end
 end
 
 redef class AIfexprExpr
@@ -1334,6 +1348,13 @@ redef class AIfexprExpr
 
 		# Generate a if structure for the blocks
 		ssa.generate_if(old_block, n_expr, n_then, n_else, new_block)
+	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		n_expr.visit_expression(ssa, block)
+		n_then.visit_expression(ssa, block)
+		n_else.visit_expression(ssa, block)
 	end
 end
 
