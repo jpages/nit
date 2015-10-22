@@ -56,10 +56,10 @@ class BasicBlock
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
-			if not block.callers_blocks.has(self) then
+			# if not block.callers_blocks.has(self) then
 				block.callers_blocks.add(self)
 				block.compute_environment(ssa)
-			end
+			# end
 		end
 	end
 
@@ -145,9 +145,12 @@ class BasicBlock
 				# Replace by the new version in the AST-site
 				# instruction.variable = new_version
 
-				environment[instruction.variable.original_variable.as(not null)].remove_all
+				# environment[instruction.variable.original_variable.as(not null)].remove_all
 				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
+				# environment[new_version] = new Array[AExpr]
+				# environment[new_version].add(instruction.n_value)
 
+				instruction.variable.original_variable.dep_exprs = environment[instruction.variable.original_variable.as(not null)].clone
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
 				new_version.update_logical_dependences
 			end
@@ -915,7 +918,7 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		print "NYI {self}"
+		# print "NYI {self}"
 	end
 end
 
