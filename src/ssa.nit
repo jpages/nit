@@ -52,14 +52,18 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
+		if nb_treated == 10 then
+			return
+		end
+
+		nb_treated += 1
+
 		fill_environment(ssa)
 
 		# Finally, launch the recursion in successors block
 		for block in successors do
-			# if not block.callers_blocks.has(self) then
-				block.callers_blocks.add(self)
-				block.compute_environment(ssa)
-			# end
+			block.callers_blocks.add(self)
+			block.compute_environment(ssa)
 		end
 	end
 
@@ -116,7 +120,7 @@ class BasicBlock
 				# If there is an initial value
 				if instruction.n_expr != null then
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
-					instruction.variable.update_logical_dependences
+					# instruction.variable.update_logical_dependences
 				end
 				instruction.variable.as(not null).versions = new Array[Variable]
 				instruction.variable.as(not null).versions.add(instruction.variable.as(not null))
@@ -128,12 +132,11 @@ class BasicBlock
 						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
 					else
 						# Just copy the value inside the environment in the variable
-						# TODO: replace version inside the ast
 						if not site.variable.original_variable.versions.is_empty then
 							# site.variable = site.variable.original_variable.versions.last
 						end
 						site.variable.dep_exprs = environment[site.variable.original_variable].clone
-						site.variable.update_logical_dependences
+						# site.variable.update_logical_dependences
 					end
 				end
 			end
@@ -145,14 +148,14 @@ class BasicBlock
 				# Replace by the new version in the AST-site
 				# instruction.variable = new_version
 
-				# environment[instruction.variable.original_variable.as(not null)].remove_all
+				environment[instruction.variable.original_variable.as(not null)].remove_all
 				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
 				# environment[new_version] = new Array[AExpr]
 				# environment[new_version].add(instruction.n_value)
 
 				instruction.variable.original_variable.dep_exprs = environment[instruction.variable.original_variable.as(not null)].clone
 				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
-				new_version.update_logical_dependences
+				# new_version.update_logical_dependences
 			end
 		end
 	end
@@ -367,33 +370,62 @@ redef class Variable
 
 	fun detect_cycles: nullable List[Variable]
 	do
-		update_indirect_dependences
 		var deps_copy = dep_exprs.clone
 
 		if dep_cycles == null then
 			dep_cycles = new List[Variable]
 		end
 
+		var current_path = new List[Variable]
 		while not deps_copy.is_empty do
 			# Take the first element
 			var current = deps_copy.first
 
 			if current isa AVarExpr then
-				current.variable.detect_cycles
-				dep_cycles.add(current.variable.as(not null))
+				current_path.add(self)
+				current.variable.detect_cycle(current_path)
 
-				if current.variable.detect_cycles.has(self) then
-					# Cycle detected, merge the two cycles
-					dep_cycles.add_all(current.variable.dep_cycles.as(not null))
-					current.variable.dep_cycles = self.dep_cycles
-					print "cycle detected"
-				end
+				var cycle = current.variable.detect_cycle(current_path)
 			end
+
 			# Delete current element
 			deps_copy.remove(current)
 		end
 
+		if dep_cycles != null then
+			print "Cycle detected, need to merge"
+		end
+
+		# TODO: reparcourir les variables pour fusionner le cycle
+		# update_indirect_dependences
 		return dep_cycles
+	end
+
+	# Detect a cycle on a Variable dependences
+	# `path` The current path to this Variable
+	fun detect_cycle(path: List[Variable]): nullable List[AExpr]
+	do
+		var cycle = new List[AExpr]
+		for dependence in dep_exprs do
+			if dependence isa AVarExpr then
+				if path.has(dependence.variable) then
+					dependence.variable.dep_cycles.add_all(path)
+					dep_cycles.add_all(path)
+
+					# Construct the circuit with all dependences and return
+					var circuit = new List[AExpr]
+					for v in dependence.variable.dep_cycles do
+						circuit.add_all(v.dep_exprs)
+					end
+
+					return circuit
+				else
+					path.add(dependence.variable.as(not null))
+				end
+			end
+		end
+
+		return null
 	end
 
 	# The indirect dependences of self
@@ -682,7 +714,8 @@ redef class APropdef
 	fun ssa_destruction(ssa: SSA)
 	do
 		for v in variables do
-			v.update_indirect_dependences
+			# v.update_indirect_dependences
+			v.indirect_dependences = v.dep_exprs
 			v.dep_exprs = v.indirect_dependences
 			for dep in v.indirect_dependences do
 				while v.indirect_dependences.count(dep) > 1 do
