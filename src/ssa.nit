@@ -41,6 +41,9 @@ class BasicBlock
 	# The environment is linked to each BasicBlock, it represents the latest versions of variables
 	var environment = new HashMap[Variable, Array[AExpr]]
 
+	# For each original variable, the last version
+	var versions = new HashMap[Variable, Variable]
+
 	# The iterated dominance frontier of this block
 	# i.e. the set of blocks this block dominate directly or indirectly
 	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
@@ -87,16 +90,55 @@ class BasicBlock
 					environment[key].add_all(value)
 				end
 			end
+
+			for key, value in other.versions do
+				if versions.has_key(key) then
+					# If the two versions differs, we need to create a PhiFunction
+					if value != versions[key] then
+						# Do not re-create a phi-function if there is already one for this variable
+						var phi: nullable PhiFunction = lookup_phi(value.original_variable)
+
+						if phi == null then
+							# Place a phi-functions at the beginning of the block
+							phi = new PhiFunction("phi", self)
+							phi.block = self
+							phi.original_variable = value.original_variable
+							phi.declared_type = value.original_variable.declared_type
+							phi.assignment_blocks.add(self)
+							ssa.phi_functions.add(phi)
+						end
+
+						phi.add_dependences(other, value)
+						phi.add_dependences(self, versions[key])
+
+						print "Place a phi function for {value.original_variable} {phi}"
+
+						versions[value.original_variable] = phi
+					end
+				else
+					# Add this versions to the current environment if there is no version yet
+					if not versions.has_key(key) then
+						versions[key] = value
+					end
+				end
+			end
 		end
+
+		for key,value in versions do print "deux \t{key} -> {value}"
+		print "deux {instructions}\n"
 
 		# Handle the PhiFunction
 		for variable in ssa.propdef.variables do
 			if not environment.has_key(variable.original_variable) then
-				environment[variable.original_variable.as(not null)] = new Array[AExpr]
+				environment[variable.original_variable] = new Array[AExpr]
 			end
 
 			# Search and merge the values of the variable
 			for block in predecessors do
+				if block.versions.has_key(variable.original_variable) and not versions.has_key(variable.original_variable) then
+					versions[variable.original_variable] = block.versions[variable.original_variable]
+				end
+
 				if block.environment.has_key(variable.original_variable) then
 					for expr in block.environment[variable.original_variable] do
 						if not environment[variable.original_variable].has(expr) then
@@ -120,23 +162,29 @@ class BasicBlock
 				# If there is an initial value
 				if instruction.n_expr != null then
 					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
-					# instruction.variable.update_logical_dependences
 				end
-				instruction.variable.as(not null).versions = new Array[Variable]
-				instruction.variable.as(not null).versions.add(instruction.variable.as(not null))
+				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
 
 			for site in variables_sites do
 				if site isa AVarExpr then
 					if not environment.has_key(site.variable.original_variable) then
-						print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
+						print "Problem in variables_sites with {site.variable.as(not null)} {instructions}"
+						abort
 					else
 						# Just copy the value inside the environment in the variable
-						if not site.variable.original_variable.versions.is_empty then
-							# site.variable = site.variable.original_variable.versions.last
+						if versions.has_key(site.variable.original_variable) then
+							site.variable = versions[site.variable.original_variable]
+						else
+							print "Problem with {site.variable.original_variable.to_s} in {self} {self.instructions}"
+							print "{environment[site.variable.original_variable]}"
+
+							for key,value in versions do
+								print "\t{key} -> {value}"
+							end
+							abort
 						end
-						site.variable.dep_exprs = environment[site.variable.original_variable].clone
-						# site.variable.update_logical_dependences
+						# site.variable.dep_exprs = environment[site.variable.original_variable].clone
 					end
 				end
 			end
@@ -146,16 +194,14 @@ class BasicBlock
 				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
 
 				# Replace by the new version in the AST-site
-				# instruction.variable = new_version
+				instruction.variable = new_version
+				versions[new_version.original_variable] = new_version
 
-				environment[instruction.variable.original_variable.as(not null)].remove_all
-				environment[instruction.variable.original_variable.as(not null)].add(instruction.n_value)
+				environment[instruction.variable.original_variable].remove_all
+				environment[instruction.variable.original_variable].add(instruction.n_value)
+
 				# environment[new_version] = new Array[AExpr]
 				# environment[new_version].add(instruction.n_value)
-
-				instruction.variable.original_variable.dep_exprs = environment[instruction.variable.original_variable.as(not null)].clone
-				new_version.dep_exprs.add_all(environment[instruction.variable.original_variable])
-				# new_version.update_logical_dependences
 			end
 		end
 	end
@@ -164,10 +210,15 @@ class BasicBlock
 	fun clone_environment: HashMap[Variable, Array[AExpr]]
 	do
 		var clone = new HashMap[Variable, Array[AExpr]]
+		var clone_versions = new HashMap[Variable, Variable]
 
 		for variable, values in environment do
 			clone[variable] = new Array[AExpr]
 			clone[variable].add_all(values)
+		end
+
+		for key, value in versions do
+			clone_versions[key] = value
 		end
 
 		return clone
@@ -205,6 +256,7 @@ class BasicBlock
 			if not s.df_computed then s.compute_df
 		end
 	end
+
 	# Used to dump the BasicBlock to dot
 	var treated_debug: Bool = false
 
@@ -218,7 +270,20 @@ class BasicBlock
 	var variables = new Array[Variable] is lazy
 
 	# The PhiFunction this block contains at the beginning
-	var phi_functions = new Array[PhiFunction] is lazy
+	var phi_functions = new List[PhiFunction] is lazy
+
+	# Lookup in `phi_functions` a PhiFunction for the original variable (without renaming) `variable`
+	# Return the looked Phi if found, else return null
+	fun lookup_phi(variable: Variable): nullable PhiFunction
+	do
+		for phi in phi_functions do
+			if phi.original_variable == variable then
+				return phi
+			end
+		end
+
+		return null
+	end
 
 	# The number of times this block was treated by `compute_environment`
 	var nb_treated = 0
@@ -438,10 +503,7 @@ redef class Variable
 	var read_blocks: Array[BasicBlock] = new Array[BasicBlock] is lazy
 
 	# The original Variable in case of renaming
-	var original_variable: nullable Variable = self
-
-	# All the versions of this Variable in case of renaming
-	var versions = new Array[Variable] is lazy
+	var original_variable: Variable = self
 
 	# If true, this variable is a parameter of a method
 	var parameter: Bool = false
@@ -463,10 +525,7 @@ redef class Variable
 
 		# Recopy the fields into the new version
 		new_version.location = expr.location
-		new_version.original_variable = original_variable.as(not null)
-
-		# Add this new version to the original variable
-		original_variable.versions.push(new_version)
+		new_version.original_variable = original_variable
 
 		# Increment the counter
 		counter += 1
@@ -524,12 +583,8 @@ class PhiFunction
 	fun add_dependences(block: BasicBlock, v: Variable)
 	do
 		# Look in which blocks of DF(block) `v` has been assigned
-		# for b in block.predecessors do
-		# 	if v.assignment_blocks.has(b) then
-				var dep = new Couple[Variable, BasicBlock](v, block)
-				dependences.add(dep)
-		# 	end
-		# end
+		var dep = new Couple[Variable, BasicBlock](v, block)
+		dependences.add(dep)
 	end
 
 	# Print the PhiFunction with all its dependences
@@ -575,8 +630,6 @@ redef class APropdef
 	fun init_environment(root_block: BasicBlock)
 	do
 		for v in variables do
-			v.versions = new Array[Variable]
-			v.versions.add(v)
 			root_block.environment[v] = new Array[AExpr]
 		end
 	end
@@ -598,9 +651,6 @@ redef class APropdef
 
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_environment(ssa)
-		var vars = new List[Variable]
-		vars.add_all(variables)
-
 		ssa_destruction(ssa)
 
 		if mpropdef.name == "foo" then
@@ -615,6 +665,10 @@ redef class APropdef
 
 	fun compute_environment(ssa: SSA)
 	do
+		for v in variables do
+			basic_block.versions[v] = v
+		end
+
 		basic_block.compute_environment(ssa)
 	end
 
