@@ -55,7 +55,7 @@ class BasicBlock
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
-		if nb_treated == 10 then
+		if nb_treated == 5 then
 			return
 		end
 
@@ -124,9 +124,6 @@ class BasicBlock
 			end
 		end
 
-		for key,value in versions do print "deux \t{key} -> {value}"
-		print "deux {instructions}\n"
-
 		# Handle the PhiFunction
 		for variable in ssa.propdef.variables do
 			if not environment.has_key(variable.original_variable) then
@@ -155,21 +152,12 @@ class BasicBlock
 			variables_sites.remove_all
 			instruction.visit_expression(ssa, self)
 
-			if instruction isa AVardeclExpr then
-				# Add a new Variable to the environment
-				environment[instruction.variable.as(not null)] = new Array[AExpr]
-
-				# If there is an initial value
-				if instruction.n_expr != null then
-					environment[instruction.variable.as(not null)].add(instruction.n_expr.as(not null))
-				end
-				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
-			end
-
 			for site in variables_sites do
-				if site isa AVarExpr then
+				if site isa AVarExpr and site.variable == site.variable.original_variable then
 					if not environment.has_key(site.variable.original_variable) then
-						print "Problem in variables_sites with {site.variable.as(not null)} {instructions}"
+						print "Problem in variables_sites with {site.variable.as(not null).original_variable} {instructions}"
+
+						for key, value in environment do print "\tenv {key}-> {value}"
 						abort
 					else
 						# Just copy the value inside the environment in the variable
@@ -184,24 +172,45 @@ class BasicBlock
 							end
 							abort
 						end
-						# site.variable.dep_exprs = environment[site.variable.original_variable].clone
+						if not environment.has_key(site.variable.original_variable) then
+							site.dump_tree
+							print "erreur in environment {site.variable.original_variable}"
+							for key, value in environment do print "\tenv {key}-> {value}"
+							abort
+						else
+							site.variable.dep_exprs = environment[site.variable.original_variable].clone
+						end
 					end
 				end
 			end
 
 			if instruction isa AVarAssignExpr then
+				instruction.dump_tree
 				# We need to create a new version of the variable
 				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
 
 				# Replace by the new version in the AST-site
+				print "{instruction.variable.as(not null)} {new_version} {new_version.original_variable}"
 				instruction.variable = new_version
 				versions[new_version.original_variable] = new_version
 
 				environment[instruction.variable.original_variable].remove_all
 				environment[instruction.variable.original_variable].add(instruction.n_value)
 
-				# environment[new_version] = new Array[AExpr]
-				# environment[new_version].add(instruction.n_value)
+				print "After generation"
+				for key, value in environment do print "\tenv {key}-> {value}"
+				for key,value in versions do print "\tversions {key} -> {value}"
+			end
+
+			if instruction isa AVardeclExpr then
+				# Add a new Variable to the environment
+				environment[instruction.variable.as(not null)] = new Array[AExpr]
+
+				# If there is an initial value
+				if instruction.n_expr != null then
+					environment[instruction.variable.as(not null).original_variable].add(instruction.n_expr.as(not null))
+				end
+				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
 		end
 	end
@@ -272,6 +281,9 @@ class BasicBlock
 	# The PhiFunction this block contains at the beginning
 	var phi_functions = new List[PhiFunction] is lazy
 
+	# The number of times this block was treated by `compute_environment`
+	var nb_treated = 0
+
 	# Lookup in `phi_functions` a PhiFunction for the original variable (without renaming) `variable`
 	# Return the looked Phi if found, else return null
 	fun lookup_phi(variable: Variable): nullable PhiFunction
@@ -284,9 +296,6 @@ class BasicBlock
 
 		return null
 	end
-
-	# The number of times this block was treated by `compute_environment`
-	var nb_treated = 0
 
 	fun compute_environment_loop(ssa: SSA)
 	do
@@ -680,90 +689,6 @@ redef class APropdef
 		end
 	end
 
-	# Compute the first phase of SSA algorithm: placing phi-functions
-	# fun compute_phi(ssa: SSA)
-	# do
-	# 	var root_block = basic_block.as(not null)
-
-	# 	# Compute the iterated dominance frontier of the graph of basic blocks
-	# 	root_block.compute_df
-
-	# 	# Places where a phi-function is added per variable
-	# 	var phi_blocks = new HashMap[Variable, Array[BasicBlock]]
-
-	# 	# For each variables in the propdef
-	# 	for v in variables do
-	# 		var phi_variables = new Array[BasicBlock]
-
-	# 		var blocks = new Array[BasicBlock]
-	# 		blocks.add_all(v.assignment_blocks)
-
-	# 		# While we have not treated each part defining `v`
-	# 		while not blocks.is_empty do
-	# 			# Remove a block from the array
-	# 			var block = blocks.shift
-
-	# 			# For each block in the dominance frontier of `block`
-	# 			for df in block.dominance_frontier do
-	# 				# If we have not yet put a phi-function at the beginning of this block
-	# 				if not phi_variables.has(df) then
-	# 					phi_variables.add(df)
-
-	# 					# Create a new phi-function and set its dependences
-	# 					var phi = new PhiFunction("phi", df)
-	# 					phi.add_dependences(df, v)
-	# 					phi.block = df
-	# 					phi.original_variable = v
-	# 					phi.declared_type = v.declared_type
-
-	# 					# Indicate this phi-function is assigned in this block
-	# 					phi.assignment_blocks.add(block)
-	# 					ssa.phi_functions.add(phi)
-
-	# 					# Add a phi-function at the beginning of df for variable v
-	# 					df.phi_functions.add(phi)
-
-	# 					if not v.read_blocks.has(df) or not v.assignment_blocks.has(df) then blocks.add(df)
-	# 				end
-	# 			end
-	# 		end
-
-	# 		# Add `phi-variables` to the global map
-	# 		phi_blocks[v] = phi_variables
-	# 	end
-	# end
-
-	# fun generate_name(v: Variable, counter: HashMap[Variable, Int], expr: ANode, ssa: SSA): Variable
-	# do
-	# 	var original_variable = v.original_variable.as(not null)
-
-	# 	var i = counter[original_variable]
-
-	# 	var new_version: Variable
-
-	# 	# Create a new version of Variable
-	# 	if original_variable isa PhiFunction then
-	# 		var block = original_variable.block
-	# 		new_version = new PhiFunction(original_variable.name + i.to_s, block)
-	# 		new_version.dependences.add_all(original_variable.dependences)
-	# 		ssa.phi_functions.add(new_version)
-	# 	else
-	# 		new_version = new Variable(original_variable.name + i.to_s)
-	# 		new_version.declared_type = expr.as(AVarFormExpr).variable.declared_type
-	# 		variables.add(new_version)
-	# 	end
-
-	# 	# Recopy the fields into the new version
-	# 	new_version.location = expr.location
-	# 	new_version.original_variable = original_variable
-
-	# 	# Push a new version on the stack
-	# 	original_variable.stack.add(new_version)
-	# 	counter[v] = i + 1
-
-	# 	return new_version
-	# end
-
 	# `ssa` Current instance of SSA
 	fun ssa_destruction(ssa: SSA)
 	do
@@ -778,90 +703,6 @@ redef class APropdef
 			end
 		end
 	end
-
-	# Transform SSA-representation into an executable code (delete phi-functions)
-	# `ssa` Current instance of SSA
-	# fun ssa_destruction(ssa: SSA)
-	# do
-	# 	var builder = new ASTBuilder(mpropdef.mclassdef.mmodule, mpropdef.mclassdef.bound_mtype)
-
-	# 	# for phi in ssa.phi_functions do
-	# 	# 	# For each phi, merge dependences
-	# 	# 	for dependence in phi.dependences do
-	# 	# 		# For each variable in dependence, copy its value in a previous block and put it inside current environment
-	# 	# 		if dependence.second.environment.has_key(dependence.first) then
-	# 	# 			environment[dependence.first].add_all(dependence.second.environment[dependence.first])
-	# 	# 		end
-	# 	# 	end
-	# 	# end
-
-	# 	# for site in variables_sites do
-	# 	# 	if site isa AVarExpr then
-	# 	# 		if environment.has_key(site.variable) then
-	# 	# 			site.variable.dep_exprs = environment[site.variable].clone
-	# 	# 		else
-	# 	# 			print "\t problem in variables_sites with {site.variable.as(not null)} {instructions}"
-	# 	# 		end
-	# 	# 	end
-	# 	# end
-
-	# 	# Iterate over all phi-functions
-	# 	for phi in ssa.phi_functions do
-	# 		# Collect all the dep_exprs of several variables in the phi
-	# 		var phi_deps = new List[AExpr]
-	# 		for dependence in phi.dependences do
-	# 			for dep_expr in dependence.first.dep_exprs do
-	# 				if not phi_deps.has(dep_expr) then phi_deps.add(dep_expr)
-	# 			end
-	# 		end
-
-	# 		for dep in phi.dependences do
-	# 			dep.first.dep_exprs = phi_deps.to_a
-
-	# 			# dep.second is the block where we need to create a varassign
-	# 			var var_read = builder.make_var_read(dep.first, dep.first.declared_type.as(not null))
-	# 			var nvar = builder.make_var_assign(dep.first, var_read)
-
-	# 			# Add the varassign to all predecessor blocks
-	# 			var previous_block = dep.second
-	# 			previous_block.instructions.add(nvar)
-
-	# 			previous_block.variables_sites.add(var_read)
-
-	# 			propagate_dependences(dep.first, phi.block, phi_deps)
-	# 			ssa.propdef.variables.add(dep.first)
-	# 		end
-	# 	end
-	# end
-
-	# Propagate the dependences of the phi-functions into following variables
-	# `phi` The PhiFunction
-	# `block` Current block where we propagate dependences
-	# fun propagate_dependences(variable: Variable, block: BasicBlock, dep_exprs: List[AExpr])
-	# do
-	# 	# Treat each block once
-	# 	if block.treated_phi.has(variable) then return
-
-	# 	# For each variable access site in the block
-	# 	for site in block.variables_sites do
-	# 		if site isa AVarExpr then
-	# 			# Propagate the dependences of the phi-function in variables after the phi
-	# 			for expr in dep_exprs do
-	# 				if not site.variable.dep_exprs.has(expr) then
-	# 					site.variable.dep_exprs.add(expr)
-	# 				end
-	# 			end
-	# 		else
-	# 			# The site is a variable write, we stop the propagation
-	# 			return
-	# 		end
-	# 	end
-
-	# 	block.treated_phi.add(variable)
-
-	# 	# If we do not meet a variable write, continue the propagation
-	# 	for b in block.successors do propagate_dependences(variable, b, dep_exprs)
-	# end
 end
 
 redef class AAttrPropdef
@@ -950,7 +791,6 @@ class BlockDebug
 
 			s += "block" + block.to_s.escape_to_dot
 			s += "|\{" + block.instructions.first.location.file.filename.to_s + block.instructions.first.location.line_start.to_s
-			# s += "|\{" + block.instructions.first.to_s
 			s += " | " + block.instructions.first.to_s.escape_to_dot
 
 			# Print phi-functions if any
@@ -959,8 +799,6 @@ class BlockDebug
 			end
 
 			s += "}|\{" + block.instructions.last.location.file.filename.to_s + block.instructions.last.location.line_start.to_s
-			# s += "}|\{" + block.instructions.last.to_s
-
 			s += " | " + block.instructions.last.to_s.escape_to_dot + "}}\"];"+ "\n"
 		else
 			s += "block" + block.to_s.escape_to_dot
