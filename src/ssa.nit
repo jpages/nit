@@ -98,6 +98,7 @@ class BasicBlock
 						# Do not re-create a phi-function if there is already one for this variable
 						var phi: nullable PhiFunction = lookup_phi(value.original_variable)
 
+						# TODO: to conrrect
 						if phi == null then
 							# Place a phi-functions at the beginning of the block
 							phi = new PhiFunction("phi", self)
@@ -110,8 +111,6 @@ class BasicBlock
 
 						phi.add_dependences(other, value)
 						phi.add_dependences(self, versions[key])
-
-						print "Place a phi function for {value.original_variable} {phi}"
 
 						versions[value.original_variable] = phi
 					end
@@ -146,6 +145,11 @@ class BasicBlock
 			end
 		end
 
+		print "\nbefore handling instructions and variables_sites for {self}"
+		for key, value in environment do print "\tenv {key}-> {value}"
+		for key,value in versions do print "\tversions {key} -> {value}"
+		print "\n"
+
 		# Add all new variables to the environment
 		for instruction in instructions do
 			# Visit the instruction to collect variables sites
@@ -154,6 +158,7 @@ class BasicBlock
 
 			for site in variables_sites do
 				if site isa AVarExpr and site.variable == site.variable.original_variable then
+					# print "Before in {site} {site.variable.as(not null)} {site.variable.dep_exprs}"
 					if not environment.has_key(site.variable.original_variable) then
 						print "Problem in variables_sites with {site.variable.as(not null).original_variable} {instructions}"
 
@@ -161,7 +166,7 @@ class BasicBlock
 						abort
 					else
 						# Just copy the value inside the environment in the variable
-						if versions.has_key(site.variable.original_variable) then
+						if versions.get_or_null(site.variable.original_variable) != null then
 							site.variable = versions[site.variable.original_variable]
 						else
 							print "Problem with {site.variable.original_variable.to_s} in {self} {self.instructions}"
@@ -173,8 +178,7 @@ class BasicBlock
 							abort
 						end
 						if not environment.has_key(site.variable.original_variable) then
-							site.dump_tree
-							print "erreur in environment {site.variable.original_variable}"
+							print "erreur in environment {site.variable.as(not null)} {site.variable.original_variable} {site.its_variable.as(not null)}"
 							for key, value in environment do print "\tenv {key}-> {value}"
 							abort
 						else
@@ -184,22 +188,16 @@ class BasicBlock
 				end
 			end
 
-			if instruction isa AVarAssignExpr then
-				instruction.dump_tree
+			if instruction isa AVarAssignExpr and instruction.variable == instruction.variable.original_variable then
 				# We need to create a new version of the variable
 				var new_version = instruction.variable.original_variable.generate_version(instruction, ssa)
 
 				# Replace by the new version in the AST-site
-				print "{instruction.variable.as(not null)} {new_version} {new_version.original_variable}"
 				instruction.variable = new_version
 				versions[new_version.original_variable] = new_version
 
 				environment[instruction.variable.original_variable].remove_all
 				environment[instruction.variable.original_variable].add(instruction.n_value)
-
-				print "After generation"
-				for key, value in environment do print "\tenv {key}-> {value}"
-				for key,value in versions do print "\tversions {key} -> {value}"
 			end
 
 			if instruction isa AVardeclExpr then
@@ -212,6 +210,10 @@ class BasicBlock
 				end
 				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
+
+			print "After fill_environment for {self} {instructions}"
+			for key, value in environment do print "\tenv {key}-> {value}"
+			for key,value in versions do print "\tversions {key} -> {value}"
 		end
 	end
 
@@ -658,11 +660,8 @@ redef class APropdef
 		# The propdef has no body (abstract)
 		if not is_generated then return
 
-		# Once basic blocks were generated, compute SSA algorithm
-		compute_environment(ssa)
-		ssa_destruction(ssa)
 
-		if mpropdef.name == "foo" then
+		if mpropdef.name == "enlarge" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
 
@@ -670,6 +669,9 @@ redef class APropdef
 				print "variable {v} with deps {v.dep_exprs}"
 			end
 		end
+		# Once basic blocks were generated, compute SSA algorithm
+		compute_environment(ssa)
+		ssa_destruction(ssa)
 	end
 
 	fun compute_environment(ssa: SSA)
@@ -843,25 +845,14 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		# print "NYI {self}"
+		print "NYI {self}"
 	end
-end
-
-redef class AVarFormExpr
-	# The original variable
-	var original_variable: nullable Variable = variable
 end
 
 redef class AVarExpr
 	redef fun visit_expression(ssa, block)
 	do
-		self.variable.as(not null).read_blocks.add(block)
-		block.variables.add(self.variable.as(not null))
-
-		self.variable.as(not null).original_variable = self.variable.as(not null)
-
 		# Save this read site in the block
-		block.read_sites.add(self)
 		block.variables_sites.add(self)
 	end
 end
@@ -869,11 +860,6 @@ end
 redef class AVardeclExpr
 	redef fun visit_expression(ssa, block)
 	do
-		var decl = self.variable.as(not null)
-
-		decl.original_variable = decl
-		block.variables.add(decl)
-
 		if self.n_expr != null then
 			self.variable.dep_exprs.add(self.n_expr.as(not null))
 			self.n_expr.visit_expression(ssa, block)
@@ -894,8 +880,6 @@ redef class AVarAssignExpr
 	redef fun visit_expression(ssa, block)
 	do
 		self.variable.as(not null).assignment_blocks.add(block)
-		block.variables.add(self.variable.as(not null))
-		self.variable.as(not null).original_variable = self.variable.as(not null)
 
 		block.variables_sites.add(self)
 
@@ -918,7 +902,6 @@ redef class AVarReassignExpr
 	do
 		self.variable.as(not null).assignment_blocks.add(block)
 		block.variables.add(self.variable.as(not null))
-		self.variable.as(not null).original_variable = self.variable.as(not null)
 
 		# Save this write site in the block
 		block.variables_sites.add(self)
@@ -1205,12 +1188,12 @@ redef class ABlockExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		for expr in n_expr do
-			old_block.instructions.add(expr)
+			# old_block.instructions.add(expr)
 		end
 
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
-			# old_block.instructions.add(n_expr[i])
+			old_block.instructions.add(n_expr[i])
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
