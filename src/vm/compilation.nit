@@ -60,3 +60,11 @@ redef class Variable
 		return new_version
 	end
 end
+
+redef class PhiFunction
+	redef fun init_position
+	do
+		# The position of the PhiFunction is the same as its original variable
+		position = original_variable.position
+	end
+end
