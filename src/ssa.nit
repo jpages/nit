@@ -498,9 +498,8 @@ redef class Variable
 		for dependence in dep_exprs do
 			if dependence isa AVarExpr then
 				if path.has(dependence.variable) then
-					if dependence.variable.dep_cycles == null then
-						dependence.variable.dep_cycles = new List[Variable]
-					end
+					if dependence.variable.dep_cycles == null then dependence.variable.dep_cycles = new List[Variable]
+					if dep_cycles == null then dep_cycles = new List[Variable]
 
 					dependence.variable.dep_cycles.add_all(path)
 					dep_cycles.add_all(path)
