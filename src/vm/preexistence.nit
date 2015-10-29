@@ -346,15 +346,12 @@ redef class MOSite
 end
 
 redef class MOCallSite
-	var counter = 0
 	redef fun compute_preexist
 	do
 		# If the preexistence extension is deactivated, the callsite is not preexistant
-		if disable_preexistence_extensions or disable_method_return or counter == 20 then
+		if disable_preexistence_extensions or disable_method_return then
 			return 8
 		end
-
-		counter += 1
 
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
