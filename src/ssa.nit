@@ -98,15 +98,17 @@ class BasicBlock
 						# Do not re-create a phi-function if there is already one for this variable
 						var phi: nullable PhiFunction = lookup_phi(value.original_variable)
 
-						# TODO: to conrrect
+						# TODO: to correct
 						if phi == null then
 							# Place a phi-functions at the beginning of the block
-							phi = new PhiFunction("phi", self)
+							phi = new PhiFunction("phi", self, value.original_variable)
 							phi.block = self
 							phi.original_variable = value.original_variable
 							phi.declared_type = value.original_variable.declared_type
 							phi.assignment_blocks.add(self)
 							ssa.phi_functions.add(phi)
+						else
+							print "We retrieve a PhiFunction for this variable"
 						end
 
 						phi.add_dependences(other, value)
@@ -158,7 +160,6 @@ class BasicBlock
 
 			for site in variables_sites do
 				if site isa AVarExpr and site.variable == site.variable.original_variable then
-					# print "Before in {site} {site.variable.as(not null)} {site.variable.dep_exprs}"
 					if not environment.has_key(site.variable.original_variable) then
 						print "Problem in variables_sites with {site.variable.as(not null).original_variable} {instructions}"
 
@@ -610,6 +611,18 @@ class PhiFunction
 
 		return s
 	end
+
+	init(n: String, b: BasicBlock, original: Variable)
+	do
+		name = n
+		block = b
+		original_variable = original
+		init_position
+	end
+
+	fun init_position
+	do
+	end
 end
 
 redef class APropdef
@@ -659,7 +672,6 @@ redef class APropdef
 
 		# The propdef has no body (abstract)
 		if not is_generated then return
-
 
 		if mpropdef.name == "enlarge" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
