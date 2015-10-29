@@ -147,10 +147,10 @@ class BasicBlock
 			end
 		end
 
-		print "\nbefore handling instructions and variables_sites for {self}"
-		for key, value in environment do print "\tenv {key}-> {value}"
-		for key,value in versions do print "\tversions {key} -> {value}"
-		print "\n"
+		# print "\nbefore handling instructions and variables_sites for {self}"
+		# for key, value in environment do print "\tenv {key}-> {value}"
+		# for key,value in versions do print "\tversions {key} -> {value}"
+		# print "\n"
 
 		# Add all new variables to the environment
 		for instruction in instructions do
@@ -212,9 +212,9 @@ class BasicBlock
 				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
 
-			print "After fill_environment for {self} {instructions}"
-			for key, value in environment do print "\tenv {key}-> {value}"
-			for key,value in versions do print "\tversions {key} -> {value}"
+			# print "After fill_environment for {self} {instructions}"
+			# for key, value in environment do print "\tenv {key}-> {value}"
+			# for key,value in versions do print "\tversions {key} -> {value}"
 		end
 	end
 
@@ -445,7 +445,7 @@ redef class Variable
 	# Used to detect cycles
 	var dep_cycles: nullable List[Variable]
 
-	fun detect_cycles: nullable List[Variable]
+	fun detect_cycles
 	do
 		var deps_copy = dep_exprs.clone
 
@@ -470,12 +470,24 @@ redef class Variable
 		end
 
 		if dep_cycles != null then
-			print "Cycle detected, need to merge"
-		end
+			# A Cycle is detected, merge it
+			var variables_cycle = new Array[Variable]
+			variables_cycle.add_all(dep_cycles.as(not null))
+			variables_cycle.add_all(current_path)
+			variables_cycle.add(self)
 
-		# TODO: reparcourir les variables pour fusionner le cycle
-		# update_indirect_dependences
-		return dep_cycles
+			var indirect_dep = new HashSet[AExpr]
+			for v in variables_cycle do
+				for dep in v.dep_exprs do
+					if not dep isa AVarExpr then indirect_dep.add(dep)
+				end
+			end
+
+			for v in variables_cycle do
+				v.dep_exprs.remove_all
+				v.dep_exprs.add_all(indirect_dep)
+			end
+		end
 	end
 
 	# Detect a cycle on a Variable dependences
@@ -486,6 +498,10 @@ redef class Variable
 		for dependence in dep_exprs do
 			if dependence isa AVarExpr then
 				if path.has(dependence.variable) then
+					if dependence.variable.dep_cycles == null then
+						dependence.variable.dep_cycles = new List[Variable]
+					end
+
 					dependence.variable.dep_cycles.add_all(path)
 					dep_cycles.add_all(path)
 
@@ -683,6 +699,8 @@ redef class APropdef
 		end
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_environment(ssa)
+
+		detect_cycles(basic_block.as(not null))
 		ssa_destruction(ssa)
 	end
 
@@ -707,7 +725,7 @@ redef class APropdef
 	fun ssa_destruction(ssa: SSA)
 	do
 		for v in variables do
-			# v.update_indirect_dependences
+			v.update_indirect_dependences
 			v.indirect_dependences = v.dep_exprs
 			v.dep_exprs = v.indirect_dependences
 			for dep in v.indirect_dependences do
@@ -857,7 +875,7 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		print "NYI {self}"
+		# print "NYI {self}"
 	end
 end
 
