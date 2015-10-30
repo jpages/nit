@@ -61,8 +61,47 @@ redef class ModelBuilder
 	end
 end
 
+# A Pic pattern is an association between a Property Introduction Class represented by a position,
+# and a class: the receiver class
+class PICPattern
+	# The class of the receiver static type
+	var recv_class: MClass
+
+	# The virtual type of the stored patterns
+	type PATTERN: MOPattern
+
+	# The collections of patterns
+	var patterns: List[PATTERN]
+end
+
+# A PICPattern for an access inside a method table (a method call or a subtyping test)
+class MethodPICPattern
+	super PICPattern
+
+	# The position of the PIC's block inside the virtual function table
+	var position: Int
+
+	redef type PATTERN: MOCallSitePattern
+end
+
+# A PICPattern for an access inside the attribute table
+class AttributePICPattern
+	super PICPattern
+
+	# The position of the PIC's block inside the virtual function table
+	var position: Int
+
+	redef type PATTERN: MOAttrPattern
+end
+
+# Superclass of all patterns
+class MOPattern
+end
+
 # Pattern of instantiation sites
 class MONewPattern
+	super MOPattern
+
 	# Class associated to the pattern
 	var cls: MClass
 
@@ -78,6 +117,8 @@ end
 
 # Pattern of objects sites
 abstract class MOSitePattern
+	super MOPattern
+
 	# Type of the sites that refer to this pattern
 	type S: MOSite
 
@@ -194,6 +235,7 @@ class MOCallSitePattern
 	# if not, then this pattern references procedure sites
 	var is_function: Bool
 
+	# TODO: create the corresponding PICPattern
 	init(rst: MType, rsc: MClass, gp: MMethod, function: Bool)
 	do
 		super(rst, rsc, gp)
@@ -239,7 +281,7 @@ class MOCallSitePattern
 	end
 end
 
-# Common subpattern of all attributes (read/write)
+# Common pattern of all attribute reads and writes
 abstract class MOAttrPattern
 	super MOPropSitePattern
 
