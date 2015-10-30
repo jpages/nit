@@ -711,14 +711,6 @@ redef class APropdef
 		# The propdef has no body (abstract)
 		if not is_generated then return
 
-		if mpropdef.name == "foo" then
-			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
-			debug.dump(basic_block.as(not null))
-
-			for v in variables do
-				print "variable {v} with deps {v.dep_exprs}"
-			end
-		end
 		# Once basic blocks were generated, compute SSA algorithm
 		compute_environment(ssa)
 
