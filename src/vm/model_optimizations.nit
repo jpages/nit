@@ -181,8 +181,8 @@ end
 
 # Pattern of method call
 class MOCallSitePattern
-	super MOExprSitePattern
 	super MOPropSitePattern
+	super MOExprSitePattern
 
 	redef type GP: MMethod
 
@@ -190,13 +190,18 @@ class MOCallSitePattern
 
 	redef type S: MOCallSite
 
-	init(rst: MType, rsc: MClass, gp: MMethod)
+	# Indicate if the corresponding property has a return,
+	# if not, then this pattern references procedure sites
+	var is_function: Bool
+
+	init(rst: MType, rsc: MClass, gp: MMethod, function: Bool)
 	do
 		super(rst, rsc, gp)
 
 		self.gp = gp
 		self.rst = rst
 		self.rsc = rsc
+		is_function = function
 
 		if rsc.abstract_loaded then
 			for subclass in rsc.loaded_subclasses do
@@ -683,11 +688,6 @@ class MOCallSite
 	# Values of each arguments
 	var given_args = new List[MOExpr]
 
-	redef fun pattern_factory(rst, gp, rsc)
-	do
-		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod))).init_abstract
-	end
-
 	redef fun pretty_print(file)
 	do
 		super
@@ -715,6 +715,31 @@ class MOCallSite
 
 		return callees
 	end
+end
+
+# A call to a method with a return
+class MOFunctionSite
+	super MOCallSite
+
+	redef fun pattern_factory(rst, gp, rsc)
+	do
+		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod), true)).init_abstract
+	end
+end
+
+# A call to a method which has no return
+class MOProcedureSite
+	super MOCallSite
+
+	redef fun pattern_factory(rst, gp, rsc)
+	do
+		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod), false)).init_abstract
+	end
+end
+
+# A call to an initializer
+class MOInitSite
+	super MOProcedureSite
 end
 
 # MO of read attribute
@@ -1125,6 +1150,10 @@ redef class ANewExpr
 
 		recvtype.as(not null).mclass.set_new_pattern(monew)
 
+		# Creation of the MOCallSite
+		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
+		var mocallsite = new MOInitSite(self, mpropdef)
+
 		var cs = callsite.as(not null)
 
 		# Creation of the MOCallSite
@@ -1222,7 +1251,15 @@ redef class ASendExpr
 	do
 		var cs = callsite.as(not null)
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOCallSite(mpropdef, self)
+
+		var mocallsite: MOCallSite
+		if cs.mpropdef.msignature.as(not null).return_mtype != null then
+			# The mproperty is a function
+			mocallsite = new MOFunctionSite(self, mpropdef)
+		else
+			# The mproperty is a procedure
+			mocallsite = new MOProcedureSite(self, mpropdef)
+		end
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
