@@ -482,6 +482,7 @@ class MOStats
 		pstats.matrix[45][0] = sys.vm.mo_supers.length
 		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
 
+		print "all_moexprs {sys.vm.all_moexprs.length}"
 		pstats.matrix[48][0] = nb_procedure
 		pstats.matrix[49][0] = nb_method_return
 		pstats.matrix[50][0] = nb_method_return_pre
