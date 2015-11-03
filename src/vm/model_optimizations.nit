@@ -67,11 +67,20 @@ class PICPattern
 	# The class of the receiver static type
 	var recv_class: MClass
 
+	# The class of the property introduction class (the class of the global property)
+	var pic_class: MClass
+
 	# The virtual type of the stored patterns
 	type PATTERN: MOPattern
 
 	# The collections of patterns
-	var patterns: List[PATTERN]
+	var patterns: List[PATTERN] is noinit
+
+	# Add a MOPattern to `pattens`
+	fun add_pattern(pattern: PATTERN)
+	do
+		patterns.add(pattern)
+	end
 end
 
 # A PICPattern for an access inside a method table (a method call or a subtyping test)
@@ -96,6 +105,7 @@ end
 
 # Superclass of all patterns
 class MOPattern
+
 end
 
 # Pattern of instantiation sites
@@ -134,9 +144,13 @@ abstract class MOSitePattern
 	# True if at least one site of this pattern was executed
 	var is_executed: Bool = false
 
+	# The associated PICPattern
+	var pic_pattern: PICPattern is noinit
+
 	fun init_abstract: SELF
 	do
 		sys.vm.all_patterns.add(self)
+
 		return self
 	end
 
@@ -180,6 +194,44 @@ abstract class MOPropSitePattern
 	do
 		super
 		gp.patterns.add(self)
+	end
+
+	redef fun init_abstract
+	do
+		var res = super
+
+		# Create the associated PICPattern if not already created
+		set_pic_pattern
+
+		return res
+	end
+
+	fun set_pic_pattern
+	do
+		print "set_pic_pattern {rsc}#{gp}"
+
+		# The PIC is the class which introduced the property of the current pattern
+		var pic = gp.intro_mclassdef.mclass
+
+		# See if the corresponding PICPattern already exists
+		var found_pic_pattern: nullable PICPattern = null
+
+		for p in pic.pic_patterns do
+			if p.recv_class == rsc and p.pic_class == pic then
+				found_pic_pattern = p
+				break
+			end
+		end
+
+		if not found_pic_pattern == null then
+			# Create an appropriate PICPattern
+			found_pic_pattern = new PICPattern(rsc, pic)
+		end
+
+		# Just make the association
+		#TODO: initialize pic_patterns collection
+		found_pic_pattern.add_pattern(self)
+		pic_pattern = found_pic_pattern.as(not null)
 	end
 
 	fun compatible_site(site: MOPropSite): Bool is abstract
@@ -833,6 +885,11 @@ redef class MClass
 	# Contrary relation of concretes_receivers
 	var concrete_caller_sites: nullable List[MOSite]
 
+	# The list of PICPatterns of this class,
+	# this class is considered the Property Introduction Class
+	# and stores alls the PICPatterns for a property which is introduced in self
+	var pic_patterns = new List[PICPattern]
+
 	# `self` is an instance of object
 	fun is_instance_of_object(vm:VirtualMachine): Bool
 	do
@@ -932,9 +989,13 @@ redef class VirtualMachine
 	# All patterns of the program
 	var all_patterns = new List[MOSitePattern]
 
+	# All PICPatterns of the program
+	var all_picpatterns = new List[PICPattern]
+
 	# All MONewPattern
 	var all_new_patterns = new List[MONewPattern]
 
+	# TODO: delete this if because it is already done in virtual_machine.nit
 	redef fun load_class(mclass)
 	do
 		super
