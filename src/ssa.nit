@@ -83,6 +83,28 @@ class BasicBlock
 
 		other_predecessors.remove_at(0)
 
+		# Handle the PhiFunction
+		for variable in ssa.propdef.variables do
+			if not environment.has_key(variable.original_variable) then
+				environment[variable.original_variable] = new Array[AExpr]
+			end
+
+			# Search and merge the values of the variable
+			for block in predecessors do
+				if block.versions.has_key(variable.original_variable) and not versions.has_key(variable.original_variable) then
+					versions[variable.original_variable] = block.versions[variable.original_variable]
+				end
+
+				if block.environment.has_key(variable.original_variable) then
+					for expr in block.environment[variable.original_variable] do
+						if not environment[variable.original_variable].has(expr) then
+							environment[variable.original_variable].add(expr)
+						end
+					end
+				end
+			end
+		end
+
 		for other in other_predecessors do
 			for key, value in other.environment do
 				if not environment.has_key(key) then
@@ -107,6 +129,7 @@ class BasicBlock
 							phi.declared_type = value.original_variable.declared_type
 							phi.assignment_blocks.add(self)
 							ssa.phi_functions.add(phi)
+							ssa.propdef.variables.add(phi)
 						else
 							print "We retrieve a PhiFunction for this variable"
 						end
@@ -115,33 +138,16 @@ class BasicBlock
 						phi.add_dependences(self, versions[key])
 
 						versions[value.original_variable] = phi
+
+						# environment[phi.original_variable].remove_all
+						environment[phi.original_variable].add_all(other.environment[phi.original_variable])
+						# environment[phi.original_variable].add_all(environment[phi.original_variable])
+						phi.dep_exprs = environment[phi.original_variable].clone
 					end
 				else
 					# Add this versions to the current environment if there is no version yet
 					if not versions.has_key(key) then
 						versions[key] = value
-					end
-				end
-			end
-		end
-
-		# Handle the PhiFunction
-		for variable in ssa.propdef.variables do
-			if not environment.has_key(variable.original_variable) then
-				environment[variable.original_variable] = new Array[AExpr]
-			end
-
-			# Search and merge the values of the variable
-			for block in predecessors do
-				if block.versions.has_key(variable.original_variable) and not versions.has_key(variable.original_variable) then
-					versions[variable.original_variable] = block.versions[variable.original_variable]
-				end
-
-				if block.environment.has_key(variable.original_variable) then
-					for expr in block.environment[variable.original_variable] do
-						if not environment[variable.original_variable].has(expr) then
-							environment[variable.original_variable].add(expr)
-						end
 					end
 				end
 			end
@@ -199,6 +205,7 @@ class BasicBlock
 
 				environment[instruction.variable.original_variable].remove_all
 				environment[instruction.variable.original_variable].add(instruction.n_value)
+				new_version.dep_exprs = environment[instruction.variable.original_variable].clone
 			end
 
 			if instruction isa AVardeclExpr then
@@ -688,7 +695,7 @@ redef class APropdef
 		# The propdef has no body (abstract)
 		if not is_generated then return
 
-		if mpropdef.name == "enlarge" then
+		if mpropdef.name == "foo" then
 			var debug = new BlockDebug(new FileWriter.open("basic_blocks.dot"))
 			debug.dump(basic_block.as(not null))
 
@@ -724,7 +731,7 @@ redef class APropdef
 	fun ssa_destruction(ssa: SSA)
 	do
 		for v in variables do
-			v.update_indirect_dependences
+			# v.update_indirect_dependences
 			v.indirect_dependences = v.dep_exprs
 			v.dep_exprs = v.indirect_dependences
 			for dep in v.indirect_dependences do
@@ -1217,12 +1224,12 @@ redef class ABlockExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		for expr in n_expr do
-			# old_block.instructions.add(expr)
+			old_block.instructions.add(expr)
 		end
 
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
-			old_block.instructions.add(n_expr[i])
+			# old_block.instructions.add(n_expr[i])
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
