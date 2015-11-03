@@ -739,6 +739,7 @@ redef class APropdef
 	fun ssa_destruction(ssa: SSA)
 	do
 		for v in variables do
+			# v.update_indirect_dependences
 			v.indirect_dependences = v.dep_exprs
 			v.dep_exprs = v.indirect_dependences
 			for dep in v.indirect_dependences do
@@ -1392,12 +1393,12 @@ redef class ABlockExpr
 		if old_block.instructions.has(self) then old_block.instructions.remove(self)
 
 		for expr in n_expr do
-			# old_block.instructions.add(expr)
+			old_block.instructions.add(expr)
 		end
 
 		# Recursively continue in the body of the block
 		for i in [0..self.n_expr.length[ do
-			old_block.instructions.add(n_expr[i])
+			# old_block.instructions.add(n_expr[i])
 			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
