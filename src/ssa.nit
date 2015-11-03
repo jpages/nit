@@ -357,6 +357,14 @@ class SSA
 		propdef.generate_basic_blocks(self)
 	end
 
+	# Add an AST-site to the `object_sites` collection
+	fun add_object_site(site: AExpr)
+	do
+		if not propdef.object_sites.has(site) then
+			propdef.object_sites.add(site)
+		end
+	end
+
 	# Generate a BasicBlock structure for a if instruction
 	# This method constructs several BasicBlock, one for each branch of the test and
 	# returns the successor block of the if
@@ -731,7 +739,6 @@ redef class APropdef
 	fun ssa_destruction(ssa: SSA)
 	do
 		for v in variables do
-			# v.update_indirect_dependences
 			v.indirect_dependences = v.dep_exprs
 			v.dep_exprs = v.indirect_dependences
 			for dep in v.indirect_dependences do
@@ -988,38 +995,45 @@ redef class AReturnExpr
 	end
 end
 
-# redef class AAssertExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		self.n_expr.generate_basic_blocks(ssa, old_block)
+redef class AAssertExpr
+	# redef fun generate_basic_blocks(ssa, old_block)
+	# do
+	# 	self.n_expr.generate_basic_blocks(ssa, old_block)
 
-# 		# The condition of the assert is the last expression of the previous block
-# 		old_block.last = self.n_expr
+	# 	# The condition of the assert is the last expression of the previous block
+	# 	old_block.last = self.n_expr
 
-# 		# The block if the assert fail
-# 		var block_false = new BasicBlock
+	# 	# The block if the assert fail
+	# 	var block_false = new BasicBlock
 
-# 		if self.n_else != null then
-# 			block_false.first = self.n_else.as(not null)
-# 			block_false.last = self.n_else.as(not null)
-# 			self.n_else.generate_basic_blocks(ssa, block_false)
-# 		else
-# 			block_false.first = self
-# 			block_false.last = self
-# 		end
+	# 	if self.n_else != null then
+	# 		block_false.first = self.n_else.as(not null)
+	# 		block_false.last = self.n_else.as(not null)
+	# 		self.n_else.generate_basic_blocks(ssa, block_false)
+	# 	else
+	# 		block_false.first = self
+	# 		block_false.last = self
+	# 	end
 
-# 		old_block.link(block_false)
+	# 	old_block.link(block_false)
 
-# 		# The block if the assert is true: the execution continue
-# 		var block_true = new BasicBlock
-# 		block_true.first = self
-# 		block_true.last = self
+	# 	# The block if the assert is true: the execution continue
+	# 	var block_true = new BasicBlock
+	# 	block_true.first = self
+	# 	block_true.last = self
 
-# 		old_block.link(block_true)
+	# 	old_block.link(block_true)
 
-# 		return block_true
-# 	end
-# end
+	# 	return block_true
+	# end
+
+	redef fun visit_expression(ssa, block)
+	do
+		self.n_expr.visit_expression(ssa, block)
+
+		if n_else != null then n_else.visit_expression(ssa, block)
+	end
+end
 
 redef class AOrExpr
 	redef fun visit_expression(ssa, block)
@@ -1097,7 +1111,7 @@ end
 redef class AIsaExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		self.n_expr.visit_expression(ssa, block)
 	end
@@ -1106,7 +1120,7 @@ end
 redef class AAsCastExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		self.n_expr.visit_expression(ssa, block)
 	end
@@ -1115,7 +1129,7 @@ end
 redef class AAsNotnullExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		self.n_expr.visit_expression(ssa, block)
 	end
@@ -1138,7 +1152,7 @@ end
 redef class ASendExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		# Recursively goes into arguments to find variables if any
 		for e in self.raw_arguments do e.visit_expression(ssa, block)
@@ -1153,7 +1167,7 @@ redef class ASendReassignFormExpr
 	do
 		self.n_expr.generate_basic_blocks(ssa, old_block, new_block)
 
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		# Recursively goes into arguments to find variables if any
 		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block, new_block)
@@ -1168,7 +1182,7 @@ redef class ASuperExpr
 		# Recursively goes into arguments to find variables if any
 		for arg in self.n_args.n_exprs do arg.generate_basic_blocks(ssa, old_block, new_block)
 
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 	end
 end
 
@@ -1177,14 +1191,14 @@ redef class ANewExpr
 	do
 		for e in self.n_args.n_exprs do e.visit_expression(ssa, block)
 
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 	end
 end
 
 redef class AAttrExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		self.n_expr.visit_expression(ssa, block)
 	end
@@ -1193,7 +1207,7 @@ end
 redef class AAttrAssignExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 		self.n_value.visit_expression(ssa, block)
 
 		self.n_expr.visit_expression(ssa, block)
@@ -1204,7 +1218,7 @@ redef class AAttrReassignExpr
 	# TODO: separate the instructions
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 		self.n_value.visit_expression(ssa, block)
 
 		self.n_expr.visit_expression(ssa, block)
@@ -1214,7 +1228,7 @@ end
 redef class AIssetAttrExpr
 	redef fun visit_expression(ssa, block)
 	do
-		ssa.propdef.object_sites.add(self)
+		ssa.add_object_site(self)
 
 		self.n_expr.visit_expression(ssa, block)
 	end
@@ -1310,6 +1324,11 @@ redef class ADoExpr
 	do
 		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
 	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		# n_block.visit_expression(ssa, block)
+	end
 end
 
 redef class AWhileExpr
@@ -1334,12 +1353,23 @@ redef class AWhileExpr
 		# Generate a while structure
 		ssa.generate_while(old_block, n_expr, n_block, new_block)
 	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+	# 	n_expr.visit_expression(ssa, block)
+	# 	n_block.visit_expression(ssa, block)
+	end
 end
 
 redef class ALoopExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
+	end
+
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		# n_block.visit_expression(ssa, block)
 	end
 end
 
@@ -1370,4 +1400,10 @@ redef class AForExpr
 		# Generate a for structure (similar to a while loop)
 		ssa.generate_while(old_block, n_expr, n_block, new_block)
 	end
+
+	# redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	# do
+	# 	n_expr.visit_expression(ssa, block)
+	# 	n_block.visit_expression(ssa, block)
+	# end
 end
