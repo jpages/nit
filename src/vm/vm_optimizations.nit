@@ -69,6 +69,29 @@ redef class VirtualMachine
 		callsite.status = 0
 		return self.call(propdef, args)
 	end
+
+	redef fun read_variable(v: Variable): Instance
+	do
+		debug_variables(v)
+		return super
+	end
+
+	# Assign the value of the `Variable` in an environment
+	redef fun write_variable(v: Variable, value: Instance)
+	do
+		debug_variables(v)
+		super
+	end
+
+	# Verify that a Variable object has its corresponding MOVar
+	fun debug_variables(v: Variable)
+	do
+		if sys.debug_mode then
+			if v.movar == null then
+				debug_file.write("ERROR {v} with dependences {v.dep_exprs} does not have a MOVAR\n")
+			end
+		end
+	end
 end
 
 redef class AAttrFormExpr
@@ -105,12 +128,24 @@ redef class AAttrFormExpr
 			status = 2
 		end
 	end
+
+	# Debug attribute accesses
+	fun debug_attr_model
+	do
+		if sys.debug_mode then
+			if mo_entity == null then
+				debug_file.write("ERROR {self} does not have a mo_entity\n")
+			end
+		end
+	end
 end
 
 redef class AAttrExpr
 	redef fun expr(v)
 	do
 		assert v isa VirtualMachine
+
+		debug_attr_model
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
@@ -148,6 +183,8 @@ redef class AAttrAssignExpr
 	do
 		assert v isa VirtualMachine
 
+		debug_attr_model
+
 		var recv = v.expr(self.n_expr)
 		if recv == null then return
 		if recv.mtype isa MNullType then fatal(v, "Receiver is null")
@@ -167,6 +204,20 @@ redef class AAttrAssignExpr
 
 		#TODO : we need recompilations here
 		status = 0
+	end
+end
+
+
+redef class ASendExpr
+	redef fun expr(v)
+	do
+		if sys.debug_mode then
+			if mo_entity == null then
+				debug_file.write("ERROR {self} does not have a mo_entity\n")
+			end
+		end
+
+		return super
 	end
 end
 
@@ -222,6 +273,12 @@ redef class AIsaExpr
 	redef fun expr(v)
 	do
 		assert v isa VirtualMachine
+
+		if sys.debug_mode then
+			if mo_entity == null then
+				debug_file.write("ERROR {self} does not have a mo_entity\n")
+			end
+		end
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
@@ -286,6 +343,12 @@ redef class AAsCastExpr
 	redef fun expr(v)
 	do
 		assert v isa VirtualMachine
+
+		if sys.debug_mode then
+			if mo_entity == null then
+				debug_file.write("ERROR {self} does not have a mo_entity\n")
+			end
+		end
 
 		var recv = v.expr(self.n_expr)
 		if recv == null then return null
