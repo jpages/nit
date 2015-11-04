@@ -548,7 +548,6 @@ class MOStats
 			file.write("\n")
 		end
 
-
 		file.close
 	end
 

@@ -7,10 +7,14 @@ redef class ToolContext
 	# Enable traces of analysis
 	var trace_on = new OptionBool("Display the trace of model optimizing / preexistence analysis", "--mo-trace")
 
+	# If true, the execution is verified to test the model
+	var debug = new OptionBool("Launch the execution in debug mode", "--debug")
+
 	redef init
 	do
 		super
 		option_context.add_option(trace_on)
+		option_context.add_option(debug)
 	end
 end
 
@@ -20,6 +24,12 @@ redef class Sys
 
 	# Tell if trace is enabled
 	var trace_on: Bool is noinit
+
+	# The trace file for debug the model, see the option `debug`
+	var debug_file: FileWriter is noinit
+
+	# The debug mode of the virtual machine
+	var debug_mode: Bool = false
 
 	# Singleton of MONull
 	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
@@ -35,7 +45,19 @@ redef class ModelBuilder
 	redef fun run_virtual_machine(mainmodule, arguments)
 	do
 		sys.trace_on = toolcontext.trace_on.value
+		sys.debug_mode = toolcontext.debug.value
+
+		if toolcontext.debug.value then
+			# Create the output file for debug traces
+			sys.debug_file = new FileWriter.open("debug_file.txt")
+		end
+
 		super(mainmodule, arguments)
+
+		if toolcontext.debug.value then
+			# Create the output file for debug traces
+			sys.debug_file.close
+		end
 	end
 end
 

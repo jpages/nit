@@ -129,7 +129,7 @@ class BasicBlock
 							phi.declared_type = value.original_variable.declared_type
 							phi.assignment_blocks.add(self)
 							ssa.phi_functions.add(phi)
-							ssa.propdef.variables.add(phi)
+							# ssa.propdef.variables.add(phi)
 						else
 							print "We retrieve a PhiFunction for this variable"
 						end
@@ -888,7 +888,7 @@ redef class AExpr
 	# *`block` The block in which self is included
 	fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-		# print "NYI {self}"
+		print "NYI {self}"
 	end
 end
 
@@ -1237,6 +1237,8 @@ end
 redef class ABlockExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
+		if old_block.instructions.has(self) then old_block.instructions.remove(self)
+
 		for expr in n_expr do
 			old_block.instructions.add(expr)
 		end
@@ -1324,11 +1326,6 @@ redef class ADoExpr
 	do
 		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
 	end
-
-	redef fun visit_expression(ssa: SSA, block: BasicBlock)
-	do
-		# n_block.visit_expression(ssa, block)
-	end
 end
 
 redef class AWhileExpr
@@ -1356,8 +1353,8 @@ redef class AWhileExpr
 
 	redef fun visit_expression(ssa: SSA, block: BasicBlock)
 	do
-	# 	n_expr.visit_expression(ssa, block)
-	# 	n_block.visit_expression(ssa, block)
+		# n_expr.visit_expression(ssa, block)
+		# n_block.visit_expression(ssa, block)
 	end
 end
 
@@ -1401,9 +1398,9 @@ redef class AForExpr
 		ssa.generate_while(old_block, n_expr, n_block, new_block)
 	end
 
-	# redef fun visit_expression(ssa: SSA, block: BasicBlock)
-	# do
-	# 	n_expr.visit_expression(ssa, block)
-	# 	n_block.visit_expression(ssa, block)
-	# end
+	redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		# n_expr.visit_expression(ssa, block)
+		# n_block.visit_expression(ssa, block)
+	end
 end
