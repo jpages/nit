@@ -35,6 +35,12 @@ redef class Sys
 
 	# Used to put location of preexist sites
 	var dump_location: nullable FileWriter = null
+
+	var dump_ast: FileWriter is noinit
+
+	var dump_object_sites: FileWriter is noinit
+
+	var all_ast_sites = new HashSet[AExpr]
 end
 
 redef class ModelBuilder
@@ -197,6 +203,12 @@ redef class VirtualMachine
 		for i in [0..matrix_length[ do
 			sys.pstats.matrix[i] = new Array[Int].filled_with(0, 6)
 		end
+
+		if sys.debug_mode then
+			# Create the files for dumping ast_sites and model_sites
+			sys.dump_ast = new FileWriter.open("dump_ast_sites.txt")
+			sys.dump_object_sites = new FileWriter.open("dump_object_sites.txt")
+		end
 	end
 end
 
@@ -205,6 +217,10 @@ redef class APropdef
 	do
 		super
 		sys.pstats.nb_ast_sites += object_sites.length
+
+		if sys.debug_mode then
+			sys.all_ast_sites.add_all(object_sites)
+		end
 	end
 end
 
@@ -354,6 +370,7 @@ class MOStats
 	do
 		var file = new FileWriter.open("trace_sites.txt")
 
+		print "sys.vm.all_moentities {sys.vm.all_moentities.length}"
 		for mosite in sys.vm.all_moentities do
 			if mosite isa MOSite then
 				# Do not print the primitive sites
@@ -363,10 +380,26 @@ class MOStats
 			end
 
 			if sys.debug_mode then
-				if mosite.ast == null then
+				if mosite.ast != null then
+					sys.dump_object_sites.write("{mosite} {mosite.ast.as(not null)}\n")
+				else
 					sys.debug_file.write("ERROR {mosite} without ast\n")
+					sys.dump_object_sites.write("{mosite} null\n")
 				end
 			end
+		end
+
+		if sys.debug_mode then
+			for ast_site in sys.all_ast_sites do
+				if ast_site.mo_entity != null then
+					sys.dump_ast.write("{ast_site.mo_entity.as(not null)} {ast_site}\n")
+				else
+					sys.dump_ast.write("{ast_site} null\n")
+				end
+			end
+
+			sys.dump_object_sites.close
+			sys.dump_ast.close
 		end
 
 		file.close

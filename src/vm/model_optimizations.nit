@@ -522,8 +522,10 @@ end
 class MOSuper
 	super MOExpr
 
-	init
+	init(lp: MPropDef, node: nullable AExpr)
 	do
+		self.lp = lp
+		self.ast = node.as(not null)
 		sys.vm.all_moentities.add(self)
 		sys.vm.mo_supers.add(self)
 	end
@@ -855,7 +857,7 @@ redef class VirtualMachine
 	var all_moexprs = new List[MOExpr]
 
 	# The list of all object entities
-	var all_moentities = new List[MOEntity]
+	var all_moentities = new HashSet[MOEntity]
 
 	# The list of all MOSuper
 	var mo_supers = new List[MOSuper]
@@ -1306,7 +1308,7 @@ redef class ASuperExpr
 	do
 		if mo_entity != null then return mo_entity.as(not null)
 
-		var mosuper = new MOSuper(mpropdef)
+		var mosuper = new MOSuper(mpropdef, self)
 
 		mo_entity = mosuper
 		return mosuper
