@@ -134,6 +134,10 @@ redef class AAttrFormExpr
 	do
 		if sys.debug_mode then
 			if mo_entity == null then
+				dump_tree
+
+				print "\n\n"
+				parent.dump_tree
 				debug_file.write("ERROR {self} does not have a mo_entity\n")
 			end
 		end
@@ -213,6 +217,9 @@ redef class ASendExpr
 	do
 		if sys.debug_mode then
 			if mo_entity == null then
+				dump_tree
+				print "\n\n"
+				parent.dump_tree
 				debug_file.write("ERROR {self} does not have a mo_entity\n")
 			end
 		end
@@ -780,7 +787,7 @@ redef class MOCallSite
 	# Clone a MOSite
 	redef fun clone: MOSite
 	do
-		var copy = new MOCallSite(ast, lp)
+		var copy = new MOCallSite(lp, ast.as(not null))
 		copy.pattern = pattern
 
 		if concretes_receivers != null then
@@ -808,7 +815,7 @@ redef class MOReadSite
 	# Clone a MOSite
 	redef fun clone: MOSite
 	do
-		var copy = new MOReadSite(ast, lp)
+		var copy = new MOReadSite(lp, ast.as(not null))
 		copy.pattern = pattern
 
 		if concretes_receivers != null then

@@ -369,6 +369,9 @@ abstract class MOEntity
 	# The local property containing this expression
 	var lp: MPropDef
 
+	# The corresponding ast node, if any
+	var ast: nullable AExpr
+
 	fun pretty_print(file: FileWriter)
 	do
 	end
@@ -378,9 +381,11 @@ end
 abstract class MOExpr
 	super MOEntity
 
-	init
+	init(lp: MPropDef, node: nullable AExpr)
 	do
+		super(lp, ast)
 		sys.vm.all_moexprs.add(self)
+		ast = node
 	end
 
 	fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
@@ -399,6 +404,13 @@ abstract class MOVar
 
 	# The offset of the variable in it environment, or the position of parameter
 	var offset: Int
+
+	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
+	do
+		super(lp, ast)
+		variable = v
+		offset = pos
+	end
 
 	redef fun pretty_print(file: FileWriter)
 	do
@@ -497,8 +509,9 @@ class MONew
 		return concretes
 	end
 
-	init(mpropdef: MPropDef)
+	init(mpropdef: MPropDef, ast: AExpr)
 	do
+		super(mpropdef, ast)
 		sys.vm.all_new_sites.add(self)
 		lp = mpropdef
 		lp.monews.add(self)
@@ -511,7 +524,7 @@ class MOSuper
 
 	init
 	do
-		sys.vm.all_moentitites.add(self)
+		sys.vm.all_moentities.add(self)
 		sys.vm.mo_supers.add(self)
 	end
 end
@@ -529,9 +542,6 @@ end
 # Root hierarchy of objets sites
 abstract class MOSite
 	super MOEntity
-
-	# The AST node where this site comes from
-	var ast: AExpr
 
 	# The type of the site pattern associated to this site
 	type P: MOSitePattern
@@ -578,41 +588,14 @@ abstract class MOSite
 		return concretes_receivers
 	end
 
-	init(ast: AExpr, mpropdef: MPropDef)
+	init(mpropdef: MPropDef, ast: AExpr)
 	do
-		super(mpropdef)
+		super(mpropdef, ast)
 		self.ast = ast
 		lp = mpropdef
 		lp.mosites.add(self)
 
-		sys.vm.all_moentitites.add(self)
-	end
-end
-
-# MO of a subtype test site
-abstract class MOSubtypeSite
-	super MOExprSite
-
-	redef type P: MOSubtypeSitePattern
-
-	# Static type on which the test is applied
-	var target: MType
-
-	# Static MClass of the class
-	var target_mclass: MClass
-
-	init(ast: AExpr, mpropdef: MPropDef, target: MType)
-	do
-		super
-		var mclass = target.get_mclass(sys.vm, mpropdef)
-		self.target = mclass.mclass_type
-		self.target_mclass = mclass.as(not null)
-	end
-
-	redef fun pretty_print(file)
-	do
-		super
-		file.write("target {target}")
+		sys.vm.all_moentities.add(self)
 	end
 end
 
@@ -630,6 +613,39 @@ abstract class MOExprSite
 	super MOExpr
 
 	redef type P: MOExprSitePattern
+
+	init(mpropdef: MPropDef, ast: AExpr)
+	do
+		self.lp = mpropdef
+		self.ast = ast
+	end
+end
+
+# MO of a subtype test site
+abstract class MOSubtypeSite
+	super MOExprSite
+
+	redef type P: MOSubtypeSitePattern
+
+	# Static type on which the test is applied
+	var target: MType
+
+	# Static MClass of the class
+	var target_mclass: MClass
+
+	init(mpropdef: MPropDef, ast: nullable AExpr, target: MType)
+	do
+		super(mpropdef, ast.as(not null))
+		var mclass = target.get_mclass(sys.vm, mpropdef)
+		self.target = mclass.mclass_type
+		self.target_mclass = mclass.as(not null)
+	end
+
+	redef fun pretty_print(file)
+	do
+		super
+		file.write("target {target}")
+	end
 end
 
 class MOAsNotNullSite
@@ -839,7 +855,7 @@ redef class VirtualMachine
 	var all_moexprs = new List[MOExpr]
 
 	# The list of all object entities
-	var all_moentitites = new List[MOEntity]
+	var all_moentities = new List[MOEntity]
 
 	# The list of all MOSuper
 	var mo_supers = new List[MOSuper]
@@ -957,28 +973,28 @@ end
 redef class AAttrExpr
 	redef fun copy_site(mpropdef: MPropDef): MOReadSite
 	do
-		return new MOReadSite(self, mpropdef)
+		return new MOReadSite(mpropdef, self)
 	end
 end
 
 redef class AAttrAssignExpr
 	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
 	do
-		return new MOWriteSite(self, mpropdef)
+		return new MOWriteSite(mpropdef, self)
 	end
 end
 
 redef class AAttrReassignExpr
 	redef fun copy_site(mpropdef: MPropDef): MOWriteSite
 	do
-		return new MOWriteSite(self, mpropdef)
+		return new MOWriteSite(mpropdef, self)
 	end
 end
 
 redef class AIssetAttrExpr
 	redef fun copy_site(mpropdef: MPropDef): MOReadSite
 	do
-		return new MOReadSite(self, mpropdef)
+		return new MOReadSite(mpropdef, self)
 	end
 end
 
@@ -1011,7 +1027,7 @@ redef class AIsaExpr
 
 	redef fun copy_site(mpropdef: MPropDef): MOIsaSubtypeSite
 	do
-		return new MOIsaSubtypeSite(self, mpropdef, cast_type.as(not null))
+		return new MOIsaSubtypeSite(mpropdef, self, cast_type.as(not null))
 	end
 end
 
@@ -1027,14 +1043,14 @@ end
 redef class AAsCastExpr
 	redef fun copy_site(mpropdef: MPropDef): MOAsSubtypeSite
 	do
-		return new MOAsSubtypeSite(self, mpropdef, n_type.mtype.as(not null))
+		return new MOAsSubtypeSite(mpropdef, self, n_type.mtype.as(not null))
 	end
 end
 
 redef class AAsNotnullExpr
 	redef fun copy_site(mpropdef: MPropDef): MOAsNotNullSite
 	do
-		return new MOAsNotNullSite(self, mpropdef)
+		return new MOAsNotNullSite(mpropdef, self)
 	end
 
 	redef fun ast2mo(mpropdef)
@@ -1097,32 +1113,32 @@ redef class ANewExpr
 	do
 		if mo_entity != null then return mo_entity.as(not null)
 
-		var monew = new MONew(mpropdef)
+		var monew = new MONew(mpropdef, self)
 		mpropdef.monews.add(monew)
-		recvtype.as(not null).mclass.set_new_pattern(monew)
-
-		# Create the associated callsite if there is an explicit call to a constructor
-		if callsite != null then
-			var cs = callsite.as(not null)
-
-			# Creation of the MOCallSite
-			var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-			var mocallsite = new MOCallSite(self, mpropdef)
-
-			recv_class.set_site_pattern(mocallsite, cs.mproperty)
-
-			# Association of the receiver with the new callsite
-			mocallsite.expr_recv = monew
-
-			for arg in n_args.n_exprs do
-				mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
-			end
-
-			# Associate the monew with the callsite
-			monew.callsite = mocallsite
-		end
+		monew.ast = self
 
 		mo_entity = monew
+
+		recvtype.as(not null).mclass.set_new_pattern(monew)
+
+		var cs = callsite.as(not null)
+
+		# Creation of the MOCallSite
+		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
+		var mocallsite = new MOCallSite(mpropdef, self)
+
+		recv_class.set_site_pattern(mocallsite, cs.mproperty)
+
+		# Association of the receiver with the new callsite
+		mocallsite.expr_recv = monew
+
+		for arg in n_args.n_exprs do
+			mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
+		end
+
+		# Associate the monew with the callsite
+		monew.callsite = mocallsite
+
 		return monew
 	end
 
@@ -1185,11 +1201,11 @@ redef class ASendExpr
 
 		if params_len == 0 then
 			# The node is a MOReadSite
-			moattr = new MOReadSite(self, mpropdef)
+			moattr = new MOReadSite(mpropdef, self)
 		else
 			# The node is a MOWriteSite
 			assert params_len == 1
-			moattr = new MOWriteSite(self, mpropdef)
+			moattr = new MOWriteSite(mpropdef, self)
 		end
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
@@ -1202,7 +1218,7 @@ redef class ASendExpr
 	do
 		var cs = callsite.as(not null)
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOCallSite(self, mpropdef)
+		var mocallsite = new MOCallSite(mpropdef, self)
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
