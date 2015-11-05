@@ -354,11 +354,17 @@ class MOStats
 	do
 		var file = new FileWriter.open("trace_sites.txt")
 
-		for mosite in sys.vm.all_moentitites do
+		for mosite in sys.vm.all_moentities do
 			if mosite isa MOSite then
 				# Do not print the primitive sites
 				if mosite.expr_recv.preexistence_origin.bin_and(16) != 16 then
 					file.write("{mosite.trace} {mosite}\n")
+				end
+			end
+
+			if sys.debug_mode then
+				if mosite.ast == null then
+					sys.debug_file.write("ERROR {mosite} without ast\n")
 				end
 			end
 		end
@@ -478,7 +484,7 @@ class MOStats
 
 		pstats.matrix[42][0] = sys.pstats.nb_ast_sites
 		pstats.matrix[43][0] = sys.vm.all_new_sites.length
-		pstats.matrix[44][0] = sys.vm.all_moentitites.length
+		pstats.matrix[44][0] = sys.vm.all_moentities.length
 		pstats.matrix[45][0] = sys.vm.mo_supers.length
 		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
 
@@ -629,7 +635,7 @@ class MOStats
 		nb_ast_sites = counters.nb_ast_sites
 
 		new_sites = sys.vm.all_new_sites.length
-		object_sites = sys.vm.all_moentitites.length
+		object_sites = sys.vm.all_moentities.length
 
 		matrix = new Array[Array[Int]].with_capacity(counters.matrix.length)
 		for i in [0..counters.matrix.length[ do
