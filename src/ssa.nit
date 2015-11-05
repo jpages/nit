@@ -1047,6 +1047,26 @@ redef class AAssertExpr
 	end
 end
 
+redef class ABinopExpr
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		add_instruction(old_block)
+
+		n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		n_expr2.generate_basic_blocks(ssa, old_block, new_block)
+	end
+
+	redef fun visit_expression(ssa, block)
+	do
+		ssa.add_object_site(self)
+
+		self.n_expr.visit_expression(ssa, block)
+		self.n_expr2.visit_expression(ssa, block)
+
+		for e in self.raw_arguments do e.visit_expression(ssa, block)
+	end
+end
+
 redef class AOrExpr
 	redef fun visit_expression(ssa, block)
 	do
@@ -1217,6 +1237,8 @@ redef class ASendExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		add_instruction(old_block)
+
+		for e in self.raw_arguments do e.generate_basic_blocks(ssa, old_block, new_block)
 
 		n_expr.generate_basic_blocks(ssa, old_block, new_block)
 	end
@@ -1494,4 +1516,13 @@ redef class AForExpr
 		# Generate a for structure (similar to a while loop)
 		ssa.generate_while(old_block, n_expr, n_block, new_block)
 	end
+
+	#TODO: debug
+	# redef fun visit_expression(ssa, block)
+	# do
+	# 	dump_tree
+	# 	print "\n\n"
+	# 	parent.dump_tree
+	# 	abort
+	# end
 end
