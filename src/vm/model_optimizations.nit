@@ -959,14 +959,14 @@ redef class AAttrFormExpr
 
 		var attr_site = copy_site(mpropdef).as(MOAttrSite)
 
+		# Associate the MOEntity with the AST node
+		mo_entity = attr_site
+
 		var recv = get_receiver
 		attr_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_site_pattern(attr_site, mproperty.as(not null))
-
-		# Associate the MOEntity with the AST node
-		mo_entity = attr_site
 
 		return attr_site
 	end
@@ -1009,12 +1009,13 @@ class ASubtypeExpr
 
 		var recv = get_receiver
 		var cast_site = copy_site(mpropdef).as(MOSubtypeSite)
+		mo_entity = cast_site
+
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_subtype_pattern(cast_site, mpropdef)
 
-		mo_entity = cast_site
 		return cast_site
 	end
 end
@@ -1060,12 +1061,13 @@ redef class AAsNotnullExpr
 		if mo_entity != null then return mo_entity.as(not null)
 
 		var moexpr = copy_site(mpropdef)
+		mo_entity = moexpr
+
 		moexpr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_asnotnull_pattern(moexpr, mpropdef)
 
-		mo_entity = moexpr
 		return moexpr
 	end
 end
@@ -1239,11 +1241,11 @@ redef class ASendExpr
 
 		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
 			var mo = ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
-			mo_entity = mo
+
 			return mo
 		else
 			var mo = ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
-			mo_entity = mo
+
 			return mo
 		end
 	end
@@ -1252,6 +1254,7 @@ redef class ASendExpr
 	fun ast2mo_accessor(mpropdef: MPropDef, called_node_ast: AAttrPropdef): MOEntity
 	do
 		var moattr = copy_site_accessor(mpropdef, called_node_ast)
+		mo_entity = moattr
 
 		moattr.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
@@ -1263,6 +1266,7 @@ redef class ASendExpr
 	fun ast2mo_method(mpropdef: MPropDef, called_node_ast: ANode, is_attribute: Bool): MOEntity
 	do
 		var mocallsite = copy_site_method(mpropdef)
+		mo_entity = mocallsite
 
 		mocallsite.expr_recv = n_expr.ast2mo(mpropdef).as(MOExpr)
 
