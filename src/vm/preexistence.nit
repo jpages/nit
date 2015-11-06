@@ -315,7 +315,7 @@ redef class MOPhiVar
 	redef fun compute_preexist
 	do
 		count += 1
-		if count == 15 then return 0
+		if count == 30 then return 0
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then
@@ -350,15 +350,18 @@ redef class MOCallSite
 	redef fun compute_preexist
 	do
 		# If the preexistence extension is deactivated, the callsite is not preexistant
-		if disable_preexistence_extensions or disable_method_return or counter == 20 then
+		if disable_preexistence_extensions or disable_method_return then
 			return 8
+		end
+
+		if counter == 30 then
+			return 3
 		end
 
 		counter += 1
 
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
-		var preval = 0
 
 		if concretes_receivers != null then
 			callees = concretes_callees
@@ -372,6 +375,11 @@ redef class MOCallSite
 			if callees.length == 0 then return 1
 		end
 
+		# If the receiver is not preexisting, do not continue the analysis in chained called
+		if not expr_recv.is_pre then return expr_recv.expr_preexist
+
+		var preval = expr_recv.expr_preexist
+
 		nb_callees = callees.length
 		for lp in callees do
 			var prelp: Int
@@ -382,11 +390,7 @@ redef class MOCallSite
 				prelp = lp.return_expr.return_preexist
 			end
 
-			if preval == 0 then
-				preval = prelp
-			else
-				preval = preval.merge(prelp)
-			end
+			preval = preval.merge(prelp)
 		end
 
 		if preval.bit_npre then return preval

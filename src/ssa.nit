@@ -1067,27 +1067,19 @@ redef class ABinopExpr
 	end
 end
 
-redef class AOrExpr
+redef class ABinBoolExpr
 	redef fun visit_expression(ssa, block)
 	do
 		self.n_expr.visit_expression(ssa, block)
 		self.n_expr2.visit_expression(ssa, block)
 	end
-end
 
-redef class AImpliesExpr
-	redef fun visit_expression(ssa, block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		self.n_expr.visit_expression(ssa, block)
-		self.n_expr2.visit_expression(ssa, block)
-	end
-end
+		add_instruction(old_block)
 
-redef class AAndExpr
-	redef fun visit_expression(ssa, block)
-	do
-		self.n_expr.visit_expression(ssa, block)
-		self.n_expr2.visit_expression(ssa, block)
+		n_expr.generate_basic_blocks(ssa, old_block, new_block)
+		n_expr2.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
@@ -1095,14 +1087,6 @@ redef class ANotExpr
 	redef fun visit_expression(ssa, block)
 	do
 		self.n_expr.visit_expression(ssa, block)
-	end
-end
-
-redef class AOrElseExpr
-	redef fun visit_expression(ssa, block)
-	do
-		self.n_expr.visit_expression(ssa, block)
-		self.n_expr2.visit_expression(ssa, block)
 	end
 end
 
@@ -1129,6 +1113,15 @@ redef class ASuperstringExpr
 	do
 		for nexpr in self.n_exprs do
 			nexpr.visit_expression(ssa, block)
+		end
+	end
+
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
+	do
+		add_instruction(old_block)
+
+		for nexpr in self.n_exprs do
+			nexpr.generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
 end
@@ -1206,6 +1199,22 @@ redef class AParExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		n_expr.generate_basic_blocks(ssa, old_block, new_block)
+	end
+end
+
+redef class AExprs
+	fun visit_expression(ssa: SSA, block: BasicBlock)
+	do
+		for nexpr in n_exprs do
+			nexpr.visit_expression(ssa, block)
+		end
+	end
+
+	fun generate_basic_blocks(ssa: SSA, old_block: BasicBlock, new_block: BasicBlock)
+	do
+		for nexpr in n_exprs do
+			nexpr.generate_basic_blocks(ssa, old_block, new_block)
+		end
 	end
 end
 
