@@ -243,7 +243,7 @@ class MOStats
 	# The number of new sites in AST
 	var new_sites: Int = 0
 
-	# TODO: comment
+	# Number of mo_entities
 	var object_sites: Int = 0
 
 	# Label to display on dump
@@ -471,14 +471,14 @@ class MOStats
 			end
 
 			# Debug the two model
-			debug_model(propdef, trace_file, trace_model)
+			# debug_model(propdef, trace_file, trace_model)
 			if propdef.msignature.return_mtype != null and propdef.return_expr != null then
 				nb_method_return += 1
 
 				var primitive_return = false
 				if propdef.msignature.return_mtype.is_primitive_type then primitive_return = true
 
-				# If the propdef has a preexisting returns
+				# If the propdef has a preexisting return
 				if propdef.return_expr.is_pre and not primitive_return then
 					nb_method_return_pre += 1
 					# Trace the origin of preexistence
@@ -521,7 +521,6 @@ class MOStats
 		pstats.matrix[45][0] = sys.vm.mo_supers.length
 		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
 
-		print "all_moexprs {sys.vm.all_moexprs.length}"
 		pstats.matrix[48][0] = nb_procedure
 		pstats.matrix[49][0] = nb_method_return
 		pstats.matrix[50][0] = nb_method_return_pre
@@ -604,14 +603,6 @@ class MOStats
 		if node isa APropdef then
 			trace_file.write("Return dependences {node.returnvar.dep_exprs}\n")
 
-			for v in node.variables do
-				trace_file.write("\t")
-
-				# v.pretty_print(trace_file)
-				trace_file.write("\n")
-			end
-			trace_file.write("\n")
-
 			# trace of MO model
 			trace_model.write("full_name {propdef.full_name} location {propdef.location} ")
 
@@ -623,8 +614,6 @@ class MOStats
 
 			for site in propdef.mosites do
 				trace_model.write("\t")
-
-				# site.pretty_print(trace_model)
 
 				if site isa MOCallSite then
 					if site.trace_origin == 32 and site.expr_recv.preexistence_origin == 3 then
@@ -638,21 +627,20 @@ class MOStats
 
 			# Verify that the variables of the two models are equal
 			var i = 0
-			# if propdef.variables.length != node.variables.length then
-			# 	print "Problem in {propdef} {node.location}"
-			# 	print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
-			# else
-			for variable in node.variables do
-				trace_model.write("{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
-				# propdef.variables[i].pretty_print_expr(trace_model)
-				trace_model.write("\n")
+			if propdef.variables.length != node.variables.length then
+				print "Problem in {propdef} {node.location}"
+				print "MOVAR.Length = {propdef.variables.length} VARIABLE.length {node.variables.length.to_s}"
+			else
+				for variable in node.variables do
+					trace_model.write("{variable.name} dep_exprs.length {variable.dep_exprs.length}" + "\n\t")
+					trace_model.write("\n")
 
-				# trace_model.write("Variable"+i.to_s+"\n\t")
-				variable.pretty_print(trace_model)
-				# trace_model.write("\n")
-				i += 1
+					trace_model.write("Variable"+i.to_s+"\n\t")
+					variable.pretty_print(trace_model)
+					trace_model.write("\n")
+					i += 1
+				end
 			end
-			# end
 		end
 	end
 
