@@ -311,19 +311,25 @@ redef class MOSSAVar
 end
 
 redef class MOPhiVar
-	var count = 0
+	var counter = 0
 	redef fun compute_preexist
 	do
-		count += 1
-		if count == 30 then return 0
+		counter += 1
+
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then
+
+				if counter == 30 then
+					counter = 0
+					return preval
+				end
 				preval = dep.expr_preexist
 			else
 				preval = preval.merge(dep.expr_preexist)
 			end
 		end
+
 		return preval
 	end
 
@@ -355,7 +361,8 @@ redef class MOCallSite
 		end
 
 		if counter == 30 then
-			return 3
+			print "Counter = 30 {self}"
+			return 8
 		end
 
 		counter += 1

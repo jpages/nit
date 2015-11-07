@@ -286,7 +286,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(70)
+		var res = new Array[String].with_capacity(75)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -352,6 +352,12 @@ class MOStats
 		res.add("sites with non-preexisting return,")
 		res.add("no return sites,")
 		res.add("not executed sites,")
+		res.add("\n")
+		res.add("total self,")
+		res.add("static self,")
+		res.add("sst self,")
+		res.add("ph self,")
+		res.add("null self,")
 		return res
 	end
 
@@ -901,6 +907,28 @@ redef class MOSite
 		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
 			pstats.matrix[0][index_x] += 1
 			pstats.matrix[0][5] += 1
+		end
+
+		# Recopy the total of self sites
+		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
+			pstats.matrix[65][index_x] += 1
+			pstats.matrix[65][5] += 1
+
+			# Increment for each implementation with self as a receiver
+			var impl = get_impl(sys.vm)
+			if impl isa StaticImpl then
+				pstats.matrix[66][index_x] += 1
+				pstats.matrix[66][5] += 1
+			else if impl isa SSTImpl then
+				pstats.matrix[67][index_x] += 1
+				pstats.matrix[67][5] += 1
+			else if impl isa PHImpl then
+				pstats.matrix[68][index_x] += 1
+				pstats.matrix[68][5] += 1
+			else if impl isa NullImpl then
+				pstats.matrix[69][index_x] += 1
+				pstats.matrix[69][5] += 1
+			end
 		end
 	end
 
