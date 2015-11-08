@@ -126,27 +126,44 @@ redef class MOStats
 	end
 
 	# Generate a third table in latex format
+	# Presents the percentage of improved site with new rules (call, read and new)
 	# `file` An already opened output file
 	private fun table3(file: FileWriter)
 	do
 		file.write("%Table 3\n")
 
-		var total_other = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
-		var total_callsites = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
-		var total_table3 = total_other + total_callsites
+		var total_callsites_improved = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
+		var total_callsites_improvable = pstats.matrix[26][0] + pstats.matrix[26][1] + pstats.matrix[26][2]
 
-		# Get improvable_methods from table2-original
-		var reader = new FileReader.open("output_latex/table2-last-original.tex")
-		var lines = reader.read_lines
-		var improvables = lines[6].split('&')
-		reader.close
+		var total_readsite_improved = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
+		var total_readsite_improvable = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
 
-		var table3 = "CallSite & {pstats.matrix[27][0]} & {pstats.matrix[27][1]} & {pstats.matrix[27][2]} & {total_callsites} & {total_callsites*100/improvables[4].to_i}\\\\\n"
-		table3 += "other & {pstats.matrix[29][0]} & {pstats.matrix[29][1]} & {pstats.matrix[29][2]} & {total_other} & {total_other*100/improvables[4].to_i}\\\\\n"
+		var total_new_improved = pstats.matrix[24][0] + pstats.matrix[24][1] + pstats.matrix[24][2]
+		var total_new_improvable = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
+
+		var total_other_improved = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
+		var total_other_improvable = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2] + pstats.matrix[30][0] + pstats.matrix[30][1] + pstats.matrix[30][2]
+
+		var table3 = "CallSite & {if pstats.matrix[26][0] != 0 then pstats.matrix[27][0]*100/pstats.matrix[26][0] else 0} & {if pstats.matrix[26][1] != 0 then pstats.matrix[27][1]*100/pstats.matrix[26][1] else 0} & {if pstats.matrix[26][2] != 0 then pstats.matrix[27][2]*100/pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
+		table3 += "ReadSite & {if pstats.matrix[31][0] != 0 then pstats.matrix[31][0]*100/pstats.matrix[31][0] else 0} & {if pstats.matrix[31][1] != 0 then pstats.matrix[31][1]*100/pstats.matrix[31][1] else 0} & {if pstats.matrix[31][2] != 0 then pstats.matrix[31][2]*100/pstats.matrix[31][2] else 0}  & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
+		table3 += "NewSite & {if pstats.matrix[23][0] != 0 then pstats.matrix[24][0]*100/pstats.matrix[23][0] else 0} & {if pstats.matrix[23][1] != 0 then pstats.matrix[24][1]*100/pstats.matrix[23][1] else 0} & {if pstats.matrix[23][2] != 0 then pstats.matrix[24][2]*100/pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
+		table3 += "other & {if pstats.matrix[29][0] != 0 then pstats.matrix[29][0]*100/(pstats.matrix[29][0] + pstats.matrix[30][0]) else 0} & {if pstats.matrix[29][1] != 0 then pstats.matrix[29][1]*100/(pstats.matrix[29][1] + pstats.matrix[30][1]) else 0} & {if pstats.matrix[29][2] != 0 then pstats.matrix[29][2]*100/(pstats.matrix[29][2] + pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
 
 		table3 += "\\hline\n"
-		table3 += "total improved & {pstats.matrix[29][0] + pstats.matrix[27][0]} & {pstats.matrix[29][1] + pstats.matrix[27][1]} & {pstats.matrix[29][2] + pstats.matrix[27][2]} & {total_table3} & {total_table3*100/improvables[4].to_i}\\\\\n"
-		table3 += "improvable total & {improvables[1]} & {improvables[2]} & {improvables[3]} & {improvables[4]} & 100\\\\\n"
+
+		var total_improved_method = pstats.matrix[27][0] + pstats.matrix[31][0] + pstats.matrix[24][0] + pstats.matrix[29][0]
+		var total_improvable_method = pstats.matrix[26][0] + pstats.matrix[31][0] + pstats.matrix[23][0] + pstats.matrix[29][0] + pstats.matrix[30][0]
+
+		var total_improved_attribute = pstats.matrix[27][1] + pstats.matrix[31][1] + pstats.matrix[24][1] + pstats.matrix[29][1]
+		var total_improvable_attribute = pstats.matrix[26][1] + pstats.matrix[31][1] + pstats.matrix[23][1] + pstats.matrix[29][1] + pstats.matrix[30][1]
+		if total_improvable_attribute == 0 then total_improvable_attribute = 1
+
+		var total_improved_cast = pstats.matrix[27][2] + pstats.matrix[31][2] + pstats.matrix[24][2] + pstats.matrix[29][2]
+		var total_improvable_cast = pstats.matrix[26][2] + pstats.matrix[31][2] + pstats.matrix[23][2] + pstats.matrix[29][2] + pstats.matrix[30][2]
+		if total_improvable_cast == 0 then total_improvable_cast = 1
+
+		var total_table3 = (total_improved_method + total_improved_attribute + total_improved_cast)*100/(total_improvable_method + total_improvable_attribute + total_improvable_cast)
+		table3 += "total improved & {if total_improvable_method != 0 then total_improved_method*100/total_improvable_method else 0} & {if total_improvable_attribute != 0 then total_improved_attribute*100/total_improvable_attribute else 0} & { if total_improvable_cast != 0 then total_improved_cast*100/total_improvable_cast else 0} & {total_table3}\\\\\n"
 
 		file.write(table3)
 		file.write("\n\n")
