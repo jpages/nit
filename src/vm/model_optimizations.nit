@@ -74,7 +74,7 @@ class PICPattern
 	type PATTERN: MOPattern
 
 	# The collections of patterns
-	var patterns: List[PATTERN] is noinit
+	var patterns = new List[PATTERN]
 
 	# Add a MOPattern to `pattens`
 	fun add_pattern(pattern: PATTERN)
@@ -223,13 +223,12 @@ abstract class MOPropSitePattern
 			end
 		end
 
-		if not found_pic_pattern == null then
+		if found_pic_pattern == null then
 			# Create an appropriate PICPattern
 			found_pic_pattern = new PICPattern(rsc, pic)
 		end
 
 		# Just make the association
-		#TODO: initialize pic_patterns collection
 		found_pic_pattern.add_pattern(self)
 		pic_pattern = found_pic_pattern.as(not null)
 	end
@@ -1254,14 +1253,9 @@ redef class ANewExpr
 		recvtype.as(not null).mclass.set_new_pattern(monew)
 
 		# Creation of the MOCallSite
-		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOInitSite(self, mpropdef)
-
 		var cs = callsite.as(not null)
-
-		# Creation of the MOCallSite
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOCallSite(mpropdef, self)
+		var mocallsite = new MOInitSite(mpropdef, self)
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
@@ -1358,10 +1352,10 @@ redef class ASendExpr
 		var mocallsite: MOCallSite
 		if cs.mpropdef.msignature.as(not null).return_mtype != null then
 			# The mproperty is a function
-			mocallsite = new MOFunctionSite(self, mpropdef)
+			mocallsite = new MOFunctionSite(mpropdef, self)
 		else
 			# The mproperty is a procedure
-			mocallsite = new MOProcedureSite(self, mpropdef)
+			mocallsite = new MOProcedureSite(mpropdef, self)
 		end
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
