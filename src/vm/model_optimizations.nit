@@ -214,7 +214,7 @@ abstract class MOPropSitePattern
 		var pic = gp.intro_mclassdef.mclass
 
 		# See if the corresponding PICPattern already exists
-		var found_pic_pattern: nullable PICPattern = null
+		var found_pic_pattern = null
 
 		for p in pic.pic_patterns do
 			if p.recv_class == rsc and p.pic_class == pic then
@@ -230,7 +230,7 @@ abstract class MOPropSitePattern
 
 		# Just make the association
 		found_pic_pattern.add_pattern(self)
-		pic_pattern = found_pic_pattern.as(not null)
+		pic_pattern = found_pic_pattern
 	end
 
 	fun compatible_site(site: MOPropSite): Bool is abstract

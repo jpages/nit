@@ -420,8 +420,98 @@ redef class MPropDef
 	end
 end
 
+redef class PICPattern
+	# Implementation of the PICPattern
+	var impl: nullable Implementation = null
+
+	# Compute an appropriate Implementation based on the positions of recv_class and pic_class
+	fun get_impl: Implementation
+	do
+		if impl == null then compute_impl
+		return impl.as(not null)
+	end
+
+	# Compute an Implementation for self and set attribute `impl`
+	private fun compute_impl
+	do
+		# If the recv_class, is loaded we can compute an implementation
+		if recv_class.loaded then
+			# If the PIC is always at the same position in all loaded subclasses of pic
+			if pic_pos_unique then
+				# We can use an single subtyping mutable implementation
+				set_sst_impl(true)
+			else if get_block_position > 0 then
+				# In all loaded subclasses of recv_class, the pic block is at the same position,
+				# use sst mutable implementation
+				set_sst_impl(true)
+			else
+				# The pic has several position in subclasses of recv_class,
+				# we must use a perfect hashing non-mutable implementation
+				set_ph_impl(false, pic_class.vtable.id)
+			end
+		else
+			# The receiver class is not loaded, use a ph implementation by default
+			set_ph_impl(true, pic_class.vtable.id)
+		end
+	end
+
+	# Set a single-subtyping implementation
+	# *`mutable` Indicate if the implementation can change in the future
+	fun set_sst_impl(mutable: Bool)
+	do
+		var pos_cls = get_block_position
+
+		impl = new SSTImpl(mutable, pos_cls)
+	end
+
+	# Set a perfect hashing implementation
+	# *`mutable` Indicate if the implementation can change in the future
+	# *`id` The target identifier
+	fun set_ph_impl(mutable: Bool, id: Int)
+	do
+		impl = new PHImpl(mutable, get_block_position, id)
+	end
+
+	# Tell if the pic is at unique position on whole class hierarchy
+	fun pic_pos_unique: Bool
+	do
+		return get_pic_position > 0
+	end
+
+	# Return the position of the PIC block in recv class
+	fun get_block_position: Int is abstract
+
+	# Return the position of the pic (neg. value if pic is at multiple positions)
+	fun get_pic_position: Int is abstract
+end
+
+redef class MethodPICPattern
+
+	redef fun get_block_position: Int
+	do
+		return recv_class.get_position_methods(pic_class)
+	end
+
+	redef fun get_pic_position: Int
+	do
+		return pic_class.position_methods
+	end
+end
+
+redef class AttributePICPattern
+	redef fun get_block_position: Int
+	do
+		return recv_class.get_position_attributes(pic_class)
+	end
+
+	redef fun get_pic_position: Int
+	do
+		return pic_class.position_attributes
+	end
+end
+
 redef abstract class MOSitePattern
-	# Implementation of the pattern (used if site as not concrete receivers list)
+	# Implementation of the pattern (used if site has not concrete receivers list)
 	var impl: nullable Implementation is noinit
 
 	# Get implementation, compute it if not exists
