@@ -3,9 +3,10 @@
 module stats
 
 import vm_optimizations
+import date
 
 redef class ToolContext
-	# Enable print stats
+	# Enable statistics on the model
 	var stats_on = new OptionBool("Display statistics of model optimizing / preexistence after execution", "--mo-stats")
 
 	# Enable print site state
@@ -187,8 +188,8 @@ redef class VirtualMachine
 
 		if sys.debug_mode then
 			# Create the files for dumping ast_sites and model_sites
-			sys.dump_ast = new FileWriter.open("dump_ast_sites.txt")
-			sys.dump_object_sites = new FileWriter.open("dump_object_sites.txt")
+			sys.dump_ast = new FileWriter.open("{pstats.dir}/dump_ast_sites.txt")
+			sys.dump_object_sites = new FileWriter.open("{pstats.dir}/dump_object_sites.txt")
 		end
 	end
 end
@@ -247,6 +248,22 @@ class MOStats
 
 	# The general matrix of the statistics
 	var matrix: Array[Array[Int]] = new Array[Array[Int]]
+
+	# The directory used to store current results of statistics
+	var dir: String is noinit
+
+	init(s: String)
+	do
+		# Create a directory with the current date to store the results
+		var date = new DateTime.now
+		dir = "{date.year}{date.month}{date.day}"
+
+		if not "{date.year}{date.month}{date.day}".file_exists then
+			dir.mkdir
+		end
+
+		lbl = s
+	end
 
 	# Return an array which contains all captions of the statistics for the x axis
 	fun caption_x: Array[String]
@@ -344,7 +361,7 @@ class MOStats
 
 	fun trace_patterns
 	do
-		var file = new FileWriter.open("trace_patterns.txt")
+		var file = new FileWriter.open("{dir}/trace_patterns.txt")
 
 		for pattern in sys.vm.all_patterns do
 			file.write("{pattern.trace} {pattern}\n")
@@ -355,7 +372,7 @@ class MOStats
 
 	fun trace_sites
 	do
-		var file = new FileWriter.open("trace_sites.txt")
+		var file = new FileWriter.open("{dir}/trace_sites.txt")
 
 		print "sys.vm.all_moentities {sys.vm.all_moentities.length}"
 		for mosite in sys.vm.all_moentities do
@@ -394,7 +411,7 @@ class MOStats
 
 	fun trace_local_methods
 	do
-		var file = new FileWriter.open("trace_local_methods.txt")
+		var file = new FileWriter.open("{dir}/trace_local_methods.txt")
 
 		for mpropdef in sys.vm.compiled_mproperties do
 			file.write("{mpropdef.trace}\n")
@@ -405,7 +422,7 @@ class MOStats
 
 	fun trace_global_methods
 	do
-		var file = new FileWriter.open("trace_global_methods.txt")
+		var file = new FileWriter.open("{dir}/trace_global_methods.txt")
 
 		for mmethod in sys.vm.compiled_global_methods do
 			file.write("{mmethod.trace}\n")
@@ -423,7 +440,7 @@ class MOStats
 			lbl += "-extend"
 		end
 
-		var file = new FileWriter.open("statistics-{lbl}.csv")
+		var file = new FileWriter.open("{dir}/statistics-{lbl}.csv")
 
 		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + null_preexist (total)
 		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][5]
@@ -438,8 +455,8 @@ class MOStats
 		var cuc_pos = 0
 		var cuc_null = 0
 
-		var trace_file = new FileWriter.open("trace_file.txt")
-		var trace_model = new FileWriter.open("trace_model.txt")
+		var trace_file = new FileWriter.open("{dir}/trace_file.txt")
+		var trace_model = new FileWriter.open("{dir}/trace_model.txt")
 
 		# Statistics on method returns
 		var nb_method_return = 0 # A method with a return

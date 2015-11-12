@@ -34,7 +34,7 @@ redef class MOStats
 	private fun dump_to_tex(lbl: String)
 	do
 		# Make a special directory to put the files
-		var dir = "output_latex"
+		var dir = "{self.dir}/output_latex"
 		dir.mkdir
 
 		table1(new FileWriter.open("{dir}/table1-{lbl}.tex"))
