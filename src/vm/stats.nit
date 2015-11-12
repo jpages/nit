@@ -11,15 +11,11 @@ redef class ToolContext
 	# Enable print site state
 	var print_site_state = new OptionBool("Display state of a MOSite (preexistence, impl)", "--site-state")
 
-	# Enable print location of preexists sites
-	var print_location_preexist = new OptionBool("Dump the location of preexist site", "--location-preexist")
-
 	redef init
 	do
 		super
 		option_context.add_option(stats_on)
 		option_context.add_option(print_site_state)
-		option_context.add_option(print_location_preexist)
 	end
 end
 
@@ -29,12 +25,6 @@ redef class Sys
 
 	# Access to print_site_state from anywhere
 	var print_site_state: Bool = false
-
-	# Access to location-preexist information from anywhere
-	var print_location_preexist: Bool = false
-
-	# Used to put location of preexist sites
-	var dump_location: nullable FileWriter = null
 
 	var dump_ast: FileWriter is noinit
 
@@ -47,7 +37,6 @@ redef class ModelBuilder
 	redef fun run_virtual_machine(mainmodule, arguments)
 	do
 		sys.print_site_state = toolcontext.print_site_state.value
-		sys.print_location_preexist = toolcontext.print_location_preexist.value
 
 		super(mainmodule, arguments)
 
@@ -74,10 +63,6 @@ redef class ModelBuilder
 		sys.pstats = new MOStats("last")
 		sys.pstats.copy_data(old_counters)
 
-		if sys.print_location_preexist then
-			dump_location = new FileWriter.open("mo-stats-location")
-		end
-
 		for expr in sys.vm.all_moexprs do expr.preexist_init
 
 		for site in pstats.analysed_sites
@@ -95,10 +80,6 @@ redef class ModelBuilder
 			if method isa MMethodDef then
 				sys.pstats.get_method_return_origin(method)
 			end
-		end
-
-		if sys.print_location_preexist then
-			dump_location.as(not null).close
 		end
 
 		# Print the array of preexistence values
