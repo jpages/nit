@@ -52,6 +52,8 @@ redef class MOStats
 		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 
 		table6(new FileWriter.open("{dir}/table6-{lbl}.tex"))
+
+		table_self(new FileWriter.open("{dir}/table_self-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -217,6 +219,23 @@ redef class MOStats
 		table6 += "without return & {pstats.matrix[48][0]} & {pstats.matrix[56][0]} & {pstats.matrix[62][0]}\\\\\n"
 
 		file.write(table6)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Statistics of implementation for self receivers
+	private fun table_self(file: FileWriter)
+	do
+		file.write("%Table self\n")
+
+		var table_self = "static & {pstats.matrix[66][0]} & {pstats.matrix[66][1]} & {pstats.matrix[66][2]} & {pstats.matrix[66][5]}\\\\\n"
+		table_self += "SST & {pstats.matrix[67][0]} & {pstats.matrix[67][1]} & {pstats.matrix[67][2]} & {pstats.matrix[67][5]} \\\\\n"
+		table_self += "PH & {pstats.matrix[68][0]} & {pstats.matrix[68][1]} & {pstats.matrix[68][2]} & {pstats.matrix[68][5]} \\\\\n"
+
+		table_self += "\\hline\n"
+		table_self += "total & {pstats.matrix[65][0]} & {pstats.matrix[65][1]} & {pstats.matrix[65][2]} & {pstats.matrix[65][5]}\\\\\n"
+
+		file.write(table_self)
 		file.write("\n\n")
 		file.close
 	end

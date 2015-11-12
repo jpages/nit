@@ -864,8 +864,6 @@ redef class MOSite
 
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 then
-			#TODO: retourner à l'ast et dumper l'arbre pour vérifier que c'est bien un other
-
 			# We also filter the receiver which come from a parameter or a literal
 			if not origin == 1 and not origin == 8 then
 				# If the site is preexisting
