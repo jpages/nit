@@ -76,7 +76,7 @@ class PICPattern
 	# The collections of patterns
 	var patterns = new List[PATTERN]
 
-	# Add a MOPattern to `pattens`
+	# Add a MOPattern to `patterns`
 	fun add_pattern(pattern: PATTERN)
 	do
 		patterns.add(pattern)
@@ -87,25 +87,19 @@ end
 class MethodPICPattern
 	super PICPattern
 
-	# The position of the PIC's block inside the virtual function table
-	var position: Int
-
-	redef type PATTERN: MOCallSitePattern
+	# TODO: this can be a method or a subtyping test pattern
+	redef type PATTERN: MOSitePattern
 end
 
 # A PICPattern for an access inside the attribute table
 class AttributePICPattern
 	super PICPattern
 
-	# The position of the PIC's block inside the virtual function table
-	var position: Int
-
 	redef type PATTERN: MOAttrPattern
 end
 
 # Superclass of all patterns
 class MOPattern
-
 end
 
 # Pattern of instantiation sites
@@ -151,7 +145,37 @@ abstract class MOSitePattern
 	do
 		sys.vm.all_patterns.add(self)
 
+		# Create the associated PICPattern if not already created
+		set_pic_pattern
+
 		return self
+	end
+
+	# Associate self with its PICPattern, create it if not exist
+	fun set_pic_pattern
+	do
+		# The PIC is the class which introduced the property of the current pattern
+		var pic = get_pic(sys.vm)
+
+		# See if the corresponding PICPattern already exists
+		var found_pic_pattern = null
+
+		for p in pic.pic_patterns do
+			if p.recv_class == rsc and p.pic_class == pic then
+				found_pic_pattern = p
+				break
+			end
+		end
+
+		if found_pic_pattern == null then
+			# Create an appropriate PICPattern
+			found_pic_pattern = pic_pattern_factory(rsc, pic)
+			sys.vm.all_picpatterns.add(found_pic_pattern)
+		end
+
+		# Just make the association
+		found_pic_pattern.add_pattern(self)
+		pic_pattern = found_pic_pattern
 	end
 
 	# Add a site
@@ -167,6 +191,15 @@ abstract class MOSitePattern
 	do
 		return "Pattern {rsc}"
 	end
+
+	# Get the pic
+	fun get_pic(vm: VirtualMachine): MClass is abstract
+
+	# Create the appropriate PICPattern for this pattern if not exist
+	# `rsc` The class of the receiver
+	# `pic` The class which introduced the called global property
+	# Return the newly created PICPattern
+	fun pic_pattern_factory(rsc: MClass, pic: MClass): PICPattern is abstract
 end
 
 # Pattern of properties sites (method call / attribute access)
@@ -196,44 +229,9 @@ abstract class MOPropSitePattern
 		gp.patterns.add(self)
 	end
 
-	redef fun init_abstract
-	do
-		var res = super
-
-		# Create the associated PICPattern if not already created
-		set_pic_pattern
-
-		return res
-	end
-
-	fun set_pic_pattern
-	do
-		print "set_pic_pattern {rsc}#{gp}"
-
-		# The PIC is the class which introduced the property of the current pattern
-		var pic = gp.intro_mclassdef.mclass
-
-		# See if the corresponding PICPattern already exists
-		var found_pic_pattern = null
-
-		for p in pic.pic_patterns do
-			if p.recv_class == rsc and p.pic_class == pic then
-				found_pic_pattern = p
-				break
-			end
-		end
-
-		if found_pic_pattern == null then
-			# Create an appropriate PICPattern
-			found_pic_pattern = new PICPattern(rsc, pic)
-		end
-
-		# Just make the association
-		found_pic_pattern.add_pattern(self)
-		pic_pattern = found_pic_pattern
-	end
-
 	fun compatible_site(site: MOPropSite): Bool is abstract
+
+	redef fun get_pic(vm) do return gp.intro_mclassdef.mclass
 
 	redef fun trace
 	do
@@ -263,12 +261,26 @@ class MOSubtypeSitePattern
 	do
 		return super + "target = {target} {target.name}"
 	end
+
+	redef fun get_pic(vm) do return target.as(MClassType).mclass
+
+	redef fun pic_pattern_factory(rsc, pic)
+	do
+		return new MethodPICPattern(rsc, pic)
+	end
 end
 
 class MOAsNotNullPattern
 	super MOExprSitePattern
 
 	redef type S: MOAsNotNullSite
+
+	redef fun get_pic(vm) do return rsc
+
+	redef fun pic_pattern_factory(rsc, pic)
+	do
+		return new MethodPICPattern(rsc, pic)
+	end
 end
 
 # Pattern of method call
@@ -286,7 +298,6 @@ class MOCallSitePattern
 	# if not, then this pattern references procedure sites
 	var is_function: Bool
 
-	# TODO: create the corresponding PICPattern
 	init(rst: MType, rsc: MClass, gp: MMethod, function: Bool)
 	do
 		super(rst, rsc, gp)
@@ -330,6 +341,11 @@ class MOCallSitePattern
 	do
 		return super + " cuc = {cuc}"
 	end
+
+	redef fun pic_pattern_factory(rsc, pic)
+	do
+		return new MethodPICPattern(rsc, pic)
+	end
 end
 
 # Common pattern of all attribute reads and writes
@@ -339,6 +355,11 @@ abstract class MOAttrPattern
 	redef type GP: MAttribute
 
 	redef type LP: MAttributeDef
+
+	redef fun pic_pattern_factory(rsc, pic)
+	do
+		return new AttributePICPattern(rsc, pic)
+	end
 end
 
 # Pattern of read attribute

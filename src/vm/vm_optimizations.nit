@@ -435,7 +435,7 @@ redef class PICPattern
 	private fun compute_impl
 	do
 		# If the recv_class, is loaded we can compute an implementation
-		if recv_class.loaded then
+		if recv_class.loaded and pic_class.abstract_loaded then
 			# If the PIC is always at the same position in all loaded subclasses of pic
 			if pic_pos_unique then
 				# We can use an single subtyping mutable implementation
@@ -552,9 +552,6 @@ redef abstract class MOSitePattern
 	# Get the relative offset of the "property" (gp for MOPropPattern, method block offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
-	# Get the pic
-	fun get_pic(vm: VirtualMachine): MClass is abstract
-
 	# True if the pattern can be static
 	# False by default
 	fun can_be_static: Bool do return false
@@ -596,8 +593,6 @@ end
 redef class MOSubtypeSitePattern
 	redef fun get_offset(vm) do return get_pic(vm).color
 
-	redef fun get_pic(vm) do return target.as(MClassType).mclass
-
 	redef fun can_be_static
 	do
 		# If the target is not loaded, the cast will always fail
@@ -618,8 +613,6 @@ end
 redef class MOAsNotNullPattern
 	redef fun get_offset(vm) do return 0
 
-	redef fun get_pic(vm) do return rsc
-
 	redef fun set_static_impl(mutable)
 	do
 		impl = new StaticImplSubtype(false, true)
@@ -633,8 +626,6 @@ end
 
 redef abstract class MOPropSitePattern
 	redef fun get_offset(vm) do return gp.offset
-
-	redef fun get_pic(vm) do return gp.intro_mclassdef.mclass
 end
 
 redef class MOAttrPattern

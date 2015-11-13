@@ -47,6 +47,7 @@ redef class ModelBuilder
 			post_exec(mainmodule)
 			pstats.overview
 
+			# pstats.statistics_model
 			pstats.trace_patterns
 			pstats.trace_sites
 			pstats.trace_global_methods
@@ -359,6 +360,61 @@ class MOStats
 		return res
 	end
 
+	# Print statistics on PICPattern and their implementation
+	fun statistics_model
+	do
+		var file = new FileWriter.open("{dir}/statistics-model-{lbl}.csv")
+
+		# The array to store stats on picpatterns
+		var stats_array = new Array[Array[Int]].filled_with(new Array[Int].filled_with(0, 2), 3)
+
+		var caption_y = new Array[String]
+		caption_y.add(",MethodPICPattern, AttributePICPattern\n")
+		caption_y.add("total,")
+		caption_y.add("sst,")
+		caption_y.add("ph,")
+		caption_y.add("\n,")
+
+		var total_sst = 0
+		var total_ph = 0
+		var total_method = 0
+		var total_attr = 0
+		for pic_pattern in vm.all_picpatterns do
+			var impl = pic_pattern.get_impl
+			# stats_array[0][pic_pattern.index_x] += 1
+
+			print "pic_pattern {pic_pattern} {pic_pattern.index_x} {pic_pattern.get_impl}"
+			if pic_pattern isa MethodPICPattern then
+				total_method += 1
+			else
+				total_attr += 1
+			end
+
+			if impl isa SSTImpl then
+				stats_array[1][pic_pattern.index_x] += 1
+				total_sst += 1
+			else if impl isa PHImpl then
+				total_ph += 1
+				stats_array[2][pic_pattern.index_x] += 1
+			end
+		end
+
+		file.write(caption_y[0])
+		for i in [1..stats_array.length[ do
+			if i < caption_y.length then file.write(caption_y[i])
+
+			var size = stats_array[i].length
+			for j in [0..size[ do
+				print "Stats_array[{i}][{j}] = {stats_array[i][j]}"
+				file.write(stats_array[i][j].to_s + ",")
+			end
+			file.write("\n")
+		end
+
+		print "total_method = {total_method}, total_attr = {total_attr}, total_ph = {total_ph} total_sst {total_sst}"
+		file.close
+	end
+
 	fun trace_patterns
 	do
 		var file = new FileWriter.open("{dir}/trace_patterns.txt")
@@ -366,6 +422,23 @@ class MOStats
 		for pattern in sys.vm.all_patterns do
 			file.write("{pattern.trace} {pattern}\n")
 		end
+
+		# The caption on y axis
+		var caption_y = new Array[String]
+		caption_y.add("total,")
+		caption_y.add("static,")
+		caption_y.add("static preexist,")
+		caption_y.add("static npreexist,")
+		caption_y.add("sst,")
+		caption_y.add("sst preexist,")
+		caption_y.add("sst npreexist,")
+		caption_y.add("ph,")
+		caption_y.add("ph preexist,")
+		caption_y.add("ph npreexist,")
+		caption_y.add("null,")
+		caption_y.add("null preexist,")
+		caption_y.add("null npreexist,")
+		caption_y.add("\n,")
 
 		file.close
 	end
@@ -988,6 +1061,18 @@ redef class MOPropSite
 	do
 		return super + " {pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
 	end
+end
+
+redef class PICPattern
+	var index_x: Int is noinit
+end
+
+redef class MethodPICPattern
+	redef var index_x = 0
+end
+
+redef class AttributePICPattern
+	redef var index_x = 1
 end
 
 redef class MOCallSite
