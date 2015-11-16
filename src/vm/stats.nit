@@ -47,7 +47,7 @@ redef class ModelBuilder
 			post_exec(mainmodule)
 			pstats.overview
 
-			# pstats.statistics_model
+			pstats.statistics_model
 			pstats.trace_patterns
 			pstats.trace_sites
 			pstats.trace_global_methods
@@ -363,10 +363,14 @@ class MOStats
 	# Print statistics on PICPattern and their implementation
 	fun statistics_model
 	do
-		var file = new FileWriter.open("{dir}/statistics-model-{lbl}.csv")
+		var file = new FileWriter.open("{dir}/picpatterns-{lbl}.csv")
 
 		# The array to store stats on picpatterns
-		var stats_array = new Array[Array[Int]].filled_with(new Array[Int].filled_with(0, 2), 3)
+		var stats_array_size = 3
+		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 2)
+		end
 
 		var caption_y = new Array[String]
 		caption_y.add(",MethodPICPattern, AttributePICPattern\n")
@@ -381,50 +385,49 @@ class MOStats
 		var total_attr = 0
 		for pic_pattern in vm.all_picpatterns do
 			var impl = pic_pattern.get_impl
-			# stats_array[0][pic_pattern.index_x] += 1
-
-			print "pic_pattern {pic_pattern} {pic_pattern.index_x} {pic_pattern.get_impl}"
-			if pic_pattern isa MethodPICPattern then
-				total_method += 1
-			else
-				total_attr += 1
-			end
+			stats_array[0][pic_pattern.index_x] += 1
 
 			if impl isa SSTImpl then
 				stats_array[1][pic_pattern.index_x] += 1
-				total_sst += 1
 			else if impl isa PHImpl then
-				total_ph += 1
 				stats_array[2][pic_pattern.index_x] += 1
 			end
 		end
 
 		file.write(caption_y[0])
-		for i in [1..stats_array.length[ do
-			if i < caption_y.length then file.write(caption_y[i])
+		for i in [0..stats_array.length[ do
+			if i +1< caption_y.length then file.write(caption_y[i+1])
 
 			var size = stats_array[i].length
 			for j in [0..size[ do
-				print "Stats_array[{i}][{j}] = {stats_array[i][j]}"
 				file.write(stats_array[i][j].to_s + ",")
 			end
 			file.write("\n")
 		end
 
-		print "total_method = {total_method}, total_attr = {total_attr}, total_ph = {total_ph} total_sst {total_sst}"
 		file.close
 	end
 
 	fun trace_patterns
 	do
-		var file = new FileWriter.open("{dir}/trace_patterns.txt")
+		var file = new FileWriter.open("{dir}/trace_patterns-{lbl}.txt")
+		var csv_file = new FileWriter.open("{dir}/patterns-{lbl}.csv")
+
+		# The array to store stats on patterns
+		var stats_array_size = 10
+		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
+		for i in [0..stats_array_size[ do
+			stats_array[i] = new Array[Int].filled_with(0,4)
+		end
 
 		for pattern in sys.vm.all_patterns do
 			file.write("{pattern.trace} {pattern}\n")
+			stats_array[0][pattern.index_x] += 1
 		end
 
 		# The caption on y axis
 		var caption_y = new Array[String]
+		caption_y.add(",MOCallSitePattern, MOAttrPattern, MOSubtypeSitePattern, MOAsNotNullPattern\n")
 		caption_y.add("total,")
 		caption_y.add("static,")
 		caption_y.add("static preexist,")
@@ -440,6 +443,18 @@ class MOStats
 		caption_y.add("null npreexist,")
 		caption_y.add("\n,")
 
+		csv_file.write(caption_y[0])
+		for i in [0..stats_array.length[ do
+			if i +1 < caption_y.length then csv_file.write(caption_y[i+1])
+
+			var size = stats_array[i].length
+			for j in [0..size[ do
+				csv_file.write(stats_array[i][j].to_s + ",")
+			end
+			csv_file.write("\n")
+		end
+
+		csv_file.close
 		file.close
 	end
 
