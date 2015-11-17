@@ -435,7 +435,7 @@ redef class PICPattern
 	private fun compute_impl
 	do
 		# If the recv_class, is loaded we can compute an implementation
-		if recv_class.loaded and pic_class.abstract_loaded then
+		if recv_class.abstract_loaded and pic_class.abstract_loaded then
 			# If the PIC is always at the same position in all loaded subclasses of pic
 			if pic_pos_unique then
 				# We can use an single subtyping mutable implementation
@@ -531,7 +531,7 @@ redef abstract class MOSitePattern
 	# Compute the implementation
 	fun compute_impl(vm: VirtualMachine)
 	do
-		if rsc.loaded and get_pic(vm).abstract_loaded then
+		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
 			if pic_pos_unique(vm) then
 				if can_be_static then
 					set_static_impl(true)
