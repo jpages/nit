@@ -70,14 +70,11 @@ class PICPattern
 	# The class of the property introduction class (the class of the global property)
 	var pic_class: MClass
 
-	# The virtual type of the stored patterns
-	type PATTERN: MOPattern
-
 	# The collections of patterns
-	var patterns = new List[PATTERN]
+	var patterns = new List[MOPattern]
 
 	# Add a MOPattern to `patterns`
-	fun add_pattern(pattern: PATTERN)
+	fun add_pattern(pattern: MOPattern)
 	do
 		patterns.add(pattern)
 	end
@@ -86,16 +83,11 @@ end
 # A PICPattern for an access inside a method table (a method call or a subtyping test)
 class MethodPICPattern
 	super PICPattern
-
-	# TODO: this can be a method or a subtyping test pattern
-	redef type PATTERN: MOSitePattern
 end
 
 # A PICPattern for an access inside the attribute table
 class AttributePICPattern
 	super PICPattern
-
-	redef type PATTERN: MOAttrPattern
 end
 
 # Superclass of all patterns
@@ -171,6 +163,7 @@ abstract class MOSitePattern
 			# Create an appropriate PICPattern
 			found_pic_pattern = pic_pattern_factory(rsc, pic)
 			sys.vm.all_picpatterns.add(found_pic_pattern)
+			pic.pic_patterns.add(found_pic_pattern)
 		end
 
 		# Just make the association

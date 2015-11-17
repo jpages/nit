@@ -450,8 +450,8 @@ redef class PICPattern
 				set_ph_impl(false, pic_class.vtable.id)
 			end
 		else
-			# The receiver class is not loaded, use a ph implementation by default
-			set_ph_impl(true, pic_class.vtable.id)
+			# The receiver class is not loaded, use a null implementation by default
+			set_null_impl
 		end
 	end
 
@@ -470,6 +470,13 @@ redef class PICPattern
 	fun set_ph_impl(mutable: Bool, id: Int)
 	do
 		impl = new PHImpl(mutable, get_block_position, id)
+	end
+
+	# Set a null Implementation, i.e. the pic is not loaded
+	fun set_null_impl
+	do
+		# This implementation is temporary and will be replaced if the corresponding class is loaded
+		impl = new NullImpl(true, null, 0, pic_class)
 	end
 
 	# Tell if the pic is at unique position on whole class hierarchy
@@ -524,7 +531,7 @@ redef abstract class MOSitePattern
 	# Compute the implementation
 	fun compute_impl(vm: VirtualMachine)
 	do
-		if rsc.loaded then
+		if rsc.loaded and get_pic(vm).abstract_loaded then
 			if pic_pos_unique(vm) then
 				if can_be_static then
 					set_static_impl(true)
@@ -537,15 +544,8 @@ redef abstract class MOSitePattern
 		else
 			var pos_cls = get_bloc_position(vm)
 
-			if get_pic(vm).is_instance_of_object(vm) then
-				set_sst_impl(vm, false)
-			else if can_be_static then
-				set_static_impl(true)
-			else if pos_cls > 0 then
-				set_sst_impl(vm, true)
-			else
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
-			end
+			# If the rsc and/or the pic is not loaded, make a null implementation
+			impl = new NullImpl(true, null, 0, get_pic(vm))
 		end
 	end
 
@@ -934,7 +934,7 @@ class NullImpl
 	super Implementation
 
 	# The site which contains self
-	var mosite: MOSite
+	var mosite: nullable MOSite
 
 	# The (global if SST, relative if PH) offset of the property
 	var offset: Int

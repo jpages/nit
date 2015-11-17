@@ -366,7 +366,7 @@ class MOStats
 		var file = new FileWriter.open("{dir}/picpatterns-{lbl}.csv")
 
 		# The array to store stats on picpatterns
-		var stats_array_size = 2
+		var stats_array_size = 3
 		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
 		for i in [0..stats_array_size] do
 			stats_array[i] = new Array[Int].filled_with(0, 2)
@@ -377,6 +377,7 @@ class MOStats
 		caption_y.add("total,")
 		caption_y.add("sst,")
 		caption_y.add("ph,")
+		caption_y.add("null,")
 		caption_y.add("\n,")
 
 		var total_sst = 0
@@ -391,6 +392,8 @@ class MOStats
 				stats_array[1][pic_pattern.index_x] += 1
 			else if impl isa PHImpl then
 				stats_array[2][pic_pattern.index_x] += 1
+			else if impl isa NullImpl then
+				stats_array[3][pic_pattern.index_x] += 1
 			end
 		end
 
