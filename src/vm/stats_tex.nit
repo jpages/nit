@@ -76,14 +76,14 @@ redef class MOStats
 		# Table 1: Original preexistence
 		file.write("%Table 1\n")
 
-		total_pre = pstats.matrix[1][0] + pstats.matrix[1][1] + pstats.matrix[1][2]
-		total_npre = pstats.matrix[2][0] + pstats.matrix[2][1] + pstats.matrix[2][2]
+		total_pre = vm.pstats.matrix[1][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[1][2]
+		total_npre = vm.pstats.matrix[2][0] + vm.pstats.matrix[2][1] + vm.pstats.matrix[2][2]
 
-		var table1 = "preexisting & {pstats.matrix[1][0]} & {pstats.matrix[1][1]} & {pstats.matrix[1][2]} & {total_pre}\\\\\n"
-		table1 += "non preexisting & {pstats.matrix[2][0]} & {pstats.matrix[2][1]} & {pstats.matrix[2][2]} & {total_npre}\\\\\n"
+		var table1 = "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
+		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
-		table1 += "total & {pstats.matrix[1][0] + pstats.matrix[2][0]} & {pstats.matrix[1][1] + pstats.matrix[2][1]} & {pstats.matrix[1][2] + pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"
-		table1 += "preexistence rate & {pstats.matrix[1][0]*100/(pstats.matrix[1][0] + pstats.matrix[2][0])}\\% & {pstats.matrix[1][1]*100/(pstats.matrix[1][1] + pstats.matrix[2][1])}\\% & {pstats.matrix[1][2]*100/(pstats.matrix[1][2] + pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\n"
+		table1 += "total & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]} & {vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]} & {vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"
+		table1 += "preexistence rate & {vm.pstats.matrix[1][0]*100/(vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0])}\\% & {vm.pstats.matrix[1][1]*100/(vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1])}\\% & {vm.pstats.matrix[1][2]*100/(vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\n"
 
 		file.write(table1)
 		file.write("\n\n")
@@ -97,31 +97,31 @@ redef class MOStats
 		file.write("%Table 2\n")
 
 		# Line "other",  sites which are not preexisting
-		var other_methods = pstats.matrix[29][0] + pstats.matrix[30][0]
-		var other_attributes = pstats.matrix[29][1] + pstats.matrix[30][1]
-		var other_casts = pstats.matrix[29][2] + pstats.matrix[30][2]
+		var other_methods = vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]
+		var other_attributes = vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]
+		var other_casts = vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]
 		var total_others = other_methods + other_attributes + other_casts
 
-		var total_from_new = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
-		var total_from_callsite = pstats.matrix[28][0] + pstats.matrix[28][1] + pstats.matrix[28][2]
-		var total_from_readsite = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
+		var total_from_new = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]
+		var total_from_callsite = vm.pstats.matrix[28][0] + vm.pstats.matrix[28][1] + vm.pstats.matrix[28][2]
+		var total_from_readsite = vm.pstats.matrix[31][0] + vm.pstats.matrix[31][1] + vm.pstats.matrix[31][2]
 
 		var general_total = total_from_new + total_from_callsite + total_from_readsite + other_methods + other_attributes + other_casts
 
-		var table2 = "ReadSite & {pstats.matrix[31][0]} & {pstats.matrix[31][1]} & {pstats.matrix[31][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
-		table2 += "NewSite & {pstats.matrix[23][0]} & {pstats.matrix[23][1]} & {pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
-		table2 += "CallSite & {pstats.matrix[28][0]} & {pstats.matrix[28][1]} & {pstats.matrix[28][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
+		var table2 = "ReadSite & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
+		table2 += "NewSite & {vm.pstats.matrix[23][0]} & {vm.pstats.matrix[23][1]} & {vm.pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
+		table2 += "CallSite & {vm.pstats.matrix[28][0]} & {vm.pstats.matrix[28][1]} & {vm.pstats.matrix[28][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
 		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {total_others*100/general_total}\\\\\n"
 		table2 += "\\hline\n"
 
-		improvable_methods = pstats.matrix[28][0] + other_methods
-		improvable_attributes = pstats.matrix[28][1] + other_attributes
-		improvable_casts = pstats.matrix[28][2] + other_casts
+		improvable_methods = vm.pstats.matrix[28][0] + other_methods
+		improvable_attributes = vm.pstats.matrix[28][1] + other_attributes
+		improvable_casts = vm.pstats.matrix[28][2] + other_casts
 		total_improvable = improvable_methods + improvable_attributes + improvable_casts
 
 		table2 += "%improvable total & {improvable_methods} & {improvable_attributes} & {improvable_casts} & {total_improvable} & {total_improvable*100/general_total}\\\\\n"
 
-		table2 += "total & {pstats.matrix[23][0] + pstats.matrix[28][0] + pstats.matrix[31][0] + other_methods} & {pstats.matrix[23][1] + pstats.matrix[28][1] + pstats.matrix[31][1] + other_attributes} & {pstats.matrix[23][2] + pstats.matrix[28][2] + pstats.matrix[31][2] + other_casts} & {general_total} & 100\\\\\n"
+		table2 += "total & {vm.pstats.matrix[23][0] + vm.pstats.matrix[28][0] + vm.pstats.matrix[31][0] + other_methods} & {vm.pstats.matrix[23][1] + vm.pstats.matrix[28][1] + vm.pstats.matrix[31][1] + other_attributes} & {vm.pstats.matrix[23][2] + vm.pstats.matrix[28][2] + vm.pstats.matrix[31][2] + other_casts} & {general_total} & 100\\\\\n"
 
 		file.write(table2)
 		file.write("\n\n")
@@ -135,34 +135,34 @@ redef class MOStats
 	do
 		file.write("%Table 3\n")
 
-		var total_callsites_improved = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
-		var total_callsites_improvable = pstats.matrix[26][0] + pstats.matrix[26][1] + pstats.matrix[26][2]
+		var total_callsites_improved = vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]
+		var total_callsites_improvable = vm.pstats.matrix[26][0] + vm.pstats.matrix[26][1] + vm.pstats.matrix[26][2]
 
-		var total_readsite_improved = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
-		var total_readsite_improvable = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
+		var total_readsite_improved = vm.pstats.matrix[31][0] + vm.pstats.matrix[31][1] + vm.pstats.matrix[31][2]
+		var total_readsite_improvable = vm.pstats.matrix[31][0] + vm.pstats.matrix[31][1] + vm.pstats.matrix[31][2]
 
-		var total_new_improved = pstats.matrix[24][0] + pstats.matrix[24][1] + pstats.matrix[24][2]
-		var total_new_improvable = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
+		var total_new_improved = vm.pstats.matrix[24][0] + vm.pstats.matrix[24][1] + vm.pstats.matrix[24][2]
+		var total_new_improvable = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]
 
-		var total_other_improved = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
-		var total_other_improvable = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2] + pstats.matrix[30][0] + pstats.matrix[30][1] + pstats.matrix[30][2]
+		var total_other_improved = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2]
+		var total_other_improvable = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][0] + vm.pstats.matrix[30][1] + vm.pstats.matrix[30][2]
 
-		var table3 = "CallSite & {if pstats.matrix[26][0] != 0 then pstats.matrix[27][0]*100/pstats.matrix[26][0] else 0} & {if pstats.matrix[26][1] != 0 then pstats.matrix[27][1]*100/pstats.matrix[26][1] else 0} & {if pstats.matrix[26][2] != 0 then pstats.matrix[27][2]*100/pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
-		table3 += "ReadSite & {if pstats.matrix[31][0] != 0 then pstats.matrix[31][0]*100/pstats.matrix[31][0] else 0} & {if pstats.matrix[31][1] != 0 then pstats.matrix[31][1]*100/pstats.matrix[31][1] else 0} & {if pstats.matrix[31][2] != 0 then pstats.matrix[31][2]*100/pstats.matrix[31][2] else 0}  & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
-		table3 += "NewSite & {if pstats.matrix[23][0] != 0 then pstats.matrix[24][0]*100/pstats.matrix[23][0] else 0} & {if pstats.matrix[23][1] != 0 then pstats.matrix[24][1]*100/pstats.matrix[23][1] else 0} & {if pstats.matrix[23][2] != 0 then pstats.matrix[24][2]*100/pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
-		table3 += "other & {if pstats.matrix[29][0] != 0 then pstats.matrix[29][0]*100/(pstats.matrix[29][0] + pstats.matrix[30][0]) else 0} & {if pstats.matrix[29][1] != 0 then pstats.matrix[29][1]*100/(pstats.matrix[29][1] + pstats.matrix[30][1]) else 0} & {if pstats.matrix[29][2] != 0 then pstats.matrix[29][2]*100/(pstats.matrix[29][2] + pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
+		var table3 = "CallSite & {if vm.pstats.matrix[26][0] != 0 then vm.pstats.matrix[27][0]*100/vm.pstats.matrix[26][0] else 0} & {if vm.pstats.matrix[26][1] != 0 then vm.pstats.matrix[27][1]*100/vm.pstats.matrix[26][1] else 0} & {if vm.pstats.matrix[26][2] != 0 then vm.pstats.matrix[27][2]*100/vm.pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
+		table3 += "ReadSite & {if vm.pstats.matrix[31][0] != 0 then vm.pstats.matrix[31][0]*100/vm.pstats.matrix[31][0] else 0} & {if vm.pstats.matrix[31][1] != 0 then vm.pstats.matrix[31][1]*100/vm.pstats.matrix[31][1] else 0} & {if vm.pstats.matrix[31][2] != 0 then vm.pstats.matrix[31][2]*100/vm.pstats.matrix[31][2] else 0}  & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
+		table3 += "NewSite & {if vm.pstats.matrix[23][0] != 0 then vm.pstats.matrix[24][0]*100/vm.pstats.matrix[23][0] else 0} & {if vm.pstats.matrix[23][1] != 0 then vm.pstats.matrix[24][1]*100/vm.pstats.matrix[23][1] else 0} & {if vm.pstats.matrix[23][2] != 0 then vm.pstats.matrix[24][2]*100/vm.pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
+		table3 += "other & {if vm.pstats.matrix[29][0] != 0 then vm.pstats.matrix[29][0]*100/(vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]) else 0} & {if vm.pstats.matrix[29][1] != 0 then vm.pstats.matrix[29][1]*100/(vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]) else 0} & {if vm.pstats.matrix[29][2] != 0 then vm.pstats.matrix[29][2]*100/(vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
 
 		table3 += "\\hline\n"
 
-		var total_improved_method = pstats.matrix[27][0] + pstats.matrix[31][0] + pstats.matrix[24][0] + pstats.matrix[29][0]
-		var total_improvable_method = pstats.matrix[26][0] + pstats.matrix[31][0] + pstats.matrix[23][0] + pstats.matrix[29][0] + pstats.matrix[30][0]
+		var total_improved_method = vm.pstats.matrix[27][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[24][0] + vm.pstats.matrix[29][0]
+		var total_improvable_method = vm.pstats.matrix[26][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[23][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]
 
-		var total_improved_attribute = pstats.matrix[27][1] + pstats.matrix[31][1] + pstats.matrix[24][1] + pstats.matrix[29][1]
-		var total_improvable_attribute = pstats.matrix[26][1] + pstats.matrix[31][1] + pstats.matrix[23][1] + pstats.matrix[29][1] + pstats.matrix[30][1]
+		var total_improved_attribute = vm.pstats.matrix[27][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[24][1] + vm.pstats.matrix[29][1]
+		var total_improvable_attribute = vm.pstats.matrix[26][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[23][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]
 		if total_improvable_attribute == 0 then total_improvable_attribute = 1
 
-		var total_improved_cast = pstats.matrix[27][2] + pstats.matrix[31][2] + pstats.matrix[24][2] + pstats.matrix[29][2]
-		var total_improvable_cast = pstats.matrix[26][2] + pstats.matrix[31][2] + pstats.matrix[23][2] + pstats.matrix[29][2] + pstats.matrix[30][2]
+		var total_improved_cast = vm.pstats.matrix[27][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[24][2] + vm.pstats.matrix[29][2]
+		var total_improvable_cast = vm.pstats.matrix[26][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[23][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]
 		if total_improvable_cast == 0 then total_improvable_cast = 1
 
 		var total_table3 = (total_improved_method + total_improved_attribute + total_improved_cast)*100/(total_improvable_method + total_improvable_attribute + total_improvable_cast)
@@ -180,34 +180,34 @@ redef class MOStats
 	do
 		file.write("%Table 3 percentages\n")
 
-		var total_callsites_improved = pstats.matrix[27][0] + pstats.matrix[27][1] + pstats.matrix[27][2]
-		var total_callsites_improvable = pstats.matrix[26][0] + pstats.matrix[26][1] + pstats.matrix[26][2]
+		var total_callsites_improved = vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]
+		var total_callsites_improvable = vm.pstats.matrix[26][0] + vm.pstats.matrix[26][1] + vm.pstats.matrix[26][2]
 
-		var total_readsite_improved = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
-		var total_readsite_improvable = pstats.matrix[31][0] + pstats.matrix[31][1] + pstats.matrix[31][2]
+		var total_readsite_improved = vm.pstats.matrix[31][0] + vm.pstats.matrix[31][1] + vm.pstats.matrix[31][2]
+		var total_readsite_improvable = vm.pstats.matrix[31][0] + vm.pstats.matrix[31][1] + vm.pstats.matrix[31][2]
 
-		var total_new_improved = pstats.matrix[24][0] + pstats.matrix[24][1] + pstats.matrix[24][2]
-		var total_new_improvable = pstats.matrix[23][0] + pstats.matrix[23][1] + pstats.matrix[23][2]
+		var total_new_improved = vm.pstats.matrix[24][0] + vm.pstats.matrix[24][1] + vm.pstats.matrix[24][2]
+		var total_new_improvable = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]
 
-		var total_other_improved = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2]
-		var total_other_improvable = pstats.matrix[29][0] + pstats.matrix[29][1] + pstats.matrix[29][2] + pstats.matrix[30][0] + pstats.matrix[30][1] + pstats.matrix[30][2]
+		var total_other_improved = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2]
+		var total_other_improvable = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][0] + vm.pstats.matrix[30][1] + vm.pstats.matrix[30][2]
 
-		var table3 = "CallSite & {if pstats.matrix[26][0] != 0 then pstats.matrix[27][0]*100/pstats.matrix[26][0] else 0} & {if pstats.matrix[26][1] != 0 then pstats.matrix[27][1]*100/pstats.matrix[26][1] else 0} & {if pstats.matrix[26][2] != 0 then pstats.matrix[27][2]*100/pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
-		table3 += "ReadSite & {if pstats.matrix[31][0] != 0 then pstats.matrix[31][0]*100/pstats.matrix[31][0] else 0} & {if pstats.matrix[31][1] != 0 then pstats.matrix[31][1]*100/pstats.matrix[31][1] else 0} & {if pstats.matrix[31][2] != 0 then pstats.matrix[31][2]*100/pstats.matrix[31][2] else 0}  & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
-		table3 += "NewSite & {if pstats.matrix[23][0] != 0 then pstats.matrix[24][0]*100/pstats.matrix[23][0] else 0} & {if pstats.matrix[23][1] != 0 then pstats.matrix[24][1]*100/pstats.matrix[23][1] else 0} & {if pstats.matrix[23][2] != 0 then pstats.matrix[24][2]*100/pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
-		table3 += "other & {if pstats.matrix[29][0] != 0 then pstats.matrix[29][0]*100/(pstats.matrix[29][0] + pstats.matrix[30][0]) else 0} & {if pstats.matrix[29][1] != 0 then pstats.matrix[29][1]*100/(pstats.matrix[29][1] + pstats.matrix[30][1]) else 0} & {if pstats.matrix[29][2] != 0 then pstats.matrix[29][2]*100/(pstats.matrix[29][2] + pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
+		var table3 = "CallSite & {if vm.pstats.matrix[26][0] != 0 then vm.pstats.matrix[27][0]*100/vm.pstats.matrix[26][0] else 0} & {if vm.pstats.matrix[26][1] != 0 then vm.pstats.matrix[27][1]*100/vm.pstats.matrix[26][1] else 0} & {if vm.pstats.matrix[26][2] != 0 then vm.pstats.matrix[27][2]*100/vm.pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
+		table3 += "ReadSite & {if vm.pstats.matrix[31][0] != 0 then vm.pstats.matrix[31][0]*100/vm.pstats.matrix[31][0] else 0} & {if vm.pstats.matrix[31][1] != 0 then vm.pstats.matrix[31][1]*100/vm.pstats.matrix[31][1] else 0} & {if vm.pstats.matrix[31][2] != 0 then vm.pstats.matrix[31][2]*100/vm.pstats.matrix[31][2] else 0}  & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
+		table3 += "NewSite & {if vm.pstats.matrix[23][0] != 0 then vm.pstats.matrix[24][0]*100/vm.pstats.matrix[23][0] else 0} & {if vm.pstats.matrix[23][1] != 0 then vm.pstats.matrix[24][1]*100/vm.pstats.matrix[23][1] else 0} & {if vm.pstats.matrix[23][2] != 0 then vm.pstats.matrix[24][2]*100/vm.pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
+		table3 += "other & {if vm.pstats.matrix[29][0] != 0 then vm.pstats.matrix[29][0]*100/(vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]) else 0} & {if vm.pstats.matrix[29][1] != 0 then vm.pstats.matrix[29][1]*100/(vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]) else 0} & {if vm.pstats.matrix[29][2] != 0 then vm.pstats.matrix[29][2]*100/(vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
 
 		table3 += "\\hline\n"
 
-		var total_improved_method = pstats.matrix[27][0] + pstats.matrix[31][0] + pstats.matrix[24][0] + pstats.matrix[29][0]
-		var total_improvable_method = pstats.matrix[26][0] + pstats.matrix[31][0] + pstats.matrix[23][0] + pstats.matrix[29][0] + pstats.matrix[30][0]
+		var total_improved_method = vm.pstats.matrix[27][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[24][0] + vm.pstats.matrix[29][0]
+		var total_improvable_method = vm.pstats.matrix[26][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[23][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]
 
-		var total_improved_attribute = pstats.matrix[27][1] + pstats.matrix[31][1] + pstats.matrix[24][1] + pstats.matrix[29][1]
-		var total_improvable_attribute = pstats.matrix[26][1] + pstats.matrix[31][1] + pstats.matrix[23][1] + pstats.matrix[29][1] + pstats.matrix[30][1]
+		var total_improved_attribute = vm.pstats.matrix[27][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[24][1] + vm.pstats.matrix[29][1]
+		var total_improvable_attribute = vm.pstats.matrix[26][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[23][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]
 		if total_improvable_attribute == 0 then total_improvable_attribute = 1
 
-		var total_improved_cast = pstats.matrix[27][2] + pstats.matrix[31][2] + pstats.matrix[24][2] + pstats.matrix[29][2]
-		var total_improvable_cast = pstats.matrix[26][2] + pstats.matrix[31][2] + pstats.matrix[23][2] + pstats.matrix[29][2] + pstats.matrix[30][2]
+		var total_improved_cast = vm.pstats.matrix[27][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[24][2] + vm.pstats.matrix[29][2]
+		var total_improvable_cast = vm.pstats.matrix[26][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[23][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]
 		if total_improvable_cast == 0 then total_improvable_cast = 1
 
 		var total_table3 = (total_improved_method + total_improved_attribute + total_improved_cast)*100/(total_improvable_method + total_improvable_attribute + total_improvable_cast)
@@ -224,22 +224,22 @@ redef class MOStats
 	do
 		file.write("%Table 4\n")
 
-		var optimizable_inline = pstats.matrix[7][0] + pstats.matrix[16][0] + pstats.matrix[10][1] + pstats.matrix[16][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][2]
-		optimizable_inline += pstats.matrix[8][0] + pstats.matrix[17][0] + pstats.matrix[11][1] + pstats.matrix[17][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[17][2]
+		var optimizable_inline = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
+		optimizable_inline += vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
 
-		var nonoptimizable_inline = pstats.matrix[10][0] + pstats.matrix[11][0] + pstats.matrix[12][0] + pstats.matrix[12][1] + pstats.matrix[12][2]
+		var nonoptimizable_inline = vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]
 		var total_table4 = optimizable_inline + nonoptimizable_inline
 
-		var total_preexisting = pstats.matrix[7][0] + pstats.matrix[16][0] + pstats.matrix[10][1] + pstats.matrix[16][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][2]
-		var total_nonpreexisting = pstats.matrix[8][0] + pstats.matrix[17][0] + pstats.matrix[11][1] + pstats.matrix[17][1] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[17][2]
+		var total_preexisting = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
+		var total_nonpreexisting = vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
 
-		var table4 = "preexisting & {pstats.matrix[7][0] + pstats.matrix[16][0]} & {pstats.matrix[10][1] + pstats.matrix[16][1]} & {pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\%\\\\\n"
-		table4 += "non preexisting & {pstats.matrix[8][0] + pstats.matrix[17][0]} & {pstats.matrix[11][1] + pstats.matrix[17][1]} & {pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[17][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\% \\\\\n"
+		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\%\\\\\n"
+		table4 += "non preexisting & {vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\% \\\\\n"
 		table4 += "\\hline\n"
 
-		table4 += "total inlinable & {pstats.matrix[7][0] + pstats.matrix[16][0] + pstats.matrix[8][0] + pstats.matrix[17][0]} & {pstats.matrix[10][1] + pstats.matrix[16][1] + pstats.matrix[11][1] + pstats.matrix[17][1]} & {pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][2] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
-		table4 += "non-inlinable & {pstats.matrix[10][0] + pstats.matrix[11][0] + pstats.matrix[12][0]} & {pstats.matrix[12][1]} & {pstats.matrix[12][2]} & {nonoptimizable_inline} & {nonoptimizable_inline*100/total_table4}\\\\\\hline\n"
-		table4 += "total & {pstats.matrix[7][0] + pstats.matrix[16][0] + pstats.matrix[8][0] + pstats.matrix[17][0] + pstats.matrix[10][0] + pstats.matrix[11][0] + pstats.matrix[12][0]} & {pstats.matrix[10][1] + pstats.matrix[16][1] + pstats.matrix[11][1] + pstats.matrix[17][1] + pstats.matrix[12][1]} & {pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][2] + pstats.matrix[8][2] + pstats.matrix[11][2] + pstats.matrix[17][2] + pstats.matrix[12][2]} & {total_table4} & 100\\\\\n"
+		table4 += "total inlinable & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
+		table4 += "non-inlinable & {vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {nonoptimizable_inline} & {nonoptimizable_inline*100/total_table4}\\\\\\hline\n"
+		table4 += "total & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[12][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2] + vm.pstats.matrix[12][2]} & {total_table4} & 100\\\\\n"
 
 		file.write(table4)
 		file.write("\n\n")
@@ -255,14 +255,14 @@ redef class MOStats
 	do
 		file.write("%Table 6\n")
 
-		var table6 = "preexisting & {pstats.matrix[50][0]} & {pstats.matrix[53][0]} & {pstats.matrix[60][0]}\\\\\n"
-		table6 += "non preexisting & {pstats.matrix[51][0]} & {pstats.matrix[54][0] + pstats.matrix[55][0]} & {pstats.matrix[61][0]}\\\\\n"
-		table6 += "total & {pstats.matrix[50][0] + pstats.matrix[51][0]} & {pstats.matrix[53][0] + pstats.matrix[54][0] + pstats.matrix[55][0]} & {pstats.matrix[60][0] + pstats.matrix[61][0]}\\\\\n"
+		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]}\\\\\n"
+		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]}\\\\\n"
+		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]}\\\\\n"
 		table6 += "\\hline\n"
 
-		table6 += "preexistence rate & {pstats.matrix[50][0]*100/(pstats.matrix[50][0] + pstats.matrix[51][0])} & {pstats.matrix[53][0]*100/(pstats.matrix[53][0] + pstats.matrix[54][0] + pstats.matrix[55][0])} & {pstats.matrix[60][0]*100/(pstats.matrix[60][0] + pstats.matrix[61][0])}\\\\\n"
+		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])}\\\\\n"
 
-		table6 += "without return & {pstats.matrix[48][0]} & {pstats.matrix[56][0]} & {pstats.matrix[62][0]}\\\\\n"
+		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]}\\\\\n"
 
 		file.write(table6)
 		file.write("\n\n")
@@ -274,12 +274,12 @@ redef class MOStats
 	do
 		file.write("%Table self\n")
 
-		var table_self = "static & {pstats.matrix[66][0]} & {pstats.matrix[66][1]} & {pstats.matrix[66][2]} & {pstats.matrix[66][5]}\\\\\n"
-		table_self += "SST & {pstats.matrix[67][0]} & {pstats.matrix[67][1]} & {pstats.matrix[67][2]} & {pstats.matrix[67][5]} \\\\\n"
-		table_self += "PH & {pstats.matrix[68][0]} & {pstats.matrix[68][1]} & {pstats.matrix[68][2]} & {pstats.matrix[68][5]} \\\\\n"
+		var table_self = "static & {vm.pstats.matrix[66][0]} & {vm.pstats.matrix[66][1]} & {vm.pstats.matrix[66][2]} & {vm.pstats.matrix[66][5]}\\\\\n"
+		table_self += "SST & {vm.pstats.matrix[67][0]} & {vm.pstats.matrix[67][1]} & {vm.pstats.matrix[67][2]} & {vm.pstats.matrix[67][5]} \\\\\n"
+		table_self += "PH & {vm.pstats.matrix[68][0]} & {vm.pstats.matrix[68][1]} & {vm.pstats.matrix[68][2]} & {vm.pstats.matrix[68][5]} \\\\\n"
 
 		table_self += "\\hline\n"
-		table_self += "total & {pstats.matrix[65][0]} & {pstats.matrix[65][1]} & {pstats.matrix[65][2]} & {pstats.matrix[65][5]}\\\\\n"
+		table_self += "total & {vm.pstats.matrix[65][0]} & {vm.pstats.matrix[65][1]} & {vm.pstats.matrix[65][2]} & {vm.pstats.matrix[65][5]}\\\\\n"
 
 		file.write(table_self)
 		file.write("\n\n")

@@ -422,7 +422,7 @@ end
 
 redef class PICPattern
 	# Implementation of the PICPattern
-	var impl: nullable Implementation = null
+	var impl: nullable Implementation = null is writable
 
 	# Compute an appropriate Implementation based on the positions of recv_class and pic_class
 	fun get_impl: Implementation
@@ -519,7 +519,7 @@ end
 
 redef abstract class MOSitePattern
 	# Implementation of the pattern (used if site has not concrete receivers list)
-	var impl: nullable Implementation is noinit
+	var impl: nullable Implementation is writable, noinit
 
 	# Get implementation, compute it if not exists
 	fun get_impl(vm: VirtualMachine): Implementation

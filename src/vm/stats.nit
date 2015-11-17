@@ -21,9 +21,6 @@ redef class ToolContext
 end
 
 redef class Sys
-	# Preexist counters
-	var pstats = new MOStats("first") is writable
-
 	# Access to print_site_state from anywhere
 	var print_site_state: Bool = false
 
@@ -42,16 +39,16 @@ redef class ModelBuilder
 		super(mainmodule, arguments)
 
 		if toolcontext.stats_on.value then
-			pstats.overview
+			vm.pstats.statistics_model
+			vm.pstats.trace_patterns
+			vm.pstats.overview
 
 			post_exec(mainmodule)
-			pstats.overview
+			vm.pstats.overview
 
-			pstats.statistics_model
-			pstats.trace_patterns
-			pstats.trace_sites
-			pstats.trace_global_methods
-			pstats.trace_local_methods
+			vm.pstats.trace_sites
+			vm.pstats.trace_global_methods
+			vm.pstats.trace_local_methods
 		end
 	end
 
@@ -61,13 +58,19 @@ redef class ModelBuilder
 	do
 		sys.vm.init_stats
 
-		var old_counters = sys.pstats
-		sys.pstats = new MOStats("last")
-		sys.pstats.copy_data(old_counters)
+		var old_counters = sys.vm.pstats
+		sys.vm.pstats = new MOStats("last")
+		sys.vm.pstats.copy_data(old_counters)
 
 		for expr in sys.vm.all_moexprs do expr.preexist_init
 
-		for site in pstats.analysed_sites
+		for pic_pattern in sys.vm.all_picpatterns do pic_pattern.impl = null
+		for pattern in sys.vm.all_patterns do pattern.impl = null
+
+		vm.pstats.statistics_model
+		vm.pstats.trace_patterns
+
+		for site in vm.pstats.analysed_sites
 		do
 			site.lp.preexist_analysed = false
 
@@ -78,9 +81,9 @@ redef class ModelBuilder
 			site.stats(sys.vm)
 		end
 
-		for method in sys.pstats.compiled_methods do
+		for method in sys.vm.pstats.compiled_methods do
 			if method isa MMethodDef then
-				sys.pstats.get_method_return_origin(method)
+				sys.vm.pstats.get_method_return_origin(method)
 			end
 		end
 
@@ -141,7 +144,7 @@ redef class VirtualMachine
 
 		super(mclass)
 
-		sys.pstats.loaded_classes_explicits += 1
+		pstats.loaded_classes_explicits += 1
 	end
 
 	redef fun load_class_indirect(mclass)
@@ -151,11 +154,14 @@ redef class VirtualMachine
 		super(mclass)
 
 		if mclass.kind == abstract_kind and not mclass.mclass_type.is_primitive_type then
-			sys.pstats.loaded_classes_abstracts += 1
+			pstats.loaded_classes_abstracts += 1
 		else
-			sys.pstats.loaded_classes_implicits += 1
+			pstats.loaded_classes_implicits += 1
 		end
 	end
+
+	# The class to gather all statistics
+	var pstats = new MOStats("first") is writable
 
 	var return_origin: Array[Int] is noinit
 
@@ -182,15 +188,15 @@ redef class VirtualMachine
 
 		# Initialize the matrix of results
 		var matrix_length = 80
-		sys.pstats.matrix = new Array[Array[Int]].with_capacity(matrix_length)
+		pstats.matrix = new Array[Array[Int]].with_capacity(matrix_length)
 		for i in [0..matrix_length[ do
-			sys.pstats.matrix[i] = new Array[Int].filled_with(0, 6)
+			pstats.matrix[i] = new Array[Int].filled_with(0, 6)
 		end
 
 		if sys.debug_mode then
 			# Create the files for dumping ast_sites and model_sites
-			sys.dump_ast = new FileWriter.open("{pstats.dir}/dump_ast_sites.txt")
-			sys.dump_object_sites = new FileWriter.open("{pstats.dir}/dump_object_sites.txt")
+			sys.dump_ast = new FileWriter.open("{vm.pstats.dir}/dump_ast_sites.txt")
+			sys.dump_object_sites = new FileWriter.open("{vm.pstats.dir}/dump_object_sites.txt")
 		end
 	end
 end
@@ -199,7 +205,7 @@ redef class APropdef
 	redef fun compile(vm)
 	do
 		super
-		sys.pstats.nb_ast_sites += object_sites.length
+		sys.vm.pstats.nb_ast_sites += object_sites.length
 
 		if sys.debug_mode then
 			sys.all_ast_sites.add_all(object_sites)
@@ -263,7 +269,11 @@ class MOStats
 			dir.mkdir
 		end
 
-		lbl = s
+		if sys.disable_preexistence_extensions then
+			lbl = s + "-original"
+		else
+			lbl = s + "-extend"
+		end
 	end
 
 	# Return an array which contains all captions of the statistics for the x axis
@@ -537,22 +547,16 @@ class MOStats
 	# Make text csv file contains overview statistics
 	fun overview
 	do
-		if sys.disable_preexistence_extensions then
-			lbl += "-original"
-		else
-			lbl += "-extend"
-		end
-
 		var file = new FileWriter.open("{dir}/statistics-{lbl}.csv")
 
 		# optimizable_inline: method_preexist_static + attribute_preexist_sst + cast_preexist_static + cast_preexist_sst + null_preexist (total)
-		pstats.matrix[19][0] = pstats.matrix[7][0] + pstats.matrix[10][1] + pstats.matrix[7][2] + pstats.matrix[10][2] + pstats.matrix[16][5]
+		vm.pstats.matrix[19][0] = vm.pstats.matrix[7][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][5]
 
 		# non optimizable inline: npreexist_static + attribute_npreexist_sst + cast_npreexist_sst + null_npreexist (total)
-		pstats.matrix[20][0] = pstats.matrix[8][5] + pstats.matrix[11][1] + pstats.matrix[11][2] + pstats.matrix[17][5]
+		vm.pstats.matrix[20][0] = vm.pstats.matrix[8][5] + vm.pstats.matrix[11][1] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][5]
 
 		# non_inline: total_ph + method_sst + asnotnull_sst
-		pstats.matrix[21][0] = pstats.matrix[12][5] + pstats.matrix[9][0] + pstats.matrix[9][3]
+		vm.pstats.matrix[21][0] = vm.pstats.matrix[12][5] + vm.pstats.matrix[9][0] + vm.pstats.matrix[9][3]
 
 		# cuc: caller uncompiled
 		var cuc_pos = 0
@@ -608,8 +612,8 @@ class MOStats
 		trace_file.close
 		trace_model.close
 
-		pstats.matrix[33][0] = cuc_pos
-		pstats.matrix[34][0] = cuc_null
+		vm.pstats.matrix[33][0] = cuc_pos
+		vm.pstats.matrix[34][0] = cuc_null
 
 		# compiled "new" of unloaded classes at the end of execution
 		var compiled_new_unloaded = 0
@@ -620,18 +624,18 @@ class MOStats
 			end
 		end
 
-		pstats.matrix[41][0] = compiled_new_unloaded
+		vm.pstats.matrix[41][0] = compiled_new_unloaded
 
-		pstats.matrix[42][0] = sys.pstats.nb_ast_sites
-		pstats.matrix[43][0] = sys.vm.all_new_sites.length
-		pstats.matrix[44][0] = sys.vm.all_moentities.length
-		pstats.matrix[45][0] = sys.vm.mo_supers.length
-		pstats.matrix[46][0] = sys.pstats.nb_primitive_sites
+		vm.pstats.matrix[42][0] = sys.vm.pstats.nb_ast_sites
+		vm.pstats.matrix[43][0] = sys.vm.all_new_sites.length
+		vm.pstats.matrix[44][0] = sys.vm.all_moentities.length
+		vm.pstats.matrix[45][0] = sys.vm.mo_supers.length
+		vm.pstats.matrix[46][0] = sys.vm.pstats.nb_primitive_sites
 
-		pstats.matrix[48][0] = nb_procedure
-		pstats.matrix[49][0] = nb_method_return
-		pstats.matrix[50][0] = nb_method_return_pre
-		pstats.matrix[51][0] = nb_method_return_npre
+		vm.pstats.matrix[48][0] = nb_procedure
+		vm.pstats.matrix[49][0] = nb_method_return
+		vm.pstats.matrix[50][0] = nb_method_return_pre
+		vm.pstats.matrix[51][0] = nb_method_return_npre
 
 		# Print the captions of the statistics file
 		for caption in caption_x do
@@ -642,13 +646,13 @@ class MOStats
 		for pattern in sys.vm.all_patterns do
 			# If the pattern is a callsitepattern with a return
 			if not pattern.is_executed then
-				pstats.matrix[58][pattern.index_x] += 1
+				vm.pstats.matrix[58][pattern.index_x] += 1
 			end
 
 			if pattern isa MOCallSitePattern then
 
 				if pattern.callees.length == 0 then
-					pstats.matrix[57][0] += 1
+					vm.pstats.matrix[57][0] += 1
 
 					# The pattern has no callees but was executed
 					if pattern.is_executed == true then
@@ -657,16 +661,16 @@ class MOStats
 					end
 				else
 					if pattern.gp.intro.msignature.return_mtype == null then
-						pstats.matrix[56][0] += 1
+						vm.pstats.matrix[56][0] += 1
 					else
 						# A preexisting pattern is a pattern with cuc = 0 and all callees with a preexisting return
 						if pattern.is_pre and pattern.cuc == 0 then
-							pstats.matrix[53][0] += 1
+							vm.pstats.matrix[53][0] += 1
 						else
 							if pattern.cuc > 0 then
-								pstats.matrix[54][0] += 1
+								vm.pstats.matrix[54][0] += 1
 							else
-								pstats.matrix[55][0] += 1
+								vm.pstats.matrix[55][0] += 1
 							end
 						end
 					end
@@ -674,18 +678,18 @@ class MOStats
 			end
 
 			# All patterns are counted here
-			pstats.matrix[59][pattern.index_x] += 1
-			pstats.matrix[59][5] += 1
+			vm.pstats.matrix[59][pattern.index_x] += 1
+			vm.pstats.matrix[59][5] += 1
 		end
 
-		for i in [0..pstats.matrix.length[ do
+		for i in [0..vm.pstats.matrix.length[ do
 			# Write the caption on the line if any
 			if i < caption_y.length then file.write(caption_y[i])
 
 			# Then print the statistics
-			var size = pstats.matrix[i].length
+			var size = vm.pstats.matrix[i].length
 			for j in [0..size[ do
-				var value = pstats.matrix[i][j]
+				var value = vm.pstats.matrix[i][j]
 				if value != 0 then file.write(value.to_s)
 
 				file.write(",")
@@ -778,9 +782,9 @@ class MOStats
 			# If the method return an object, it's return_expr is a MOVar
 			method.return_expr.as(MOVar).return_stats(method.mproperty)
 		else if method.return_expr != null then
-			pstats.matrix[37][0] += 1
+			vm.pstats.matrix[37][0] += 1
 		else
-			pstats.matrix[38][0] += 1
+			vm.pstats.matrix[38][0] += 1
 		end
 	end
 end
@@ -858,7 +862,7 @@ redef class MOSite
 				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
 			end
 
-			pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
+			vm.pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
 
 			# Increment the total for implementation of the previous line
 			incr_total
@@ -867,7 +871,7 @@ redef class MOSite
 			incr_stats_sites
 		else
 			# Increment the total of sites with a primitive receiver
-			sys.pstats.nb_primitive_sites += 1
+			sys.vm.pstats.nb_primitive_sites += 1
 		end
 	end
 
@@ -877,7 +881,7 @@ redef class MOSite
 	fun incr_stats_sites
 	do
 		if not is_executed then
-			pstats.matrix[63][index_x] += 1
+			vm.pstats.matrix[63][index_x] += 1
 		end
 
 		# If self isa MOCallsite and call a method with a return
@@ -885,19 +889,19 @@ redef class MOSite
 			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
 				# If the pattern is preexisting, then the site is also preexisting
 				if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
-					pstats.matrix[60][0] += 1
+					vm.pstats.matrix[60][0] += 1
 				else
 					# If the site is preexisting with concretes receivers for example, the site is preexisting
 					if compute_preexist.bit_pre then
-						pstats.matrix[60][0] += 1
+						vm.pstats.matrix[60][0] += 1
 					else
 						# For all other cases, the site is non-preexisting
-						pstats.matrix[61][0] += 1
+						vm.pstats.matrix[61][0] += 1
 					end
 				end
 			else
 				if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype == null then
-					pstats.matrix[62][0] += 1
+					vm.pstats.matrix[62][0] += 1
 				end
 			end
 		end
@@ -908,17 +912,17 @@ redef class MOSite
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
 
-		pstats.matrix[impl.index_y][index_x] += 1
-		pstats.matrix[impl.index_y][5] += 1
-		pstats.matrix[impl.compute_index_y(self)][5] += 1
+		vm.pstats.matrix[impl.index_y][index_x] += 1
+		vm.pstats.matrix[impl.index_y][5] += 1
+		vm.pstats.matrix[impl.compute_index_y(self)][5] += 1
 
 		# The total of preexisting sites
 		if pre then
-			pstats.matrix[1][index_x] += 1
-			pstats.matrix[1][5] += 1
+			vm.pstats.matrix[1][index_x] += 1
+			vm.pstats.matrix[1][5] += 1
 		else
-			pstats.matrix[2][index_x] += 1
-			pstats.matrix[2][5] += 1
+			vm.pstats.matrix[2][index_x] += 1
+			vm.pstats.matrix[2][5] += 1
 		end
 	end
 
@@ -927,40 +931,40 @@ redef class MOSite
 	do
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
-			pstats.matrix[23][index_x] += 1
-			pstats.matrix[23][5] += 1
+			vm.pstats.matrix[23][index_x] += 1
+			vm.pstats.matrix[23][5] += 1
 
 			if expr_recv.is_pre then
-				pstats.matrix[24][index_x] += 1
-				pstats.matrix[24][5] += 1
+				vm.pstats.matrix[24][index_x] += 1
+				vm.pstats.matrix[24][5] += 1
 			else
-				pstats.matrix[25][index_x] += 1
-				pstats.matrix[25][5] += 1
+				vm.pstats.matrix[25][index_x] += 1
+				vm.pstats.matrix[25][5] += 1
 			end
 		end
 
 		# If the receiver comes only from a callsite
 		if origin == 4 or origin == 132 then
 			# The total of callsites
-			pstats.matrix[26][index_x] += 1
-			pstats.matrix[26][5] += 1
+			vm.pstats.matrix[26][index_x] += 1
+			vm.pstats.matrix[26][5] += 1
 
 			# If the receiver is preexisting
 			if origin.bin_and(128) == 0 then
 				if not sys.disable_preexistence_extensions then
-					pstats.matrix[27][index_x] += 1
-					pstats.matrix[27][5] += 1
+					vm.pstats.matrix[27][index_x] += 1
+					vm.pstats.matrix[27][5] += 1
 				end
 			else
-				pstats.matrix[28][index_x] += 1
-				pstats.matrix[28][5] += 1
+				vm.pstats.matrix[28][index_x] += 1
+				vm.pstats.matrix[28][5] += 1
 			end
 		end
 
 		# If the receiver comes only from an attribute read
 		if origin == 256 or origin == 384 then
-			pstats.matrix[31][index_x] += 1
-			pstats.matrix[31][5] += 1
+			vm.pstats.matrix[31][index_x] += 1
+			vm.pstats.matrix[31][5] += 1
 		end
 
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
@@ -969,11 +973,11 @@ redef class MOSite
 			if not origin == 1 and not origin == 8 then
 				# If the site is preexisting
 				if origin.bin_and(128) == 0 then
-					pstats.matrix[29][index_x] += 1
-					pstats.matrix[29][5] += 1
+					vm.pstats.matrix[29][index_x] += 1
+					vm.pstats.matrix[29][5] += 1
 				else
-					pstats.matrix[30][index_x] += 1
-					pstats.matrix[30][5] += 1
+					vm.pstats.matrix[30][index_x] += 1
+					vm.pstats.matrix[30][5] += 1
 				end
 			end
 		end
@@ -984,18 +988,18 @@ redef class MOSite
 	do
 		if get_concretes != null then
 			# Total of concretes for each category
-			pstats.matrix[3][index_x] += 1
+			vm.pstats.matrix[3][index_x] += 1
 
 			# Total of concretes
-			pstats.matrix[3][5] += 1
+			vm.pstats.matrix[3][5] += 1
 
 			# Preexisting and non-preexisting sites with concretes
 			if expr_recv.is_pre then
-				pstats.matrix[4][index_x] += 1
-				pstats.matrix[4][5] += 1
+				vm.pstats.matrix[4][index_x] += 1
+				vm.pstats.matrix[4][5] += 1
 			else
-				pstats.matrix[5][index_x] += 1
-				pstats.matrix[5][5] += 1
+				vm.pstats.matrix[5][index_x] += 1
+				vm.pstats.matrix[5][5] += 1
 			end
 		end
 	end
@@ -1004,29 +1008,29 @@ redef class MOSite
 	fun incr_self
 	do
 		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
-			pstats.matrix[0][index_x] += 1
-			pstats.matrix[0][5] += 1
+			vm.pstats.matrix[0][index_x] += 1
+			vm.pstats.matrix[0][5] += 1
 		end
 
 		# Recopy the total of self sites
 		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
-			pstats.matrix[65][index_x] += 1
-			pstats.matrix[65][5] += 1
+			vm.pstats.matrix[65][index_x] += 1
+			vm.pstats.matrix[65][5] += 1
 
 			# Increment for each implementation with self as a receiver
 			var impl = get_impl(sys.vm)
 			if impl isa StaticImpl then
-				pstats.matrix[66][index_x] += 1
-				pstats.matrix[66][5] += 1
+				vm.pstats.matrix[66][index_x] += 1
+				vm.pstats.matrix[66][5] += 1
 			else if impl isa SSTImpl then
-				pstats.matrix[67][index_x] += 1
-				pstats.matrix[67][5] += 1
+				vm.pstats.matrix[67][index_x] += 1
+				vm.pstats.matrix[67][5] += 1
 			else if impl isa PHImpl then
-				pstats.matrix[68][index_x] += 1
-				pstats.matrix[68][5] += 1
+				vm.pstats.matrix[68][index_x] += 1
+				vm.pstats.matrix[68][5] += 1
 			else if impl isa NullImpl then
-				pstats.matrix[69][index_x] += 1
-				pstats.matrix[69][5] += 1
+				vm.pstats.matrix[69][index_x] += 1
+				vm.pstats.matrix[69][5] += 1
 			end
 		end
 	end
@@ -1039,14 +1043,14 @@ redef class MOSite
 		if not rst_loaded then
 			var impl = get_impl(vm)
 
-			pstats.matrix[impl.index_y][4] += 1
-			pstats.matrix[impl.compute_index_y(self)][4] += 1
+			vm.pstats.matrix[impl.index_y][4] += 1
+			vm.pstats.matrix[impl.compute_index_y(self)][4] += 1
 
 			# Increment the total of preexisting and non-preexisting
 			if expr_recv.is_pre then
-				pstats.matrix[1][4] += 1
+				vm.pstats.matrix[1][4] += 1
 			else
-				pstats.matrix[2][4] += 1
+				vm.pstats.matrix[2][4] += 1
 			end
 		end
 	end
@@ -1239,17 +1243,17 @@ redef class MPropDef
 
 		for site in self.mosites do
 			site.stats(vm)
-			sys.pstats.analysed_sites.add(site)
+			sys.vm.pstats.analysed_sites.add(site)
 		end
 
 		for newexpr in self.monews do
-			sys.pstats.new_sites += 1
+			sys.vm.pstats.new_sites += 1
 		end
 
-		sys.pstats.compiled_methods.add(self)
+		sys.vm.pstats.compiled_methods.add(self)
 
 		if self isa MMethodDef then
-			sys.pstats.get_method_return_origin(self)
+			sys.vm.pstats.get_method_return_origin(self)
 		end
 	end
 
@@ -1272,9 +1276,9 @@ redef class MOVar
 		var callees = new List[MProperty]
 		callees.add(mproperty)
 		if trace_origin(self, callees) then
-			pstats.matrix[36][0] += 1
+			vm.pstats.matrix[36][0] += 1
 		else
-			pstats.matrix[37][0] += 1
+			vm.pstats.matrix[37][0] += 1
 		end
 	end
 
