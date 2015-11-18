@@ -434,7 +434,7 @@ redef class PICPattern
 	# Compute an Implementation for self and set attribute `impl`
 	private fun compute_impl
 	do
-		# If the recv_class, is loaded we can compute an implementation
+		# If the recv_class and pic_class are loaded we can compute an implementation
 		if recv_class.abstract_loaded and pic_class.abstract_loaded then
 			# If the PIC is always at the same position in all loaded subclasses of pic
 			if pic_pos_unique then
@@ -450,8 +450,19 @@ redef class PICPattern
 				set_ph_impl(false, pic_class.vtable.id)
 			end
 		else
-			# The receiver class is not loaded, use a null implementation by default
-			set_null_impl
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if pic_class.abstract_loaded then
+				if pic_class.is_instance_of_object(vm) then
+					set_sst_impl(false)
+				else
+					# By default, use perfect hashing
+					set_ph_impl(false, pic_class.vtable.id)
+				end
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				set_null_impl
+			end
 		end
 	end
 
@@ -542,10 +553,22 @@ redef abstract class MOSitePattern
 				set_ph_impl(vm, true, get_pic(vm).vtable.id)
 			end
 		else
-			var pos_cls = get_bloc_position(vm)
-
-			# If the rsc and/or the pic is not loaded, make a null implementation
-			impl = new NullImpl(true, null, 0, get_pic(vm))
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if get_pic(vm).abstract_loaded then
+				var pos_cls = get_bloc_position(vm)
+				if get_pic(vm).is_instance_of_object(vm) then
+					set_sst_impl(vm, false)
+				else if can_be_static then
+					set_static_impl(true)
+				else
+					# By default, use perfect hashing
+					set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				end
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				impl = new NullImpl(true, null, 0, get_pic(vm))
+			end
 		end
 	end
 
