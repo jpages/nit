@@ -144,6 +144,17 @@ redef class VirtualMachine
 
 		super(mclass)
 
+		# Add the number of superclasses of this class (including self)
+		var superclasses = mclass.in_hierarchy(mainmodule).greaters
+		pstats.loaded_superclasses += superclasses.length
+
+		for cl in superclasses do
+			# If this class introduces some attributes
+			if not cl.intro_mattributes.is_empty then
+				pstats.loaded_superclasses_attributes += 1
+			end
+		end
+
 		pstats.loaded_classes_explicits += 1
 	end
 
@@ -249,6 +260,12 @@ class MOStats
 
 	# The number of loaded abstract classes
 	var loaded_classes_abstracts: Int = 0
+
+	# Each time a class is explicitely loaded, count the size of its ancestors
+	var loaded_superclasses: Int = 0
+
+	# Each time a class is loaded, count the number of its superclasses which introduced attributes
+	var loaded_superclasses_attributes: Int = 0
 
 	# The number of MOSite with a primitive receiver
 	var nb_primitive_sites: Int = 0
@@ -376,7 +393,7 @@ class MOStats
 		var file = new FileWriter.open("{dir}/picpatterns-{lbl}.csv")
 
 		# The array to store stats on picpatterns
-		var stats_array_size = 3
+		var stats_array_size = 4
 		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
 		for i in [0..stats_array_size] do
 			stats_array[i] = new Array[Int].filled_with(0, 2)
@@ -388,6 +405,7 @@ class MOStats
 		caption_y.add("sst,")
 		caption_y.add("ph,")
 		caption_y.add("null,")
+		caption_y.add("theoritical bound of pic_patterns,")
 		caption_y.add("\n,")
 
 		var total_sst = 0
@@ -406,6 +424,9 @@ class MOStats
 				stats_array[3][pic_pattern.index_x] += 1
 			end
 		end
+
+		stats_array[4][0] = loaded_superclasses
+		stats_array[4][1] = loaded_superclasses_attributes
 
 		file.write(caption_y[0])
 		for i in [0..stats_array.length[ do
@@ -761,6 +782,9 @@ class MOStats
 		loaded_classes_explicits = counters.loaded_classes_explicits
 		loaded_classes_implicits = counters.loaded_classes_implicits
 		loaded_classes_abstracts = counters.loaded_classes_abstracts
+		loaded_superclasses = counters.loaded_superclasses
+		loaded_superclasses_attributes = counters.loaded_superclasses_attributes
+
 		analysed_sites.add_all(counters.analysed_sites)
 		compiled_methods.add_all(counters.compiled_methods)
 		compiled_new.add_all(counters.compiled_new)
