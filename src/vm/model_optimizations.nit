@@ -54,10 +54,121 @@ redef class ModelBuilder
 
 		super(mainmodule, arguments)
 
+		var concrete_types = new ConcreteTypes(self)
+		concrete_types.get_stats
+
 		if toolcontext.debug.value then
 			# Create the output file for debug traces
 			sys.debug_file.close
 		end
+	end
+end
+
+# A class to gather final classes and concrete attribute types,
+# This class is not compatible with dynamic loading, thus it emulates
+# informations of a hypothetical annotated bytecode
+class ConcreteTypes
+	# The modelbuilder of the program
+	var modelbuilder: ModelBuilder
+
+	# The set of all final classes of the executed program
+	var final_classes = new List[MClass]
+
+	# The classes that are not leaves of the hierarchy
+	var classes = new List[MClass]
+
+	# The set of immutable attributes of the program,
+	# attributes that are only initialized in the class constructor (or inline with initial value)
+	var attributes = new List[MAttribute]
+
+	# The set of immutable attributes
+	var immutable_attributes = new HashSet[MAttribute]
+
+	# The set of mutable attributes of the program
+	var mutable_attributes = new HashSet[MAttribute]
+
+	# All MAttribute of the program
+	var all_attributes = new List[MAttribute]
+
+	fun get_stats
+	do
+		var visitor = new FinalAttributeVisitor(self)
+
+		# Collect about immutable attributes
+		for m in modelbuilder.model.mmodules do
+			for cd in m.mclassdefs do
+				for mpropdef in cd.mpropdefs do
+					# For each MPropdef of the code
+					var node = modelbuilder.mpropdef2node(mpropdef)
+
+					# See if attributes are initialized only in their constructors
+					if node != null and node isa APropdef then
+						# Visit all propdefs
+						visitor.propdef = node
+						node.visit_all(visitor)
+					end
+				end
+			end
+		end
+
+		# Statistics about final classes
+		for mod in modelbuilder.model.mmodules do
+			for classdef in mod.mclassdefs do
+				# If the class is a leaf of the hierarchy
+				if classdef.mclass.in_hierarchy(vm.mainmodule).direct_smallers.length == 0 then
+					# Add it to the collection
+					final_classes.add(classdef.mclass)
+				else
+					classes.add(classdef.mclass)
+				end
+			end
+		end
+	end
+end
+
+# A visitor used to collect concrete types of attributes and detect immutable attributes
+class FinalAttributeVisitor
+	super Visitor
+
+	var propdef: nullable APropdef
+
+	var concrete_types: ConcreteTypes
+
+	redef fun visit(n)
+	do
+		if n isa AAttrFormExpr then
+			var mattribute = n.mproperty.as(not null)
+
+			# By default the attribute is immutable
+			if not concrete_types.mutable_attributes.has(mattribute) then
+				concrete_types.immutable_attributes.add(mattribute)
+			end
+
+			# If the attribute is written
+			if n isa AAttrAssignExpr or n isa AAttrReassignExpr then
+				assert n isa AAttrFormExpr
+
+				# If the Attribute is written in another class of its introduction class,
+				# it is mutable
+				if mattribute.intro_mclassdef.mclass != propdef.mpropdef.mclassdef.mclass then
+					concrete_types.mutable_attributes.add(mattribute)
+
+					# If needed, remove it from immutable attributes
+					if concrete_types.immutable_attributes.has(mattribute) then
+						concrete_types.immutable_attributes.remove(mattribute)
+					end
+				else
+					# Written in a property which is not a constructor
+					if propdef.mpropdef.as(MMethodDef).initializers.is_empty then
+						concrete_types.immutable_attributes.remove(mattribute)
+						concrete_types.mutable_attributes.add(mattribute)
+					end
+				end
+			end
+		end
+
+		# Recursively visit all children
+		n.visit_all(self)
 	end
 end
 
