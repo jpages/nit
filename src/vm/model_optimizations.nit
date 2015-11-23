@@ -87,9 +87,6 @@ class ConcreteTypes
 	# The set of mutable attributes of the program
 	var mutable_attributes = new HashSet[MAttribute]
 
-	# All MAttribute of the program
-	var all_attributes = new List[MAttribute]
-
 	fun get_stats
 	do
 		var visitor = new FinalAttributeVisitor(self)
@@ -103,6 +100,7 @@ class ConcreteTypes
 
 					# See if attributes are initialized only in their constructors
 					if node != null and node isa APropdef then
+						if node isa AAttrPropdef then print "node {node.to_s}"
 						# Visit all propdefs
 						visitor.propdef = node
 						node.visit_all(visitor)
@@ -136,6 +134,10 @@ class FinalAttributeVisitor
 
 	redef fun visit(n)
 	do
+		if n isa AAttrPropdef then
+			print "AAttrPropdef in vist(n) {n}"
+		end
+
 		if n isa AAttrFormExpr then
 			var mattribute = n.mproperty.as(not null)
 
@@ -146,7 +148,6 @@ class FinalAttributeVisitor
 
 			# If the attribute is written
 			if n isa AAttrAssignExpr or n isa AAttrReassignExpr then
-				assert n isa AAttrFormExpr
 
 				# If the Attribute is written in another class of its introduction class,
 				# it is mutable
@@ -164,6 +165,13 @@ class FinalAttributeVisitor
 						concrete_types.mutable_attributes.add(mattribute)
 					end
 				end
+			end
+
+			# Collect the right part of assignments for this attribute
+			if n isa AAttrAssignExpr then
+				mattribute.assignments.add(n.n_value)
+			else if n isa AAttrReassignExpr then
+				mattribute.assignments.add(n.n_value)
 			end
 		end
 
@@ -547,7 +555,7 @@ redef class MPropDef
 
 		for site in mosites do
 			# Init the concrete receivers
-			site.compute_concretes
+			site.compute_concretes_site
 		end
 	end
 
@@ -584,6 +592,11 @@ end
 
 redef class MMethodDef
 	redef type P: MOCallSitePattern
+end
+
+redef class MAttribute
+	# All right parts of assignments for this attribute
+	var assignments = new List[AExpr]
 end
 
 # Root hierarchy of MO entities
@@ -791,7 +804,7 @@ abstract class MOSite
 
 	fun pattern_factory(rst: MType, gp: MProperty, rsc: MClass): P is abstract
 
-	private fun compute_concretes
+	private fun compute_concretes_site
 	do
 		var res = expr_recv.compute_concretes(null)
 		if res != null then
@@ -974,6 +987,14 @@ class MOReadSite
 
 	# Tell if the attribute is immutable, useless at the moment
 	var immutable = false
+
+	redef fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
+	do
+		# Compute the global (closed-world) concrete types of this attribute
+		print "pattern.gp {pattern.gp} {pattern.gp.assignments}"
+
+		return null
+	end
 end
 
 # MO of write attribute
