@@ -150,7 +150,7 @@ redef class MOStats
 		var table3 = "ReadSite & {0} & {0} & {0} & {total_readsite_improved} & {total_readsite_improved*100/total_readsite_improvable}\\\\\n"
 		table3 += "NewSite & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {total_new_improved*100/total_new_improvable}\\\\\n"
 		table3 += "CallSite & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
-		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {total_other_improved*100/total_other_improvable}\\\\\n"
+		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
 
 		table3 += "\\hline\n"
 
@@ -193,7 +193,7 @@ redef class MOStats
 		var table3 = "CallSite & {if vm.pstats.matrix[26][0] != 0 then vm.pstats.matrix[27][0]*100/vm.pstats.matrix[26][0] else 0} & {if vm.pstats.matrix[26][1] != 0 then vm.pstats.matrix[27][1]*100/vm.pstats.matrix[26][1] else 0} & {if vm.pstats.matrix[26][2] != 0 then vm.pstats.matrix[27][2]*100/vm.pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
 		table3 += "ReadSite & {0} & {0} & {0} & {0}\\\\\n"
 		table3 += "NewSite & {if vm.pstats.matrix[23][0] != 0 then vm.pstats.matrix[24][0]*100/vm.pstats.matrix[23][0] else 0} & {if vm.pstats.matrix[23][1] != 0 then vm.pstats.matrix[24][1]*100/vm.pstats.matrix[23][1] else 0} & {if vm.pstats.matrix[23][2] != 0 then vm.pstats.matrix[24][2]*100/vm.pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
-		table3 += "other & {if vm.pstats.matrix[29][0] != 0 then vm.pstats.matrix[29][0]*100/(vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]) else 0} & {if vm.pstats.matrix[29][1] != 0 then vm.pstats.matrix[29][1]*100/(vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]) else 0} & {if vm.pstats.matrix[29][2] != 0 then vm.pstats.matrix[29][2]*100/(vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]) else 0} & {total_other_improved*100/total_other_improvable}\\\\\n"
+		table3 += "other & {if vm.pstats.matrix[29][0] != 0 then vm.pstats.matrix[29][0]*100/(vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]) else 0} & {if vm.pstats.matrix[29][1] != 0 then vm.pstats.matrix[29][1]*100/(vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]) else 0} & {if vm.pstats.matrix[29][2] != 0 then vm.pstats.matrix[29][2]*100/(vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]) else 0} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
 
 		table3 += "\\hline\n"
 

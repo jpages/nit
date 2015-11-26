@@ -640,8 +640,28 @@ end
 redef class MOReadSite
 	redef fun compute_preexist
 	do
-		# For now, an attribute read is non-preexisting perennial
-		return 24
+		if disable_preexistence_extensions then
+			# Non-preexisting and perennial
+			return 24
+		else
+			var concretes = compute_concretes(new List[MClass])
+			if concretes != null then
+				for concrete in concretes do
+					# If a least one concrete of this attribute is not loaded, is it not preexisting
+					if not concrete.abstract_loaded then
+						# TODO : 8
+						return 24
+					end
+				end
+
+				# Preexisting and perennial because concrete types of the attribute
+				# will not change in the future
+				return 3
+			else
+				# Non-preexisting and perennial
+				return 24
+			end
+		end
 	end
 
 	redef fun preexistence_origin: Int

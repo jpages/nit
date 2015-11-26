@@ -52,10 +52,10 @@ redef class ModelBuilder
 			sys.debug_file = new FileWriter.open("debug_file.txt")
 		end
 
-		super(mainmodule, arguments)
-
-		var concrete_types = new ConcreteTypes(self)
+		var concrete_types = new ConcreteTypes(self, mainmodule)
 		concrete_types.get_stats
+
+		super(mainmodule, arguments)
 
 		if toolcontext.debug.value then
 			# Create the output file for debug traces
@@ -70,6 +70,9 @@ end
 class ConcreteTypes
 	# The modelbuilder of the program
 	var modelbuilder: ModelBuilder
+
+	# The mainmodule of the program
+	var mainmodule: MModule
 
 	# The set of all final classes of the executed program
 	var final_classes = new List[MClass]
@@ -100,7 +103,10 @@ class ConcreteTypes
 
 					# See if attributes are initialized only in their constructors
 					if node != null and node isa APropdef then
-						if node isa AAttrPropdef then print "node {node.to_s}"
+						if node isa AAttrPropdef then
+							attribute_declaration(node)
+						end
+
 						# Visit all propdefs
 						visitor.propdef = node
 						node.visit_all(visitor)
@@ -113,12 +119,40 @@ class ConcreteTypes
 		for mod in modelbuilder.model.mmodules do
 			for classdef in mod.mclassdefs do
 				# If the class is a leaf of the hierarchy
-				if classdef.mclass.in_hierarchy(vm.mainmodule).direct_smallers.length == 0 then
+				if classdef.mclass.in_hierarchy(mainmodule).direct_smallers.length == 0 then
 					# Add it to the collection
 					final_classes.add(classdef.mclass)
 				else
 					classes.add(classdef.mclass)
 				end
+			end
+		end
+	end
+
+	# Get the concrete type of the initial value of this attribute
+	fun attribute_declaration(node: AAttrPropdef)
+	do
+		# Get all the annotations attached to this AAttrPropdef
+		if node.n_annotations != null then
+			for annotation in node.n_annotations.n_items do
+				if annotation.name == "writable" then
+					# If the setter of the attribute is public for all modules,
+					# we can not use its concrete types
+					node.mpropdef.mproperty.has_concrete_types = false
+					return
+				end
+			end
+		end
+
+		if node.n_expr != null then
+			# Only if the initial value is a new
+			if node.n_expr isa ANewExpr then
+				if not node.mpropdef.mproperty.assignments.has(node.n_expr.as(not null)) then
+					node.mpropdef.mproperty.assignments.add(node.n_expr.as(not null))
+				end
+			else
+				# The attribute do not have concrete types
+				node.mpropdef.mproperty.has_concrete_types = false
 			end
 		end
 	end
@@ -134,10 +168,6 @@ class FinalAttributeVisitor
 
 	redef fun visit(n)
 	do
-		if n isa AAttrPropdef then
-			print "AAttrPropdef in vist(n) {n}"
-		end
-
 		if n isa AAttrFormExpr then
 			var mattribute = n.mproperty.as(not null)
 
@@ -169,9 +199,17 @@ class FinalAttributeVisitor
 
 			# Collect the right part of assignments for this attribute
 			if n isa AAttrAssignExpr then
-				mattribute.assignments.add(n.n_value)
+				if n.n_value isa ANewExpr then
+					mattribute.assignments.add(n.n_value)
+				else
+					mattribute.has_concrete_types = false
+				end
 			else if n isa AAttrReassignExpr then
-				mattribute.assignments.add(n.n_value)
+				if n.n_value isa ANewExpr then
+					mattribute.assignments.add(n.n_value)
+				else
+					mattribute.has_concrete_types = false
+				end
 			end
 		end
 
@@ -597,6 +635,10 @@ end
 redef class MAttribute
 	# All right parts of assignments for this attribute
 	var assignments = new List[AExpr]
+
+	# Indicate if we can use the concrete types of this attribute,
+	# if false, then the attribute do not have concrete types
+	var has_concrete_types = true
 end
 
 # Root hierarchy of MO entities
@@ -991,9 +1033,22 @@ class MOReadSite
 	redef fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
 	do
 		# Compute the global (closed-world) concrete types of this attribute
-		print "pattern.gp {pattern.gp} {pattern.gp.assignments}"
+		if pattern.gp.has_concrete_types then
+			concretes = new List[MClass]
+			for assignment in pattern.gp.assignments do
+				var mclass = assignment.as(ANewExpr).mtype.as(MClassType).mclass
+				concretes.add(mclass)
+			end
+		else
+			return null
+		end
 
-		return null
+		if not concretes.is_empty then
+			print "{pattern.gp} {concretes}"
+			return concretes
+		else
+			return null
+		end
 	end
 end
 

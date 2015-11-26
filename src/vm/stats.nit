@@ -198,7 +198,7 @@ redef class VirtualMachine
 		trace_origin = new Array[Int].filled_with(0, 257)
 
 		# Initialize the matrix of results
-		var matrix_length = 80
+		var matrix_length = 82
 		pstats.matrix = new Array[Array[Int]].with_capacity(matrix_length)
 		for i in [0..matrix_length[ do
 			pstats.matrix[i] = new Array[Int].filled_with(0, 6)
@@ -312,7 +312,7 @@ class MOStats
 	# Return an array which contains all captions of the statistics for the y axis
 	fun caption_y: Array[String]
 	do
-		var res = new Array[String].with_capacity(75)
+		var res = new Array[String].with_capacity(77)
 
 		res.add("self,")
 		res.add("preexist,")
@@ -345,8 +345,9 @@ class MOStats
 		res.add("from return non-preexisting,")
 		res.add("from other preexisting,")
 		res.add("from other non-preexisting,")
-		res.add("from readsite,")
-		res.add("\n,")
+		res.add("from readsite preexisting,")
+		res.add("from readsite non-preexisting,")
+		res.add(",")
 		res.add("callers positive cuc,")
 		res.add("callers null cuc,")
 		res.add("\n,")
@@ -987,8 +988,14 @@ redef class MOSite
 
 		# If the receiver comes only from an attribute read
 		if origin == 256 or origin == 384 then
-			vm.pstats.matrix[31][index_x] += 1
-			vm.pstats.matrix[31][5] += 1
+			if origin.bin_and(128) == 0 then
+				# Preexisting attribute with concrete types
+				vm.pstats.matrix[31][index_x] += 1
+				vm.pstats.matrix[31][5] += 1
+			else
+				# vm.pstats.matrix[32][index_x] += 1
+				# vm.pstats.matrix[32][5] += 1
+			end
 		end
 
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
