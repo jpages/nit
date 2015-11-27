@@ -213,6 +213,28 @@ class FinalAttributeVisitor
 			end
 		end
 
+		# The attribute can be set with a call to its setter
+		if n isa ASendExpr then
+			var called_node_ast = concrete_types.modelbuilder.mpropdef2node(n.callsite.mpropdef)
+			var is_attribute = called_node_ast isa AAttrPropdef
+
+			# A call to an accessor
+			if is_attribute then
+				# If the accessor is a setter
+				if n.callsite.msignature.mparameters.length != 0 then
+					var mattribute = called_node_ast.as(AAttrPropdef).mpropdef.as(not null).mproperty
+
+					# We add only the right part of assignement if this is a new
+					# TODO: handle the case of primitive types
+					if n.raw_arguments[0] isa ANewExpr then
+						mattribute.assignments.add(n.raw_arguments[0])
+					else
+						mattribute.has_concrete_types = false
+					end
+				end
+			end
+		end
+
 		# Recursively visit all children
 		n.visit_all(self)
 	end
@@ -1032,6 +1054,7 @@ class MOReadSite
 
 	redef fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
 	do
+		# TODO : put the concrete types into the pattern of the attribute
 		# Compute the global (closed-world) concrete types of this attribute
 		if pattern.gp.has_concrete_types then
 			concretes = new List[MClass]

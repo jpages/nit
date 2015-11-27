@@ -191,9 +191,9 @@ redef class VirtualMachine
 
 	fun init_stats
 	do
-		return_origin = new Array[Int].filled_with(0, 129)
+		return_origin = new Array[Int].filled_with(0, 257)
 		receiver_origin = new Array[Int].filled_with(0, 513)
-		return_origin_recursive = new Array[Int].filled_with(0, 129)
+		return_origin_recursive = new Array[Int].filled_with(0, 257)
 		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
 		trace_origin = new Array[Int].filled_with(0, 257)
 
@@ -347,8 +347,7 @@ class MOStats
 		res.add("from other non-preexisting,")
 		res.add("from readsite preexisting,")
 		res.add("from readsite non-preexisting,")
-		res.add(",")
-		res.add("callers positive cuc,")
+		res.add("\ncallers positive cuc,")
 		res.add("callers null cuc,")
 		res.add("\n,")
 		res.add("inter procedural return from new,")
@@ -432,7 +431,6 @@ class MOStats
 		file.write(caption_y[0])
 		for i in [0..stats_array.length[ do
 			if i +1< caption_y.length then file.write(caption_y[i+1])
-
 			var size = stats_array[i].length
 			for j in [0..size[ do
 				file.write(stats_array[i][j].to_s + ",")
@@ -993,8 +991,8 @@ redef class MOSite
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
 			else
-				# vm.pstats.matrix[32][index_x] += 1
-				# vm.pstats.matrix[32][5] += 1
+				vm.pstats.matrix[32][index_x] += 1
+				vm.pstats.matrix[32][5] += 1
 			end
 		end
 

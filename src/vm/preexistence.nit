@@ -649,8 +649,7 @@ redef class MOReadSite
 				for concrete in concretes do
 					# If a least one concrete of this attribute is not loaded, is it not preexisting
 					if not concrete.abstract_loaded then
-						# TODO : 8
-						return 24
+						return 8
 					end
 				end
 
