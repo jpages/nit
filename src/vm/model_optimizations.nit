@@ -122,6 +122,7 @@ class ConcreteTypes
 				if classdef.mclass.in_hierarchy(mainmodule).direct_smallers.length == 0 then
 					# Add it to the collection
 					final_classes.add(classdef.mclass)
+					classdef.mclass.is_final = true
 				else
 					classes.add(classdef.mclass)
 				end
@@ -1112,6 +1113,9 @@ redef class MClass
 	# this class is considered the Property Introduction Class
 	# and stores alls the PICPatterns for a property which is introduced in self
 	var pic_patterns = new List[PICPattern]
+
+	# Indicate if this class do not have subclasses
+	var is_final = false
 
 	# `self` is an instance of object
 	fun is_instance_of_object(vm:VirtualMachine): Bool
