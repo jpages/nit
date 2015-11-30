@@ -543,7 +543,7 @@ redef abstract class MOSitePattern
 	fun compute_impl(vm: VirtualMachine)
 	do
 		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
-			if pic_pos_unique(vm) or rsc.is_final then
+			if pic_pos_unique(vm) then #or rsc.is_final then
 				if can_be_static then
 					set_static_impl(true)
 				else
@@ -557,7 +557,7 @@ redef abstract class MOSitePattern
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
 				var pos_cls = get_bloc_position(vm)
-				if get_pic(vm).is_instance_of_object(vm) or rsc.is_final then
+				if get_pic(vm).is_instance_of_object(vm) then #or rsc.is_final then
 					set_sst_impl(vm, false)
 				else if can_be_static then
 					set_static_impl(true)

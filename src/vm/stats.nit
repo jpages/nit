@@ -353,8 +353,8 @@ class MOStats
 		res.add("inter procedural return from new,")
 		res.add("inter procedural return from other,")
 		res.add("from primitive/lit,")
-		res.add("procedure,")
-		res.add("\n,")
+		res.add("procedure,\n")
+		res.add("Number of unloaded classes,")
 		res.add("compiled new of unloaded classes,")
 		res.add("ast sites,")
 		res.add("new sites,")
@@ -637,13 +637,18 @@ class MOStats
 
 		# compiled "new" of unloaded classes at the end of execution
 		var compiled_new_unloaded = 0
+		var unloaded_classes = new HashSet[MClass]
 		for newsite in sys.vm.all_new_sites do
 			if not newsite.pattern.cls.abstract_loaded then
 				compiled_new_unloaded += 1
+				unloaded_classes.add(newsite.pattern.cls)
 				print("UNLOADED {newsite} class = {newsite.pattern.cls}")
 			end
 		end
 
+		print "Unloaded classes {unloaded_classes}"
+
+		vm.pstats.matrix[40][0] = unloaded_classes.length
 		vm.pstats.matrix[41][0] = compiled_new_unloaded
 
 		vm.pstats.matrix[42][0] = sys.vm.pstats.nb_ast_sites

@@ -871,17 +871,27 @@ abstract class MOSite
 
 	private fun compute_concretes_site
 	do
-		var res = expr_recv.compute_concretes(null)
-		if res != null then
-			concretes_receivers = res
+		# If the receiver class is a final class, then the expression has concrete receiver
+		if pattern.rsc.is_final and pattern.rsc.abstract_loaded then
+			var concrete = new List[MClass]
+			concrete.add(pattern.rsc)
 
-			# for concrete in res do
-			# 	if concrete.concrete_caller_sites == null then
-			# 		concrete.concrete_caller_sites = new List[MOSite]
-			# 	end
+			concretes_receivers = concrete
 
-			# 	concrete.concrete_caller_sites.add(self)
-			# end
+			print("Site {self} rsc {pattern.rsc} final rule")
+		else
+			var res = expr_recv.compute_concretes(null)
+			if res != null then
+				concretes_receivers = res
+
+				# for concrete in res do
+				# 	if concrete.concrete_caller_sites == null then
+				# 		concrete.concrete_caller_sites = new List[MOSite]
+				# 	end
+
+				# 	concrete.concrete_caller_sites.add(self)
+				# end
+			end
 		end
 	end
 
