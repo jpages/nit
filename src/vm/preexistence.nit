@@ -370,6 +370,9 @@ redef class MOCallSite
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
 
+		# Compute the concrete receivers of this site
+		compute_concretes_site
+
 		if concretes_receivers != null then
 			callees = concretes_callees
 
@@ -644,7 +647,8 @@ redef class MOReadSite
 			# Non-preexisting and perennial
 			return 24
 		else
-			var concretes = compute_concretes(new List[MClass])
+			compute_concretes_site
+			var concretes = concretes_receivers
 			if concretes != null then
 				for concrete in concretes do
 					# If a least one concrete of this attribute is not loaded, is it not preexisting

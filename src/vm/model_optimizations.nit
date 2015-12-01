@@ -691,8 +691,20 @@ abstract class MOExpr
 
 	fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
 	do
-		# By default, an expression has not concretes
-		return null
+		# FinalSite rule
+		if ast == null then return null
+
+		var mclass = ast.mtype.get_mclass(sys.vm, lp)
+
+		if mclass != null and mclass.is_final then
+			concretes = new List[MClass]
+			concretes.add(mclass)
+
+			return concretes
+		else
+			# By default, an expression has not concretes
+			return null
+		end
 	end
 end
 
@@ -703,7 +715,7 @@ abstract class MOVar
 	# The Variable objet refered by this node
 	var variable: Variable
 
-	# The offset of the variable in it environment, or the position of parameter
+	# The offset of the variable in its environment, or the position of parameter
 	var offset: Int
 
 	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
@@ -745,9 +757,11 @@ class MOPhiVar
 	# List of expressions that variable depends
 	var dependencies = new List[MOExpr] is writable
 
-	#TODO
+	#TODOf
 	redef fun compute_concretes(concretes)
 	do
+		super
+
 		if concretes == null then
 			concretes = new List[MClass]
 		end
@@ -869,16 +883,16 @@ abstract class MOSite
 
 	fun pattern_factory(rst: MType, gp: MProperty, rsc: MClass): P is abstract
 
-	private fun compute_concretes_site
+	fun compute_concretes_site
 	do
+		if concretes_receivers != null then return
+
 		# If the receiver class is a final class, then the expression has concrete receiver
-		if pattern.rsc.is_final and pattern.rsc.abstract_loaded then
+		if pattern.rsc.is_final then
 			var concrete = new List[MClass]
 			concrete.add(pattern.rsc)
 
 			concretes_receivers = concrete
-
-			print("Site {self} rsc {pattern.rsc} final rule")
 		else
 			var res = expr_recv.compute_concretes(null)
 			if res != null then
@@ -898,6 +912,8 @@ abstract class MOSite
 	# Get concretes receivers (or return empty list)
 	fun get_concretes: nullable List[MClass]
 	do
+		compute_concretes_site
+
 		return concretes_receivers
 	end
 
@@ -1011,7 +1027,9 @@ class MOCallSite
 	do
 		var callees = new List[MPropDef]
 
-		for rcv in concretes_receivers.as(not null) do
+		compute_concretes_site
+
+		for rcv in get_concretes.as(not null) do
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
 
 			if not callees.has(propdef) then
@@ -1469,7 +1487,6 @@ redef class Variable
 			movar = mophi
 
 			for dep in dep_exprs do
-				# mophi.dependencies.add(sys.monull)
 				mophi.dependencies.add(dep.ast2mo(mpropdef).as(MOExpr))
 			end
 			return mophi

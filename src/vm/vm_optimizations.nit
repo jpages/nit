@@ -211,7 +211,6 @@ redef class AAttrAssignExpr
 	end
 end
 
-
 redef class ASendExpr
 	redef fun expr(v)
 	do
@@ -543,7 +542,7 @@ redef abstract class MOSitePattern
 	fun compute_impl(vm: VirtualMachine)
 	do
 		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
-			if pic_pos_unique(vm) then #or rsc.is_final then
+			if pic_pos_unique(vm) then
 				if can_be_static then
 					set_static_impl(true)
 				else
@@ -557,7 +556,7 @@ redef abstract class MOSitePattern
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
 				var pos_cls = get_bloc_position(vm)
-				if get_pic(vm).is_instance_of_object(vm) then #or rsc.is_final then
+				if get_pic(vm).is_instance_of_object(vm) then
 					set_sst_impl(vm, false)
 				else if can_be_static then
 					set_static_impl(true)
@@ -662,7 +661,13 @@ end
 redef class MOCallSitePattern
 	redef fun set_static_impl(mutable) do impl = new StaticImplProp(mutable, callees.first)
 
-	redef fun can_be_static do return callees.length == 1
+	redef fun can_be_static
+	do
+		# If the rsc is a final class
+		if rsc.is_final and callees.length != 0 then return true
+
+		return callees.length == 1
+	end
 
 	redef fun add_lp(lp)
 	do
@@ -691,11 +696,15 @@ redef abstract class MOSite
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 			return impl.as(not null)
-		else if get_concretes == null then
-			return pattern.get_impl(vm)
 		else
-			compute_impl_concretes(vm)
-			return impl.as(not null)
+			compute_concretes_site
+
+			if concretes_receivers == null then
+				return pattern.get_impl(vm)
+			else
+				compute_impl_concretes(vm)
+				return impl.as(not null)
+			end
 		end
 	end
 
@@ -906,6 +915,8 @@ redef class MOCallSite
 	do
 		# If the pattern can be static, return true
 		if super then return true
+
+		compute_concretes_site
 
 		if get_concretes == null then
 			return false

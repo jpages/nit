@@ -191,14 +191,14 @@ redef class VirtualMachine
 
 	fun init_stats
 	do
-		return_origin = new Array[Int].filled_with(0, 257)
+		return_origin = new Array[Int].filled_with(0, 513)
 		receiver_origin = new Array[Int].filled_with(0, 513)
 		return_origin_recursive = new Array[Int].filled_with(0, 257)
 		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
 		trace_origin = new Array[Int].filled_with(0, 257)
 
 		# Initialize the matrix of results
-		var matrix_length = 82
+		var matrix_length = 90
 		pstats.matrix = new Array[Array[Int]].with_capacity(matrix_length)
 		for i in [0..matrix_length[ do
 			pstats.matrix[i] = new Array[Int].filled_with(0, 6)
@@ -353,7 +353,8 @@ class MOStats
 		res.add("inter procedural return from new,")
 		res.add("inter procedural return from other,")
 		res.add("from primitive/lit,")
-		res.add("procedure,\n")
+		res.add("procedure,")
+		res.add("\nNumber of loaded classes,")
 		res.add("Number of unloaded classes,")
 		res.add("compiled new of unloaded classes,")
 		res.add("ast sites,")
@@ -361,7 +362,7 @@ class MOStats
 		res.add("object sites,")
 		res.add("mo_supers,")
 		res.add("primitive_sites,")
-		res.add("\n,")
+		# res.add("\n,")
 		res.add("procedures,")
 		res.add("methods with a return,")
 		res.add("methods with a preexisting return,")
@@ -379,11 +380,18 @@ class MOStats
 		res.add("no return sites,")
 		res.add("not executed sites,")
 		res.add("\n")
-		res.add("total self,")
+		res.add("total self receiver,")
 		res.add("static self,")
 		res.add("sst self,")
 		res.add("ph self,")
 		res.add("null self,")
+		res.add("\n")
+		res.add("total from readsite,")
+		res.add("readsite with concretes,")
+		res.add("static readsite,")
+		res.add("sst readsite,")
+		res.add("ph readsite,")
+		res.add("null readsite,")
 		return res
 	end
 
@@ -637,17 +645,23 @@ class MOStats
 
 		# compiled "new" of unloaded classes at the end of execution
 		var compiled_new_unloaded = 0
+
+		# Loaded classes at the end of execution
+		var loaded_classes = new HashSet[MClass]
 		var unloaded_classes = new HashSet[MClass]
 		for newsite in sys.vm.all_new_sites do
 			if not newsite.pattern.cls.abstract_loaded then
 				compiled_new_unloaded += 1
 				unloaded_classes.add(newsite.pattern.cls)
 				print("UNLOADED {newsite} class = {newsite.pattern.cls}")
+			else
+				loaded_classes.add(newsite.pattern.cls)
 			end
 		end
 
 		print "Unloaded classes {unloaded_classes}"
 
+		vm.pstats.matrix[39][0] = loaded_classes.length
 		vm.pstats.matrix[40][0] = unloaded_classes.length
 		vm.pstats.matrix[41][0] = compiled_new_unloaded
 
@@ -862,6 +876,9 @@ redef class MOSite
 		expr_recv.expr_preexist
 		origin = expr_recv.preexistence_origin
 
+		# Compute the concrete types of this site
+		compute_concretes_site
+
 		# If the receiver is not a primitive
 		if not origin.bin_and(16) == 16 then
 			incr_from_site
@@ -978,11 +995,9 @@ redef class MOSite
 			vm.pstats.matrix[26][5] += 1
 
 			# If the receiver is preexisting
-			if origin.bin_and(128) == 0 then
-				if not sys.disable_preexistence_extensions then
-					vm.pstats.matrix[27][index_x] += 1
-					vm.pstats.matrix[27][5] += 1
-				end
+			if origin.bin_and(128) == 0 and not sys.disable_preexistence_extensions then
+				vm.pstats.matrix[27][index_x] += 1
+				vm.pstats.matrix[27][5] += 1
 			else
 				vm.pstats.matrix[28][index_x] += 1
 				vm.pstats.matrix[28][5] += 1
@@ -991,6 +1006,8 @@ redef class MOSite
 
 		# If the receiver comes only from an attribute read
 		if origin == 256 or origin == 384 then
+			readsite_statistics
+
 			if origin.bin_and(128) == 0 then
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
@@ -1035,6 +1052,34 @@ redef class MOSite
 				vm.pstats.matrix[5][index_x] += 1
 				vm.pstats.matrix[5][5] += 1
 			end
+		end
+	end
+
+	# Output special statistics on receiver which come from a readsite
+	fun readsite_statistics
+	do
+		# The total of site coming from a readsite
+		vm.pstats.matrix[71][index_x] += 1
+		vm.pstats.matrix[71][5] += 1
+
+		if get_concretes != null then
+			vm.pstats.matrix[72][index_x] += 1
+			vm.pstats.matrix[72][5] += 1
+		end
+
+		var impl = get_impl(sys.vm)
+		if impl isa StaticImpl then
+			vm.pstats.matrix[73][index_x] += 1
+			vm.pstats.matrix[73][5] += 1
+		else if impl isa SSTImpl then
+			vm.pstats.matrix[74][index_x] += 1
+			vm.pstats.matrix[74][5] += 1
+		else if impl isa PHImpl then
+			vm.pstats.matrix[75][index_x] += 1
+			vm.pstats.matrix[75][5] += 1
+		else if impl isa NullImpl then
+			vm.pstats.matrix[76][index_x] += 1
+			vm.pstats.matrix[76][5] += 1
 		end
 	end
 
