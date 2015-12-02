@@ -907,6 +907,15 @@ abstract class MOSite
 				# end
 			end
 		end
+
+		# Verify that concrete types are more precise that static type of the expression
+		if concretes_receivers != null then
+			if expr_recv.ast != null then
+				if concretes_receivers.length == 1 then
+					print "compute_concretes_site {self} {expr_recv.ast.mtype.as(not null)} concretes {concretes_receivers.as(not null)}"
+				end
+			end
+		end
 	end
 
 	# Get concretes receivers (or return empty list)

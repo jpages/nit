@@ -503,7 +503,6 @@ redef class PICPattern
 end
 
 redef class MethodPICPattern
-
 	redef fun get_block_position: Int
 	do
 		return recv_class.get_position_methods(pic_class)
@@ -511,7 +510,10 @@ redef class MethodPICPattern
 
 	redef fun get_pic_position: Int
 	do
-		return pic_class.position_methods
+		if pic_class.position_methods > 0 then return pic_class.position_methods
+
+		# See if loaded subclasses of the RSC have a unique position
+		return recv_class.get_position_methods(pic_class)
 	end
 end
 
@@ -523,7 +525,10 @@ redef class AttributePICPattern
 
 	redef fun get_pic_position: Int
 	do
-		return pic_class.position_attributes
+		if pic_class.position_attributes > 0 then return pic_class.position_attributes
+
+		# See if loaded subclasses of the RSC have a unique position
+		return recv_class.get_position_attributes(pic_class)
 	end
 end
 
@@ -534,49 +539,22 @@ redef abstract class MOSitePattern
 	# Get implementation, compute it if not exists
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
-		if impl == null then compute_impl(vm)
+		if impl == null then compute_impl
 		return impl.as(not null)
 	end
 
-	# Compute the implementation
-	fun compute_impl(vm: VirtualMachine)
-	do
-		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
-			if pic_pos_unique(vm) then
-				if can_be_static then
-					set_static_impl(true)
-				else
-					set_sst_impl(vm, true)
-				end
-			else
-				set_ph_impl(vm, true, get_pic(vm).vtable.id)
-			end
-		else
-			# The rst is not loaded but the pic is,
-			# we can compute the implementation with pic's informations
-			if get_pic(vm).abstract_loaded then
-				var pos_cls = get_bloc_position(vm)
-				if get_pic(vm).is_instance_of_object(vm) then
-					set_sst_impl(vm, false)
-				else if can_be_static then
-					set_static_impl(true)
-				else
-					# By default, use perfect hashing
-					set_ph_impl(vm, false, get_pic(vm).vtable.id)
-				end
-			else
-				# The RST and the PIC are not loaded, make a null implementation by default
-				impl = new NullImpl(true, null, 0, get_pic(vm))
-			end
-		end
-	end
+	# Compute the implementation of this pattern and set attribute `impl`
+	private fun compute_impl is abstract
 
 	# Get the relative offset of the "property" (gp for MOPropPattern, method block offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
-	# True if the pattern can be static
+	# Return `true` if the pattern can be static
 	# False by default
-	fun can_be_static: Bool do return false
+	fun can_be_static: Bool
+	do
+		return false
+	end
 
 	# Set a static implementation
 	fun set_static_impl(mutable: Bool) is abstract
@@ -585,12 +563,12 @@ redef abstract class MOSitePattern
 	fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_bloc_position(vm)
+		var pos_cls = get_block_position
 
 		impl = new SSTImpl(mutable, pos_cls + offset)
 	end
 
-	# Set a ph impl
+	# Set a perfect hashing implementation
 	# *`mutable` Indicate if the implementation can change in the future
 	# *`id` The target identifier
 	fun set_ph_impl(vm: VirtualMachine, mutable: Bool, id: Int)
@@ -600,60 +578,57 @@ redef abstract class MOSitePattern
 		impl = new PHImpl(mutable, offset, id)
 	end
 
+	# Return true if the pic is at a unique position on the whole class hierarchy
+	fun pic_pos_unique: Bool
+	do
+		return get_pic_position > 0
+	end
+
 	# Return the offset of the introduction property of the class
-	# Redef in MOAttrPattern to use MClass:get_position_attribute instead of get_position_method
-	private fun get_bloc_position(vm: VirtualMachine): Int do return rsc.get_position_methods(get_pic(vm))
+	fun get_block_position: Int is abstract
 
-	# Tell if the pic is at unique position on whole class hierarchy
-	private fun pic_pos_unique(vm: VirtualMachine): Bool do return get_pic_position(vm) > 0
-
-	# Return the position of the pic (neg. value if pic is at multiple positions)
-	# Redef in MOAttrPattern to use position_attributes
-	private fun get_pic_position(vm: VirtualMachine): Int do return get_pic(vm).position_methods
-end
-
-redef class MOSubtypeSitePattern
-	redef fun get_offset(vm) do return get_pic(vm).color
-
-	redef fun can_be_static
-	do
-		# If the target is not loaded, the cast will always fail
-		if not target_mclass.abstract_loaded then return true
-
-		# If rsc has only one loaded subclass, then true
-		if rsc.single_loaded_subclass(target_mclass) then return true
-
-		return false
-	end
-
-	redef fun set_static_impl(mutable)
-	do
-		impl = new StaticImplSubtype(false, true)
-	end
-end
-
-redef class MOAsNotNullPattern
-	redef fun get_offset(vm) do return 0
-
-	redef fun set_static_impl(mutable)
-	do
-		impl = new StaticImplSubtype(false, true)
-	end
-
-	redef fun can_be_static
-	do
-		return false
-	end
-end
-
-redef abstract class MOPropSitePattern
-	redef fun get_offset(vm) do return gp.offset
+	# Return the position of the pic for this rsc (neg. value if pic is at multiple positions)
+	fun get_pic_position: Int is abstract
 end
 
 redef class MOAttrPattern
-	redef fun get_bloc_position(vm) do return rsc.get_position_attributes(get_pic(vm))
+	redef fun compute_impl
+	do
+		# Get the implementation of the PICPattern
+		var picpattern_impl = pic_pattern.get_impl
 
- 	redef fun get_pic_position(vm) do return get_pic(vm).position_attributes
+		if rsc.abstract_loaded then
+			if picpattern_impl isa SSTImpl then
+				set_sst_impl(vm, true)
+			else if picpattern_impl isa PHImpl then
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+			end
+		else
+			# A special case : if the pic is the root of the class hierarchy, we can always
+			# make a single-subtyping implementation
+			if get_pic(vm).is_instance_of_object(vm) then
+				set_sst_impl(vm, false)
+				return
+			end
+
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if get_pic(vm).abstract_loaded then
+				if picpattern_impl isa SSTImpl then
+					set_sst_impl(vm, true)
+				else if picpattern_impl isa PHImpl then
+					set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				end
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				impl = new NullImpl(true, null, 0, get_pic(vm))
+			end
+		end
+	end
+
+	redef fun get_block_position do return rsc.get_position_attributes(get_pic(vm))
+
+ 	redef fun get_pic_position do return get_pic(vm).position_attributes
 
 	redef fun set_static_impl(mutable) do abort
 end
@@ -669,6 +644,55 @@ redef class MOCallSitePattern
 		return callees.length == 1
 	end
 
+	redef fun compute_impl
+	do
+		# TODO
+		if rsc.abstract_loaded then
+			if pic_pos_unique then
+				if can_be_static then
+					set_static_impl(true)
+				else
+					set_sst_impl(vm, true)
+				end
+			else
+				set_ph_impl(vm, true, get_pic(vm).vtable.id)
+			end
+		else
+			if get_pic(vm).is_instance_of_object(vm) then
+				set_sst_impl(vm, false)
+				return
+			end
+
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if get_pic(vm).abstract_loaded then
+				# By default, use perfect hashing
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				impl = new NullImpl(true, null, 0, get_pic(vm))
+			end
+		end
+	end
+
+	redef fun get_block_position: Int
+	do
+		return rsc.get_position_methods(get_pic(vm))
+	end
+
+	redef fun get_pic_position: Int
+	do
+		# If the pic is at the same position for all loaded subclasses
+		if get_pic(vm).position_methods > 0 then
+			return get_pic(vm).position_methods
+		else
+			# The pic has not the same position for all loaded subclasses,
+			# see if the position is constant for subclasses of the rst
+
+			return get_pic(vm).position_methods
+		end
+	end
+
 	redef fun add_lp(lp)
 	do
 		var reset = not callees.has(lp)
@@ -681,6 +705,114 @@ redef class MOCallSitePattern
 			end
 		end
 	end
+end
+
+redef class MOSubtypeSitePattern
+	redef fun get_offset(vm) do return get_pic(vm).color
+
+	redef fun compute_impl
+	do
+		# TODO
+		if rsc.abstract_loaded then
+			if can_be_static then
+				set_static_impl(true)
+			else
+				set_sst_impl(vm, true)
+			end
+		else
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if get_pic(vm).abstract_loaded then
+				var pos_cls = get_block_position
+				if get_pic(vm).is_instance_of_object(vm) then
+					set_sst_impl(vm, false)
+				else if can_be_static then
+					set_static_impl(true)
+				else
+					# By default, use perfect hashing
+					set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				end
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				impl = new NullImpl(true, null, 0, get_pic(vm))
+			end
+		end
+	end
+
+	redef fun can_be_static
+	do
+		# If the target is not loaded, the cast will always fail
+		if not target_mclass.abstract_loaded then return true
+
+		# If rsc has only one loaded subclass, then true
+		if rsc.single_loaded_subclass(target_mclass) then return true
+
+		# If the target of the cast is always a superclass of the RST we can optimize,
+		# or if the target of the cast will always be false, we can also optimize
+		return false
+	end
+
+	redef fun get_block_position: Int
+	do
+		return rsc.get_position_methods(get_pic(vm))
+	end
+
+	redef fun set_static_impl(mutable)
+	do
+		impl = new StaticImplSubtype(false, true)
+	end
+end
+
+redef class MOAsNotNullPattern
+	redef fun get_offset(vm) do return 0
+
+	redef fun compute_impl
+	do
+		# TODO
+		if rsc.abstract_loaded then
+			if can_be_static then
+				set_static_impl(true)
+			else
+				set_sst_impl(vm, true)
+			end
+		else
+			# The rst is not loaded but the pic is,
+			# we can compute the implementation with pic's informations
+			if get_pic(vm).abstract_loaded then
+				var pos_cls = get_block_position
+				if get_pic(vm).is_instance_of_object(vm) then
+					set_sst_impl(vm, false)
+				else if can_be_static then
+					set_static_impl(true)
+				else
+					# By default, use perfect hashing
+					set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				end
+			else
+				# The RST and the PIC are not loaded, make a null implementation by default
+				impl = new NullImpl(true, null, 0, get_pic(vm))
+			end
+		end
+	end
+
+	redef fun get_block_position: Int
+	do
+		return rsc.get_position_methods(get_pic(vm))
+	end
+
+	redef fun set_static_impl(mutable)
+	do
+		impl = new StaticImplSubtype(false, true)
+	end
+
+	redef fun can_be_static
+	do
+		return false
+	end
+end
+
+redef abstract class MOPropSitePattern
+	redef fun get_offset(vm) do return gp.offset
 end
 
 redef abstract class MOSite
@@ -759,7 +891,7 @@ redef abstract class MOSite
 			for recv in get_concretes do
 				if not recv.loaded then return -1
 
-				var bloc_position = get_bloc_position(vm, recv)
+				var bloc_position = get_block_position(vm, recv)
 				if bloc_position < 0 then
 					bloc_position = - bloc_position
 				end
@@ -774,7 +906,7 @@ redef abstract class MOSite
 			return 1
 		else
 			# See in patterns
-			if get_bloc_position(vm, pattern.rsc) > 0 then
+			if get_block_position(vm, pattern.rsc) > 0 then
 				return 1
 			else
 				return 0
@@ -784,7 +916,7 @@ redef abstract class MOSite
 
 	# Must return the position given by MClass:get_position_method
 	# Must be redefined by MOAttrSite to use MClass::get_position_attribute
-	private fun get_bloc_position(vm: VirtualMachine, recv: MClass): Int
+	private fun get_block_position(vm: VirtualMachine, recv: MClass): Int
 	do
 		return recv.get_position_methods(get_pic(vm))
 	end
@@ -810,7 +942,7 @@ redef abstract class MOSite
 	fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_bloc_position(vm, pattern.rsc)
+		var pos_cls = get_block_position(vm, pattern.rsc)
 
 		impl = new SSTImpl(mutable, pos_cls + offset)
 	end
@@ -883,7 +1015,7 @@ redef abstract class MOAttrSite
 
 	redef fun set_static_impl(vm, mutable) do abort
 
-	redef fun get_bloc_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
+	redef fun get_block_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
 end
 
 redef class MOCallSite
