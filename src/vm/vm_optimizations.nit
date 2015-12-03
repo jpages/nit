@@ -846,8 +846,15 @@ redef abstract class MOSite
 	do
 		# Static
 		if can_be_static then
-			set_static_impl(vm, true)
-			return
+			if not pattern.rsc.abstract_loaded then
+				if self isa MOSubtypeSite or self isa MOAsNotNullSite then
+					set_static_impl(vm, true)
+					return
+				end
+			else
+				set_static_impl(vm, true)
+				return
+			end
 		end
 
 		if not get_pic(vm).abstract_loaded then
@@ -1117,10 +1124,6 @@ class NullImpl
 
 		# We execute the PHImpl
 		var res = impl.exec_attribute(recv, value)
-
-		if value == null and res == null then
-			print "Problème recv {recv}"
-		end
 
 		# We replace the implementation in the corresponding site by a new one
 		mosite.impl = impl

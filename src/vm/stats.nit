@@ -469,6 +469,18 @@ class MOStats
 
 			if impl isa StaticImpl then
 				stats_array[1][pattern.index_x] += 1
+
+				# if pattern isa MOCallSitePattern then
+				# 	var callees = new List[MMethodDef]
+				# 	callees.add(pattern.gp.lookup_first_definition(vm.mainmodule, pattern.rsc.intro.bound_mtype))
+				# 	for subclass in pattern.rsc.loaded_subclasses do
+				# 		var propdef = pattern.gp.lookup_first_definition(vm.mainmodule, subclass.intro.bound_mtype)
+				# 	end
+
+				# 	if not callees.length == 1 then
+				# 		print "Patterns.callees {pattern.callees} callees {callees}"
+				# 	end
+				# end
 			else if impl isa SSTImpl then
 				stats_array[2][pattern.index_x] += 1
 			else if impl isa PHImpl then
