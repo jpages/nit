@@ -439,6 +439,7 @@ class MOSubtypeSitePattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
+		print "MOSubtypeSitePattern rsc {rsc} pic {pic}"
 		return new MethodPICPattern(rsc, pic)
 	end
 end
@@ -517,6 +518,7 @@ class MOCallSitePattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
+		print "MOCallSitePattern rsc {rsc} pic {pic}"
 		return new MethodPICPattern(rsc, pic)
 	end
 end
@@ -531,6 +533,7 @@ abstract class MOAttrPattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
+		print "MOAttrPattern rsc {rsc} pic {pic}"
 		return new AttributePICPattern(rsc, pic)
 	end
 end
@@ -1183,7 +1186,7 @@ redef class MClass
 		end
 
 		if pattern == null then
-			pattern = (new MOSubtypeSitePattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null), site.target, site.target_mclass)).init_abstract
+			pattern = (new MOSubtypeSitePattern(site.target, site.target_mclass, mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null))).init_abstract
 			subtype_pattern.add(pattern)
 		end
 

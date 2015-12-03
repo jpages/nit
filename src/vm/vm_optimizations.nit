@@ -433,13 +433,16 @@ redef class PICPattern
 	# Compute an Implementation for self and set attribute `impl`
 	private fun compute_impl
 	do
+		# If the pic is the root of the hierarchy
+		if pic_class.is_instance_of_object(vm) then
+			set_sst_impl(false)
+			return
+		end
+
 		# If the recv_class and pic_class are loaded we can compute an implementation
-		if recv_class.abstract_loaded and pic_class.abstract_loaded then
+		if recv_class.abstract_loaded then
 			# If the PIC is always at the same position in all loaded subclasses of pic
 			if pic_pos_unique then
-				# We can use an single subtyping mutable implementation
-				set_sst_impl(true)
-			else if get_block_position > 0 then
 				# In all loaded subclasses of recv_class, the pic block is at the same position,
 				# use sst mutable implementation
 				set_sst_impl(true)
@@ -452,12 +455,8 @@ redef class PICPattern
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if pic_class.abstract_loaded then
-				if pic_class.is_instance_of_object(vm) then
-					set_sst_impl(false)
-				else
-					# By default, use perfect hashing
-					set_ph_impl(false, pic_class.vtable.id)
-				end
+				# By default, use perfect hashing
+				set_ph_impl(false, pic_class.vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
 				set_null_impl
@@ -557,6 +556,7 @@ redef abstract class MOSitePattern
 	end
 
 	# Set a static implementation
+	# `mutable` If true, the implementation can change in the future
 	fun set_static_impl(mutable: Bool) is abstract
 
 	# Set a sst impl
@@ -855,14 +855,14 @@ redef abstract class MOSite
 			return
 		end
 
-		if not pattern.rsc.abstract_loaded then
-			set_ph_impl(vm, true)
-			return
-		end
-
 		# SST
 		if get_pic(vm).is_instance_of_object(vm) then
 			set_sst_impl(vm, false)
+			return
+		end
+
+		if not pattern.rsc.abstract_loaded then
+			set_ph_impl(vm, true)
 			return
 		end
 
