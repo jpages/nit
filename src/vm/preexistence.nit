@@ -393,7 +393,7 @@ redef class MOCallSite
 		nb_callees = callees.length
 		for lp in callees do
 			var prelp: Int
-			if lp.as(MMethodDef).is_abstract then
+			if lp.is_abstract then
 				# By default, a method is preexisting
 				prelp = 7
 			else

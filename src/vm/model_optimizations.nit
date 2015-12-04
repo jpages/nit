@@ -702,7 +702,6 @@ abstract class MOExpr
 		if mclass != null and mclass.is_final then
 			concretes = new List[MClass]
 			concretes.add(mclass)
-
 			return concretes
 		else
 			# By default, an expression has not concretes
@@ -743,7 +742,9 @@ class MOSSAVar
 
 	redef fun compute_concretes(concretes)
 	do
-		return dependency.compute_concretes(concretes)
+		var concrete = dependency.compute_concretes(concretes)
+
+		return concrete
 	end
 
 	redef fun pretty_print(file: FileWriter)
@@ -760,7 +761,7 @@ class MOPhiVar
 	# List of expressions that variable depends
 	var dependencies = new List[MOExpr] is writable
 
-	#TODOf
+	#TODO
 	redef fun compute_concretes(concretes)
 	do
 		super
@@ -822,6 +823,11 @@ class MONew
 			concretes = new List[MClass]
 		end
 
+		# TODO: is the class is abstract do not consider concrete types
+		if self.pattern.cls.is_abstract then
+			return null
+		end
+
 		if not concretes.has(self.pattern.cls) then concretes.add(self.pattern.cls)
 
 		return concretes
@@ -830,7 +836,7 @@ class MONew
 	init(mpropdef: MPropDef, ast: AExpr)
 	do
 		super(mpropdef, ast)
-		sys.vm.all_new_sites.add(self)
+		if not sys.vm.all_new_sites.has(self) then sys.vm.all_new_sites.add(self)
 		lp = mpropdef
 		lp.monews.add(self)
 	end
@@ -911,14 +917,14 @@ abstract class MOSite
 			end
 		end
 
-		# Verify that concrete types are more precise that static type of the expression
-		if concretes_receivers != null then
-			if expr_recv.ast != null then
-				if concretes_receivers.length == 1 then
-					print "compute_concretes_site {self} {expr_recv.ast.mtype.as(not null)} concretes {concretes_receivers.as(not null)}"
-				end
-			end
-		end
+		# TODO Verify that concrete types are more precise that static type of the expression
+		# if concretes_receivers != null then
+		# 	if expr_recv.ast != null then
+		# 		if concretes_receivers.length == 1 then
+		# 			print "compute_concretes_site {self} {expr_recv.ast.mtype.as(not null)} concretes {concretes_receivers.as(not null)}"
+		# 		end
+		# 	end
+		# end
 	end
 
 	# Get concretes receivers (or return empty list)
@@ -934,9 +940,10 @@ abstract class MOSite
 		super(mpropdef, ast)
 		self.ast = ast
 		lp = mpropdef
-		lp.mosites.add(self)
 
-		sys.vm.all_moentities.add(self)
+		if not lp.mosites.has(self) then lp.mosites.add(self)
+
+		if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.add(self)
 	end
 end
 
@@ -1012,6 +1019,10 @@ abstract class MOAttrSite
 	redef type P: MOAttrPattern
 end
 
+redef class CallSite
+	var mocallsite: nullable MOCallSite
+end
+
 # MO of method call
 class MOCallSite
 	super MOPropSite
@@ -1019,8 +1030,21 @@ class MOCallSite
 
 	redef type P: MOCallSitePattern
 
+	# The corresponding CallSite object
+	var callsite: CallSite
+
 	# Values of each arguments
 	var given_args = new List[MOExpr]
+
+	init(mpropdef: MPropDef, ast: AExpr, cs: CallSite)
+	do
+		lp = mpropdef
+		self.ast = ast
+		callsite = cs
+		callsite.mocallsite = self
+
+		if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.has(self)
+	end
 
 	redef fun pretty_print(file)
 	do
@@ -1035,9 +1059,12 @@ class MOCallSite
 		end
 	end
 
-	fun concretes_callees: List[MPropDef]
+	fun concretes_callees: List[MMethodDef]
 	do
-		var callees = new List[MPropDef]
+		var callees = new List[MMethodDef]
+
+		# Force the recomputation of concretes_receivers
+		concretes_receivers = null
 
 		compute_concretes_site
 
@@ -1108,7 +1135,6 @@ class MOReadSite
 		end
 
 		if not concretes.is_empty then
-			print "{pattern.gp} {concretes}"
 			return concretes
 		else
 			return null
@@ -1263,26 +1289,26 @@ redef class VirtualMachine
 	var all_new_patterns = new List[MONewPattern]
 
 	# TODO: delete this if because it is already done in virtual_machine.nit
-	redef fun load_class(mclass)
-	do
-		super
+	# redef fun load_class(mclass)
+	# do
+	# 	super
 
-		# For all superclasses (including self)
-		for superclass in mclass.ordering do
-			for pattern in superclass.sites_patterns do
-				# We only update callsite patterns
-				if not pattern isa MOCallSitePattern then continue
+	# 	# For all superclasses (including self)
+	# 	for superclass in mclass.ordering do
+	# 		for pattern in superclass.sites_patterns do
+	# 			# We only update callsite patterns
+	# 			if not pattern isa MOCallSitePattern then continue
 
-				var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
+	# 			var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
 
-				if not pattern.gp.living_mpropdefs.has(lp_rsc) then
-					pattern.gp.living_mpropdefs.add(lp_rsc)
-				end
+	# 			if not pattern.gp.living_mpropdefs.has(lp_rsc) then
+	# 				pattern.gp.living_mpropdefs.add(lp_rsc)
+	# 			end
 
-				pattern.add_lp(lp_rsc)
-			end
-		end
-	end
+	# 			pattern.add_lp(lp_rsc)
+	# 		end
+	# 	end
+	# end
 end
 
 redef class MType
@@ -1522,7 +1548,7 @@ redef class ANewExpr
 		# Creation of the MOCallSite
 		var cs = callsite.as(not null)
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOInitSite(mpropdef, self)
+		var mocallsite = new MOInitSite(mpropdef, self, cs)
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
@@ -1619,10 +1645,10 @@ redef class ASendExpr
 		var mocallsite: MOCallSite
 		if cs.mpropdef.msignature.as(not null).return_mtype != null then
 			# The mproperty is a function
-			mocallsite = new MOFunctionSite(mpropdef, self)
+			mocallsite = new MOFunctionSite(mpropdef, self, cs)
 		else
 			# The mproperty is a procedure
-			mocallsite = new MOProcedureSite(mpropdef, self)
+			mocallsite = new MOProcedureSite(mpropdef, self, cs)
 		end
 
 		recv_class.set_site_pattern(mocallsite, cs.mproperty)
@@ -1642,11 +1668,9 @@ redef class ASendExpr
 
 		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
 			var mo = ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
-
 			return mo
 		else
 			var mo = ast2mo_method(mpropdef, called_node_ast.as(not null), is_attribute)
-
 			return mo
 		end
 	end

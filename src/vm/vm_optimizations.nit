@@ -55,6 +55,7 @@ redef class VirtualMachine
 		var ret = send_commons(callsite.mproperty, args, mtype)
 		if ret != null then return ret
 
+
 		if callsite.status == 0 then callsite.optimize(recv)
 
 		var propdef
@@ -67,6 +68,16 @@ redef class VirtualMachine
 
 		#TODO : we need recompilations here
 		callsite.status = 0
+
+		# Test with new mechanisms
+		if callsite.mocallsite != null then
+			var impl = callsite.mocallsite.get_impl(sys.vm)
+			if impl.exec_method(recv) != propdef then
+				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
+				print "Pattern {callsite.mocallsite.pattern} {callsite.mocallsite.pattern.callees}"
+			end
+		end
+
 		return self.call(propdef, args)
 	end
 
@@ -634,7 +645,14 @@ redef class MOAttrPattern
 end
 
 redef class MOCallSitePattern
-	redef fun set_static_impl(mutable) do impl = new StaticImplProp(mutable, callees.first)
+	redef fun set_static_impl(mutable)
+	do
+		if rsc.is_final then
+			impl = new StaticImplProp(mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
+		else
+			impl = new StaticImplProp(mutable, callees.first)
+		end
+	end
 
 	redef fun can_be_static
 	do
@@ -1029,7 +1047,7 @@ redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
 		if get_concretes == null then
-			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rst)
+			var propdef = pattern.callees.first
 			impl = new StaticImplProp(mutable, propdef)
 		else
 			impl = new StaticImplProp(mutable, concretes_callees.first)
@@ -1037,18 +1055,18 @@ redef class MOCallSite
 	end
 
 	# Clone a MOSite
-	redef fun clone: MOSite
-	do
-		var copy = new MOCallSite(lp, ast.as(not null))
-		copy.pattern = pattern
+	# redef fun clone: MOSite
+	# do
+	# 	var copy = new MOCallSite(lp, ast.as(not null), callsite)
+	# 	copy.pattern = pattern
 
-		if concretes_receivers != null then
-			copy.concretes_receivers = new List[MClass]
-			copy.concretes_receivers.add_all(concretes_receivers.as(not null))
-		end
+	# 	if concretes_receivers != null then
+	# 		copy.concretes_receivers = new List[MClass]
+	# 		copy.concretes_receivers.add_all(concretes_receivers.as(not null))
+	# 	end
 
-		return copy
-	end
+	# 	return copy
+	# end
 
 	redef fun can_be_static
 	do
@@ -1165,7 +1183,10 @@ class SSTImpl
 		end
 	end
 
-	redef fun exec_method(recv: Instance): MMethodDef is abstract
+	redef fun exec_method(recv)
+	do
+		return sys.vm.method_dispatch_sst(recv.vtable.internal_vtable, offset)
+	end
 
 	redef fun exec_subtype(recv: Instance): Bool is abstract
 end
@@ -1187,6 +1208,11 @@ class PHImpl
 			sys.vm.write_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset, value)
 			return null
 		end
+	end
+
+	redef fun exec_method(recv)
+	do
+		return sys.vm.method_dispatch_ph(recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
 	end
 end
 
