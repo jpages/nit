@@ -1211,7 +1211,7 @@ redef class MClass
 		end
 
 		if pattern == null then
-			pattern = (new MOSubtypeSitePattern(site.target, site.target_mclass, mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null))).init_abstract
+			pattern = (new MOSubtypeSitePattern(mclass_type, mclass_type.get_mclass(sys.vm, mpropdef).as(not null), site.target, site.target_mclass)).init_abstract
 			subtype_pattern.add(pattern)
 		end
 
@@ -1244,18 +1244,6 @@ redef class MClass
 	do
 		new_pattern.newexprs.add(newsite)
 		newsite.pattern = new_pattern
-	end
-
-	# Indicate if target is the only loaded subclass of target
-	fun single_loaded_subclass(target: MClass): Bool
-	do
-		if self == target and subclasses.length == 0 then
-			return true
-		else if subclasses.length == 1 then
-			return subclasses.first.single_loaded_subclass(target)
-		end
-
-		return false
 	end
 end
 

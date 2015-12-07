@@ -55,7 +55,6 @@ redef class VirtualMachine
 		var ret = send_commons(callsite.mproperty, args, mtype)
 		if ret != null then return ret
 
-
 		if callsite.status == 0 then callsite.optimize(recv)
 
 		var propdef
@@ -77,7 +76,8 @@ redef class VirtualMachine
 				print "Pattern {callsite.mocallsite.pattern} {callsite.mocallsite.pattern.callees}"
 			end
 		else
-			print "CallSite without MOCallSite {callsite}"
+			# TODO: handle this
+			# print "CallSite without MOCallSite {callsite}"
 		end
 
 		return self.call(propdef, args)
@@ -331,16 +331,28 @@ redef class AIsaExpr
 		var mtype = v.unanchor_type(self.cast_type.as(not null))
 
 		# If this test can be optimized, directly call appropriate subtyping methods
+		var subtype_res
 		if status == 1 and recv.mtype isa MClassType then
 			# Direct access
-			return v.bool_instance(v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable))
+			subtype_res = v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
 		else if status == 2 and recv.mtype isa MClassType then
 			# Perfect hashing
-			return v.bool_instance(v.inter_is_subtype_ph(id, recv.vtable.as(not null).mask, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable))
+			subtype_res = v.inter_is_subtype_ph(id, recv.vtable.as(not null).mask, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
 		else
 			# Use the slow path (default)
-			return v.bool_instance(v.is_subtype(recv.mtype, mtype))
+			subtype_res = v.is_subtype(recv.mtype, mtype)
 		end
+
+		if mo_entity != null and recv.mtype isa MClassType then
+			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
+			if impl.exec_subtype(recv) != subtype_res then
+				print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+				print "Exec recv {recv.mtype} target {mtype}"
+			end
+		end
+
+		return v.bool_instance(subtype_res)
 	end
 
 	# Optimize a `AIsaExpr`
@@ -672,12 +684,6 @@ redef class MOAttrPattern
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position
-
-		if (pos_cls + offset) < 0 then
-			print "Offset < 0 {pos_cls} {offset}"
-			print "pattern {rsc}#{gp}, {gp.offset}"
-			abort
-		end
 		impl = new SSTImpl(mutable, pos_cls + offset)
 	end
 end
@@ -795,11 +801,14 @@ redef class MOSubtypeSitePattern
 
 	redef fun can_be_static
 	do
+		# If the rst of the cast, is not a MClassType, we can not optimize
+		if not rst isa MClassType then return false
+
 		# If the target is not loaded, the cast will always fail
 		if not target_mclass.abstract_loaded then return true
 
-		# If rsc has only one loaded subclass, then true
-		if rsc.single_loaded_subclass(target_mclass) then return true
+		# If the rsc if a subclass of the target, then the test will always be true
+		if vm.is_subclass(rsc, target_mclass) then return true
 
 		# If the target of the cast is always a superclass of the RST we can optimize,
 		# or if the target of the cast will always be false, we can also optimize
@@ -813,7 +822,26 @@ redef class MOSubtypeSitePattern
 
 	redef fun set_static_impl(mutable)
 	do
-		impl = new StaticImplSubtype(false, true)
+		# The result of the subtyping test
+		var res: Bool = false
+
+		# If the target is not loaded, the test will always fail
+		if not target_mclass.abstract_loaded then res = false
+
+		# If the rsc is a subclasse of the target, then the test will always be true
+		if vm.is_subclass(rsc, target_mclass) then res = true
+
+		# TODO : if the RSC and the target have nothing in common (different part of the class hierarchy),
+		# then we can optimize the cast will always be false
+
+		impl = new StaticImplSubtype(false, res)
+	end
+
+	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	do
+		var offset = get_offset(vm)
+		var pos_cls = get_block_position
+		impl = new SSTImplSubtype(mutable, offset, get_pic(vm).vtable.id)
 	end
 end
 
@@ -1204,8 +1232,18 @@ class SSTImpl
 	do
 		return sys.vm.method_dispatch_sst(recv.vtable.internal_vtable, offset)
 	end
+end
 
-	redef fun exec_subtype(recv: Instance): Bool is abstract
+class SSTImplSubtype
+	super SSTImpl
+
+	# The target identifier for subtyping test
+	var id: Int
+
+	redef fun exec_subtype(recv: Instance)
+	do
+		return vm.inter_is_subtype_sst(id, offset, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
+	end
 end
 
 # Perfect hashing implementation
@@ -1229,6 +1267,11 @@ class PHImpl
 	do
 		return sys.vm.method_dispatch_ph(recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
 	end
+
+	redef fun exec_subtype(recv: Instance)
+	do
+		return vm.inter_is_subtype_ph(id, recv.vtable.as(not null).mask, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)
+	end
 end
 
 # Common class for static implementation between subtypes, attr, meth.
@@ -1237,6 +1280,7 @@ abstract class StaticImpl
 end
 
 # Static implementation (used only for method call)
+# TODO: rename
 class StaticImplProp
 	super StaticImpl
 
@@ -1255,4 +1299,10 @@ class StaticImplSubtype
 
 	# Is subtype ?
 	var is_subtype: Bool
+
+	redef fun exec_subtype(recv: Instance)
+	do
+		# Directly return the cached value
+		return is_subtype
+	end
 end
