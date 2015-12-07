@@ -861,7 +861,7 @@ redef class MClass
 
 			# For each subclass of `current_class`, update its position
 			for subclass in current_class.subclasses do
-				propagate_new_position_attributes(current_class, subclass, -current_class.position_methods)
+				propagate_new_position_attributes(current_class, subclass, -current_class.position_attributes)
 			end
 		else
 			# The class has already several positions and an update is needed
@@ -875,7 +875,7 @@ redef class MClass
 				vm.load_class(sub)
 
 				if vm.inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable) then
-					if not sub.positions_methods.has_key(current_class) then
+					if not sub.positions_attributes.has_key(current_class) then
 						sub.positions_attributes[current_class] = current_class.position_attributes
 					else
 						var old_position = sub.positions_attributes[current_class]

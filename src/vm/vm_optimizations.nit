@@ -76,6 +76,8 @@ redef class VirtualMachine
 				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
 				print "Pattern {callsite.mocallsite.pattern} {callsite.mocallsite.pattern.callees}"
 			end
+		else
+			print "CallSite without MOCallSite {callsite}"
 		end
 
 		return self.call(propdef, args)
@@ -195,13 +197,6 @@ redef class AAttrExpr
 
 			if instance != i then
 				print "ERROR attribute read instance = {instance}, i = {i}"
-
-				print "Status {status}, {impl} {offset} impl_offset {impl.as(ObjectImpl).offset}"
-				print "Pattern {mo_entity.as(MOReadSite).pattern.rsc}#{mo_entity.as(MOReadSite).pattern.gp} {mo_entity.as(MOReadSite).pattern.gp.offset}"
-				print "{mo_entity.as(MOReadSite).expr_recv} {mo_entity.as(MOReadSite).get_concretes != null}"
-
-				print "Positions in pattern {mo_entity.as(MOReadSite).pattern.rsc.get_position_attributes(mo_entity.as(MOReadSite).get_pic(vm))} {recv.mtype.as(MClassType).mclass.get_position_attributes(mproperty.intro_mclassdef.mclass)}"
-				print "Pattern {mo_entity.as(MOReadSite).pattern.rsc}/{mo_entity.as(MOReadSite).get_pic(vm)} {recv.mtype.as(MClassType).mclass}/{mproperty.intro_mclassdef.mclass}"
 			end
 		else
 			print "mo_entity null in {self}"
@@ -229,17 +224,28 @@ redef class AAttrAssignExpr
 		var mproperty = self.mproperty.as(not null)
 
 		assert recv isa MutableInstance
-		if status == 0 then optimize(mproperty, recv)
+		# if status == 0 then optimize(mproperty, recv)
 
-		if status == 1 then
-			v.write_attribute_sst(recv.internal_attributes, offset, i)
+		# if status == 1 then
+		# 	v.write_attribute_sst(recv.internal_attributes, offset, i)
+		# else
+		# 	v.write_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable,
+		# 			recv.vtable.as(not null).mask, id, offset, i)
+		# end
+
+		# Test with new mechanisms
+		if mo_entity != null then
+			mo_entity.as(MOWriteSite).pattern.impl = null
+			mo_entity.as(MOWriteSite).impl = null
+			var impl = mo_entity.as(MOWriteSite).get_impl(vm)
+
+			impl.exec_attribute_write(recv, i)
 		else
-			v.write_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable,
-					recv.vtable.as(not null).mask, id, offset, i)
+			print "mo_entity null in {self}"
 		end
 
 		#TODO : we need recompilations here
-		status = 0
+		# status = 0
 	end
 end
 
@@ -613,7 +619,7 @@ redef abstract class MOSitePattern
 	# Return true if the pic is at a unique position on the whole class hierarchy
 	fun pic_pos_unique: Bool
 	do
-		return get_pic_position > 0
+		return get_pic(vm).position_attributes > 0
 	end
 
 	# Return the offset of the introduction property of the class
@@ -943,10 +949,8 @@ redef abstract class MOSite
 		var position = -1
 
 		if get_concretes != null then
-			if get_concretes.first.name == "FileStream" then print "FILESTREAM"
 			for recv in get_concretes do
 				if not recv.abstract_loaded then return -1
-
 
 				if get_block_position(vm, recv) < 0 then
 					return 0
@@ -1066,13 +1070,6 @@ redef abstract class MOAttrSite
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position(vm, pattern.rsc)
-
-		if (pos_cls + offset) < 0 then
-			print "Offset < 0 {pos_cls} {offset}"
-			print "{self} pattern {pattern.rsc}#{pattern.gp}, {pattern.gp.offset} {get_block_position(vm, pattern.rsc)}"
-			abort
-		end
-
 		impl = new SSTImpl(mutable, pos_cls + offset)
 	end
 end

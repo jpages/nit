@@ -821,7 +821,8 @@ class MONew
 			concretes = new List[MClass]
 		end
 
-		# TODO: is the class is abstract do not consider concrete types
+		# TODO: if the class is abstract do not consider concrete types,
+		# we need here a patch to handle this
 		if self.pattern.cls.is_abstract then
 			return null
 		end
