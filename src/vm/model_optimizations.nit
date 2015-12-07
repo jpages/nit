@@ -518,7 +518,6 @@ class MOCallSitePattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
-		print "MOCallSitePattern rsc {rsc} pic {pic}"
 		return new MethodPICPattern(rsc, pic)
 	end
 end
@@ -533,7 +532,6 @@ abstract class MOAttrPattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
-		print "MOAttrPattern rsc {rsc} pic {pic}"
 		return new AttributePICPattern(rsc, pic)
 	end
 end

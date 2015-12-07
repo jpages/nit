@@ -186,6 +186,27 @@ redef class AAttrExpr
 			abort
 		end
 
+		# Test with new mechanisms
+		if mo_entity != null then
+			mo_entity.as(MOReadSite).pattern.impl = null
+			mo_entity.as(MOReadSite).impl = null
+			var impl = mo_entity.as(MOReadSite).get_impl(vm)
+			var instance = impl.exec_attribute_read(recv)
+
+			if instance != i then
+				print "ERROR attribute read instance = {instance}, i = {i}"
+
+				print "Status {status}, {impl} {offset} impl_offset {impl.as(ObjectImpl).offset}"
+				print "Pattern {mo_entity.as(MOReadSite).pattern.rsc}#{mo_entity.as(MOReadSite).pattern.gp} {mo_entity.as(MOReadSite).pattern.gp.offset}"
+				print "{mo_entity.as(MOReadSite).expr_recv} {mo_entity.as(MOReadSite).get_concretes != null}"
+
+				print "Positions in pattern {mo_entity.as(MOReadSite).pattern.rsc.get_position_attributes(mo_entity.as(MOReadSite).get_pic(vm))} {recv.mtype.as(MClassType).mclass.get_position_attributes(mproperty.intro_mclassdef.mclass)}"
+				print "Pattern {mo_entity.as(MOReadSite).pattern.rsc}/{mo_entity.as(MOReadSite).get_pic(vm)} {recv.mtype.as(MClassType).mclass}/{mproperty.intro_mclassdef.mclass}"
+			end
+		else
+			print "mo_entity null in {self}"
+		end
+
 		#TODO : we need recompilations here
 		status = 0
 
@@ -605,18 +626,13 @@ end
 redef class MOAttrPattern
 	redef fun compute_impl
 	do
-		# Get the implementation of the PICPattern
-		var picpattern_impl = pic_pattern.get_impl
-
 		if rsc.abstract_loaded then
-			if picpattern_impl isa SSTImpl then
+			if pic_pos_unique then
 				set_sst_impl(vm, true)
-			else if picpattern_impl isa PHImpl then
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+			else
+				set_ph_impl(vm, true, get_pic(vm).vtable.id)
 			end
 		else
-			# A special case : if the pic is the root of the class hierarchy, we can always
-			# make a single-subtyping implementation
 			if get_pic(vm).is_instance_of_object(vm) then
 				set_sst_impl(vm, false)
 				return
@@ -625,11 +641,8 @@ redef class MOAttrPattern
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
-				if picpattern_impl isa SSTImpl then
-					set_sst_impl(vm, true)
-				else if picpattern_impl isa PHImpl then
-					set_ph_impl(vm, false, get_pic(vm).vtable.id)
-				end
+				# By default, use perfect hashing
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
 				impl = new NullImpl(true, null, 0, get_pic(vm))
@@ -637,11 +650,30 @@ redef class MOAttrPattern
 		end
 	end
 
-	redef fun get_block_position do return rsc.get_position_attributes(get_pic(vm))
+	redef fun get_block_position
+	do
+		return rsc.get_position_attributes(get_pic(vm))
+	end
 
- 	redef fun get_pic_position do return get_pic(vm).position_attributes
+ 	redef fun get_pic_position
+ 	do
+ 		return rsc.get_position_attributes(get_pic(vm))
+ 	end
 
 	redef fun set_static_impl(mutable) do abort
+
+	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	do
+		var offset = get_offset(vm)
+		var pos_cls = get_block_position
+
+		if (pos_cls + offset) < 0 then
+			print "Offset < 0 {pos_cls} {offset}"
+			print "pattern {rsc}#{gp}, {gp.offset}"
+			abort
+		end
+		impl = new SSTImpl(mutable, pos_cls + offset)
+	end
 end
 
 redef class MOCallSitePattern
@@ -664,7 +696,6 @@ redef class MOCallSitePattern
 
 	redef fun compute_impl
 	do
-		# TODO
 		if rsc.abstract_loaded then
 			if pic_pos_unique then
 				if can_be_static then
@@ -730,7 +761,6 @@ redef class MOSubtypeSitePattern
 
 	redef fun compute_impl
 	do
-		# TODO
 		if rsc.abstract_loaded then
 			if can_be_static then
 				set_static_impl(true)
@@ -875,14 +905,14 @@ redef abstract class MOSite
 			end
 		end
 
-		if not get_pic(vm).abstract_loaded then
-			set_null_impl
-			return
-		end
-
 		# SST
 		if get_pic(vm).is_instance_of_object(vm) then
 			set_sst_impl(vm, false)
+			return
+		end
+
+		if not get_pic(vm).abstract_loaded then
+			set_null_impl
 			return
 		end
 
@@ -894,7 +924,7 @@ redef abstract class MOSite
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
-			# SST immutable because it can't be more than these concretes receivers statically
+			# SST immutable because statically, it can't be more than these concrete receivers
 			set_sst_impl(vm, false)
 		else if unique_pos_indicator == -1 then
 			# Some receivers classes are not loaded yet, so we use a mutable implementation
@@ -913,34 +943,24 @@ redef abstract class MOSite
 		var position = -1
 
 		if get_concretes != null then
+			if get_concretes.first.name == "FileStream" then print "FILESTREAM"
 			for recv in get_concretes do
-				if not recv.loaded then return -1
+				if not recv.abstract_loaded then return -1
 
-				var bloc_position = get_block_position(vm, recv)
-				if bloc_position < 0 then
-					bloc_position = - bloc_position
-				end
 
-				if position == -1 then
-					position = bloc_position
-				else
-					if position != bloc_position then return -1
+				if get_block_position(vm, recv) < 0 then
+					return 0
 				end
 			end
 
 			return 1
-		else
-			# See in patterns
-			if get_block_position(vm, pattern.rsc) > 0 then
-				return 1
-			else
-				return 0
-			end
 		end
+
+		# In case of a bug, return 0 here to be sure
+		return 0
 	end
 
-	# Must return the position given by MClass:get_position_method
-	# Must be redefined by MOAttrSite to use MClass::get_position_attribute
+	# TODO: comment
 	private fun get_block_position(vm: VirtualMachine, recv: MClass): Int
 	do
 		return recv.get_position_methods(get_pic(vm))
@@ -1041,6 +1061,20 @@ redef abstract class MOAttrSite
 	redef fun set_static_impl(vm, mutable) do abort
 
 	redef fun get_block_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
+
+	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	do
+		var offset = get_offset(vm)
+		var pos_cls = get_block_position(vm, pattern.rsc)
+
+		if (pos_cls + offset) < 0 then
+			print "Offset < 0 {pos_cls} {offset}"
+			print "{self} pattern {pattern.rsc}#{pattern.gp}, {pattern.gp.offset} {get_block_position(vm, pattern.rsc)}"
+			abort
+		end
+
+		impl = new SSTImpl(mutable, pos_cls + offset)
+	end
 end
 
 redef class MOCallSite
@@ -1106,9 +1140,13 @@ abstract class Implementation
 
 	# Execute an attribute access
 	# *`recv` The receiver
-	# *`value` The value to write, null if the implementation is an attribute read
-	# Return the read value if self is an attribute read
-	fun exec_attribute(recv: MutableInstance, value: nullable Instance): nullable Instance is abstract
+	# Return the read value
+	fun exec_attribute_read(recv: MutableInstance): Instance is abstract
+
+	# Execute an attribute writing
+	# *`recv` The receiver
+	# *`value` The value to write
+	fun exec_attribute_write(recv: MutableInstance, value: Instance) is abstract
 
 	# Execute a method dispatch
 	# *`recv` The receiver
@@ -1133,23 +1171,6 @@ class NullImpl
 	# The PIC of the implementation (not loaded at compile-time)
 	var pic: MClass
 
-	# A NullImpl must load the corresponding class and execute it
-	# At compile-time the receiver class was not loaded yet
-	redef fun exec_attribute(recv, value)
-	do
-		# Execute a trampoline for this site (i.e. replace it by a PH implementation)
-		var impl = trampoline(recv)
-
-		# We execute the PHImpl
-		var res = impl.exec_attribute(recv, value)
-
-		# We replace the implementation in the corresponding site by a new one
-		mosite.impl = impl
-
-		# Finally, return the read value if any
-		return res
-	end
-
 	# The method load the PIC (the class which introduced the property),
 	# Then it creates a new PHImpl for this site and return it
 	fun trampoline(recv: Instance): PHImpl
@@ -1172,15 +1193,14 @@ end
 class SSTImpl
 	super ObjectImpl
 
-	redef fun exec_attribute(recv, value)
+	redef fun exec_attribute_read(recv)
 	do
-		# If this is an attribute read
-		if value == null then
-			return sys.vm.read_attribute_sst(recv.internal_attributes, offset)
-		else
-			sys.vm.write_attribute_sst(recv.internal_attributes, offset, value)
-			return null
-		end
+		return sys.vm.read_attribute_sst(recv.internal_attributes, offset)
+	end
+
+	redef fun exec_attribute_write(recv, instance)
+	do
+		sys.vm.write_attribute_sst(recv.internal_attributes, offset, instance)
 	end
 
 	redef fun exec_method(recv)
@@ -1198,16 +1218,14 @@ class PHImpl
 	# The target identifier of the subtyping-test or the class which introduced the GP
 	var id: Int
 
-	redef fun exec_attribute(recv, value)
+	redef fun exec_attribute_read(recv)
 	do
-		# If this is an attribute read
-		if value == null then
-			return sys.vm.read_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
-		else
-			# Attribute write
-			sys.vm.write_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset, value)
-			return null
-		end
+		return sys.vm.read_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset)
+	end
+
+	redef fun exec_attribute_write(recv, value)
+	do
+		sys.vm.write_attribute_ph(recv.internal_attributes, recv.vtable.internal_vtable, recv.vtable.mask, id, offset, value)
 	end
 
 	redef fun exec_method(recv)
