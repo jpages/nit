@@ -55,6 +55,8 @@ redef class MOStats
 		table6(new FileWriter.open("{dir}/table6-{lbl}.tex"))
 
 		table_self(new FileWriter.open("{dir}/table_self-{lbl}.tex"))
+
+		table_final(new FileWriter.open("{dir}/table_final-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -278,6 +280,54 @@ redef class MOStats
 		table_self += "total & {vm.pstats.matrix[65][0]} & {vm.pstats.matrix[65][1]} & {vm.pstats.matrix[65][2]} & {vm.pstats.matrix[65][5]}\\\\\n"
 
 		file.write(table_self)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistics in .tex file for site which receiver is a final class
+	private fun table_final(file: FileWriter)
+	do
+		file.write("%Table final\n")
+
+		# The array to store statistics on final sites
+		var stats_array_size = 4
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		for mosite in sys.vm.pstats.analysed_sites do
+			var index_x: Int
+
+			if mosite isa MOCallSite then
+				index_x = 0
+			else if mosite isa MOAttrSite then
+				index_x = 1
+			else
+				index_x = 2
+			end
+
+			var impl = mosite.get_impl(vm)
+
+			if impl isa StaticImpl then
+				stats_array[0][index_x] += 1
+			else if impl isa SSTImpl then
+				stats_array[1][index_x] += 1
+			else if impl isa PHImpl then
+				stats_array[2][index_x] += 1
+			else if impl isa NullImpl then
+				stats_array[3][index_x] += 1
+			end
+		end
+
+		var table = "static & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
+		table += "SST & {} & {} & {} & {} \\\\\n"
+		table += "PH & {} & {} & {} & {} \\\\\n"
+
+		table += "\\hline\n"
+		table += "total & {} & {} & {} & {}\\\\\n"
+
+		file.write(table)
 		file.write("\n\n")
 		file.close
 	end

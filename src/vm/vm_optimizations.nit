@@ -344,12 +344,12 @@ redef class AIsaExpr
 		end
 
 		if mo_entity != null and recv.mtype isa MClassType then
-			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
-			if impl.exec_subtype(recv) != subtype_res then
-				print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
-				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "Exec recv {recv.mtype} target {mtype}"
-			end
+			# var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
+			# if impl.exec_subtype(recv) != subtype_res then
+			# 	print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+			# 	print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+			# 	print "Exec recv {recv.mtype} target {mtype}"
+			# end
 		end
 
 		return v.bool_instance(subtype_res)

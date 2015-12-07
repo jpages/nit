@@ -427,10 +427,6 @@ class MOStats
 		caption_y.add("theoritical bound of pic_patterns,")
 		caption_y.add("\n,")
 
-		var total_sst = 0
-		var total_ph = 0
-		var total_method = 0
-		var total_attr = 0
 		for pic_pattern in vm.all_picpatterns do
 			var impl = pic_pattern.get_impl
 			stats_array[0][pic_pattern.index_x] += 1
