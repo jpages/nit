@@ -98,7 +98,8 @@ redef class ModelBuilder
 		# 32: null receiver
 		# 64: recursive
 		# 128: is_npre
-		# 256: a readsite"""
+		# 256: a readsite
+		# 512: a cast"""
 		print(receiver_origin_string)
 		for i in [0..sys.vm.receiver_origin.length[ do
 			if sys.vm.receiver_origin[i] > 0 then print("receiver_origin[{i}] = {sys.vm.receiver_origin[i]}")
@@ -192,7 +193,7 @@ redef class VirtualMachine
 	fun init_stats
 	do
 		return_origin = new Array[Int].filled_with(0, 513)
-		receiver_origin = new Array[Int].filled_with(0, 513)
+		receiver_origin = new Array[Int].filled_with(0, 1025)
 		return_origin_recursive = new Array[Int].filled_with(0, 257)
 		receiver_origin_recursive = new Array[Int].filled_with(0, 257)
 		trace_origin = new Array[Int].filled_with(0, 257)
@@ -403,6 +404,10 @@ class MOStats
 		res.add("sst readsite,")
 		res.add("ph readsite,")
 		res.add("null readsite,")
+
+		res.add("\nfrom cast,")
+		res.add("from cast preexisting,")
+		res.add("from cast non-preexisting,")
 		return res
 	end
 
@@ -1034,6 +1039,20 @@ redef class MOSite
 			else
 				vm.pstats.matrix[32][index_x] += 1
 				vm.pstats.matrix[32][5] += 1
+			end
+		end
+
+		# If the receiver comes from a cast
+		if origin == 512 or origin == 640 then
+			vm.pstats.matrix[77][index_x] += 1
+			vm.pstats.matrix[77][5] += 1
+
+			if origin.bin_and(128) == 0 then
+				vm.pstats.matrix[78][index_x] += 1
+				vm.pstats.matrix[78][5] += 1
+			else
+				vm.pstats.matrix[79][index_x] += 1
+				vm.pstats.matrix[79][5] += 1
 			end
 		end
 

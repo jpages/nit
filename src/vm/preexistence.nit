@@ -221,6 +221,7 @@ redef class MOExpr
 	# 64: recursive
 	# 128: is_npre
 	# 256: the receiver is a readsite
+	# 512: the receiver is a subtypeSite
 	fun preexistence_origin: Int
 	do
 		if is_pre then
@@ -572,15 +573,17 @@ redef class MOLit
 	end
 end
 
+redef class MOSubtypeSite
+	redef fun preexistence_origin: Int
+	do
+		return super.bin_or(512)
+	end
+end
+
 redef class MOAsSubtypeSite
 	redef fun compute_preexist
 	do
 		return expr_recv.expr_preexist
-	end
-
-	redef fun preexistence_origin: Int
-	do
-		return expr_recv.preexistence_origin
 	end
 end
 
