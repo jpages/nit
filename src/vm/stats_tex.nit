@@ -287,7 +287,8 @@ redef class MOStats
 	# Output statistics in .tex file for site which receiver is a final class
 	private fun table_final(file: FileWriter)
 	do
-		file.write("%Table final\n")
+		file.write("%Table final: receiver typed by a loaded final class\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
 
 		# The array to store statistics on final sites
 		var stats_array_size = 4
@@ -296,36 +297,56 @@ redef class MOStats
 			stats_array[i] = new Array[Int].filled_with(0, 4)
 		end
 
-		for mosite in sys.vm.pstats.analysed_sites do
+		var total_methods = 0
+		var total_attributes = 0
+		var total_casts = 0
+		var grand_total = 0
+
+		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
 
-			if mosite isa MOCallSite then
+			# Do not count the site if it come from a primitive
+			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
+
+			# Do not count as.(not null)
+			if site isa MOAsNotNullSite then continue
+
+			# We only count MOSite with a final receiver
+			if not site.pattern.rsc.is_final and site.pattern.rsc.abstract_loaded then continue
+
+			if site isa MOCallSite then
 				index_x = 0
-			else if mosite isa MOAttrSite then
+				total_methods += 1
+			else if site isa MOAttrSite then
 				index_x = 1
+				total_attributes += 1
 			else
 				index_x = 2
+				total_casts += 1
 			end
 
-			var impl = mosite.get_impl(vm)
+			var impl = site.get_impl(vm)
+			if index_x != -1 then
+				if impl isa StaticImpl then
+					stats_array[0][index_x] += 1
+				else if impl isa SSTImpl then
+					stats_array[1][index_x] += 1
+				else if impl isa PHImpl then
+					stats_array[2][index_x] += 1
+				else if impl isa NullImpl then
+					stats_array[3][index_x] += 1
+				end
 
-			if impl isa StaticImpl then
-				stats_array[0][index_x] += 1
-			else if impl isa SSTImpl then
-				stats_array[1][index_x] += 1
-			else if impl isa PHImpl then
-				stats_array[2][index_x] += 1
-			else if impl isa NullImpl then
-				stats_array[3][index_x] += 1
+				grand_total += 1
 			end
 		end
 
 		var table = "static & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
-		table += "SST & {} & {} & {} & {} \\\\\n"
-		table += "PH & {} & {} & {} & {} \\\\\n"
-
+		table += "SST & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
+		table += "PH & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "Null & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
 		table += "\\hline\n"
-		table += "total & {} & {} & {} & {}\\\\\n"
+		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")

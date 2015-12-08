@@ -490,7 +490,7 @@ redef class PICPattern
 		end
 
 		# If the recv_class and pic_class are loaded we can compute an implementation
-		if recv_class.abstract_loaded then
+		if recv_class.abstract_loaded and pic_class.abstract_loaded then
 			# If the PIC is always at the same position in all loaded subclasses of pic
 			if pic_pos_unique then
 				# In all loaded subclasses of recv_class, the pic block is at the same position,
