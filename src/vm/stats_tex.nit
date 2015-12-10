@@ -333,19 +333,21 @@ redef class MOStats
 			end
 
 			var impl = site.get_impl(vm)
-			if index_x != -1 then
-				if impl isa StaticImpl then
-					stats_array[0][index_x] += 1
-				else if impl isa SSTImpl then
-					stats_array[1][index_x] += 1
-				else if impl isa PHImpl then
-					stats_array[2][index_x] += 1
-				else if impl isa NullImpl then
-					stats_array[3][index_x] += 1
-				end
-
-				grand_total += 1
+			if impl isa StaticImpl then
+				stats_array[0][index_x] += 1
+				stats_array[0][3] += 1
+			else if impl isa SSTImpl then
+				stats_array[1][index_x] += 1
+				stats_array[1][3] += 1
+			else if impl isa PHImpl then
+				stats_array[2][index_x] += 1
+				stats_array[2][3] += 1
+			else if impl isa NullImpl then
+				stats_array[3][index_x] += 1
+				stats_array[3][3] += 1
 			end
+
+			grand_total += 1
 		end
 
 		var table = "static & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
@@ -407,12 +409,16 @@ redef class MOStats
 			if index_x != -1 then
 				if impl isa StaticImpl then
 					stats_array[0][index_x] += 1
+					stats_array[0][3] += 1
 				else if impl isa SSTImpl then
 					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
 				else if impl isa PHImpl then
 					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
 				else if impl isa NullImpl then
 					stats_array[3][index_x] += 1
+					stats_array[3][3] += 1
 				end
 
 				grand_total += 1
@@ -481,12 +487,16 @@ redef class MOStats
 			if index_x != -1 then
 				if impl isa StaticImpl then
 					stats_array[0][index_x] += 1
+					stats_array[0][3] += 1
 				else if impl isa SSTImpl then
 					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
 				else if impl isa PHImpl then
 					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
 				else if impl isa NullImpl then
 					stats_array[3][index_x] += 1
+					stats_array[3][3] += 1
 				end
 
 				grand_total += 1
@@ -556,12 +566,16 @@ redef class MOStats
 			if index_x != -1 then
 				if impl isa StaticImpl then
 					stats_array[0][index_x] += 1
+					stats_array[0][3] += 1
 				else if impl isa SSTImpl then
 					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
 				else if impl isa PHImpl then
 					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
 				else if impl isa NullImpl then
 					stats_array[3][index_x] += 1
+					stats_array[3][3] += 1
 				end
 
 				grand_total += 1
@@ -607,6 +621,9 @@ redef class MOStats
 			# We only count callsite receivers
 			if not (origin == 4 or origin == 132) then continue
 
+			# Do not count as.(not null)
+			if site isa MOAsNotNullSite then continue
+
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += 1
@@ -622,12 +639,16 @@ redef class MOStats
 			if index_x != -1 then
 				if impl isa StaticImpl then
 					stats_array[0][index_x] += 1
+					stats_array[0][3] += 1
 				else if impl isa SSTImpl then
 					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
 				else if impl isa PHImpl then
 					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
 				else if impl isa NullImpl then
 					stats_array[3][index_x] += 1
+					stats_array[3][3] += 1
 				end
 
 				grand_total += 1
@@ -673,6 +694,9 @@ redef class MOStats
 			# We only count castsites receivers
 			if not (origin == 512 or origin == 640) then continue
 
+			# Do not count as.(not null)
+			if site isa MOAsNotNullSite then continue
+
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += 1
@@ -688,11 +712,15 @@ redef class MOStats
 			if index_x != -1 then
 				if impl isa StaticImpl then
 					stats_array[0][index_x] += 1
+					stats_array[0][3] += 1
 				else if impl isa SSTImpl then
 					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
 				else if impl isa PHImpl then
 					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
 				else if impl isa NullImpl then
+					stats_array[3][index_x] += 1
 					stats_array[3][index_x] += 1
 				end
 
