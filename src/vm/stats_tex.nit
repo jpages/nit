@@ -63,6 +63,10 @@ redef class MOStats
 		table_concrete_attributes(new FileWriter.open("{dir}/table_concrete_attributes-{lbl}.tex"))
 
 		table_concrete_final_attributes(new FileWriter.open("{dir}/table_concrete_final_attributes-{lbl}.tex"))
+
+		table_callsite_receivers(new FileWriter.open("{dir}/table_callsite_receivers-{lbl}.tex"))
+
+		table_casts_receivers(new FileWriter.open("{dir}/table_casts_receivers-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -362,7 +366,6 @@ redef class MOStats
 		file.write("%Table concrete receivers: MOSite with concrete receivers (with all rules)\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
-		# The array to store statistics on final sites
 		var stats_array_size = 4
 		var stats_array = new Array[Array[Int]].with_capacity(4)
 		for i in [0..stats_array_size] do
@@ -434,7 +437,6 @@ redef class MOStats
 		file.write("%Table concrete receivers: MOSite with concrete receivers which is an attribute with concrete types\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
-		# The array to store statistics on final sites
 		var stats_array_size = 4
 		var stats_array = new Array[Array[Int]].with_capacity(4)
 		for i in [0..stats_array_size] do
@@ -449,8 +451,10 @@ redef class MOStats
 		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
 
+			var origin = site.expr_recv.preexistence_origin
+
 			# Do not count the site if it come from a primitive
-			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
+			if origin.bin_and(16) == 16 then continue
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
@@ -459,7 +463,7 @@ redef class MOStats
 			var concretes = site.get_concretes
 
 			if concretes == null then continue
-			if not site.expr_recv isa MOReadSite then continue
+			if not (origin == 256 or origin == 384) then continue
 			# We only count MOSite with concrete_receivers and a readsite receiver
 
 			if site isa MOCallSite then
@@ -507,7 +511,6 @@ redef class MOStats
 		file.write("%Table concrete receivers: MOSite with concrete receivers which is a final attribute with concrete types\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
-		# The array to store statistics on final sites
 		var stats_array_size = 4
 		var stats_array = new Array[Array[Int]].with_capacity(4)
 		for i in [0..stats_array_size] do
@@ -522,8 +525,10 @@ redef class MOStats
 		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
 
+			var origin = site.expr_recv.preexistence_origin
+
 			# Do not count the site if it come from a primitive
-			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
+			if origin.bin_and(16) == 16 then continue
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
@@ -532,9 +537,141 @@ redef class MOStats
 			var concretes = site.get_concretes
 
 			if concretes == null then continue
-			if not site.expr_recv isa MOReadSite then continue
+			if not (origin == 256 or origin == 384) then continue
 			if not site.pattern.rsc.is_final then continue
 			# We only count MOSite with concrete_receivers and a readsite receiver typed by a final class
+
+			if site isa MOCallSite then
+				index_x = 0
+				total_methods += 1
+			else if site isa MOAttrSite then
+				index_x = 1
+				total_attributes += 1
+			else
+				index_x = 2
+				total_casts += 1
+			end
+
+			var impl = site.get_impl(vm)
+			if index_x != -1 then
+				if impl isa StaticImpl then
+					stats_array[0][index_x] += 1
+				else if impl isa SSTImpl then
+					stats_array[1][index_x] += 1
+				else if impl isa PHImpl then
+					stats_array[2][index_x] += 1
+				else if impl isa NullImpl then
+					stats_array[3][index_x] += 1
+				end
+
+				grand_total += 1
+			end
+		end
+
+		var table = "static & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
+		table += "SST & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
+		table += "PH & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "Null & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+		table += "\\hline\n"
+		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistics in .tex file for site which receiver (possibly an indirectly receiver) is a callsite
+	private fun table_callsite_receivers(file: FileWriter)
+	do
+		file.write("%Table callsite receivers: MOSite with concrete receivers which is a callsite\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var stats_array_size = 4
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		var total_methods = 0
+		var total_attributes = 0
+		var total_casts = 0
+		var grand_total = 0
+
+		for site in sys.vm.pstats.analysed_sites do
+			var index_x: Int
+
+			var origin = site.expr_recv.preexistence_origin
+			# Do not count the site if it come from a primitive
+			if origin.bin_and(16) == 16 then continue
+
+			# We only count callsite receivers
+			if not (origin == 4 or origin == 132) then continue
+
+			if site isa MOCallSite then
+				index_x = 0
+				total_methods += 1
+			else if site isa MOAttrSite then
+				index_x = 1
+				total_attributes += 1
+			else
+				index_x = 2
+				total_casts += 1
+			end
+
+			var impl = site.get_impl(vm)
+			if index_x != -1 then
+				if impl isa StaticImpl then
+					stats_array[0][index_x] += 1
+				else if impl isa SSTImpl then
+					stats_array[1][index_x] += 1
+				else if impl isa PHImpl then
+					stats_array[2][index_x] += 1
+				else if impl isa NullImpl then
+					stats_array[3][index_x] += 1
+				end
+
+				grand_total += 1
+			end
+		end
+
+		var table = "static & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
+		table += "SST & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
+		table += "PH & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "Null & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+		table += "\\hline\n"
+		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistics in .tex file for site which receiver (possibly an indirectly receiver) is a cast
+	private fun table_casts_receivers(file: FileWriter)
+	do
+		file.write("%Table castsites receivers: MOSite with concrete receivers which is a cast\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var stats_array_size = 4
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		var total_methods = 0
+		var total_attributes = 0
+		var total_casts = 0
+		var grand_total = 0
+
+		for site in sys.vm.pstats.analysed_sites do
+			var index_x: Int
+
+			var origin = site.expr_recv.preexistence_origin
+			# Do not count the site if it come from a primitive
+			if origin.bin_and(16) == 16 then continue
+
+			# We only count castsites receivers
+			if not (origin == 512 or origin == 640) then continue
 
 			if site isa MOCallSite then
 				index_x = 0
