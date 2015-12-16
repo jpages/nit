@@ -122,7 +122,11 @@ class ConcreteTypes
 				if classdef.mclass.in_hierarchy(mainmodule).direct_smallers.length == 0 then
 					# Add it to the collection
 					final_classes.add(classdef.mclass)
-					classdef.mclass.is_final = true
+
+					# To be more realistic, just annotate is_final classes which are introduced in the AST ou parser
+					if classdef.mclass.intro_mmodule.name == "parser" or classdef.mclass.intro_mmodule.name == "parser_nodes" then
+						classdef.mclass.is_final = true
+					end
 				else
 					classes.add(classdef.mclass)
 				end
