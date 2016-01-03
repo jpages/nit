@@ -443,7 +443,6 @@ class MOSubtypeSitePattern
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
-		print "MOSubtypeSitePattern rsc {rsc} pic {pic}"
 		return new MethodPICPattern(rsc, pic)
 	end
 end
