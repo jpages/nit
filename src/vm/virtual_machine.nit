@@ -825,11 +825,7 @@ redef class MClass
 			for sub in ordering do
 				if sub == current_class then continue
 
-				var super_id = current_class.vtable.id
-				var mask = sub.vtable.mask
-				vm.load_class(sub)
-
-				if vm.inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable) then
+				if vm.is_subclass(sub, current_class) then
 					if not sub.positions_methods.has_key(current_class) then
 						sub.positions_methods[current_class] = current_class.position_methods
 					else
@@ -870,11 +866,7 @@ redef class MClass
 			for sub in ordering do
 				if sub == current_class then continue
 
-				var super_id = current_class.vtable.id
-				var mask = sub.vtable.mask
-				vm.load_class(sub)
-
-				if vm.inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable) then
+				if vm.is_subclass(sub, current_class) then
 					if not sub.positions_attributes.has_key(current_class) then
 						sub.positions_attributes[current_class] = current_class.position_attributes
 					else
