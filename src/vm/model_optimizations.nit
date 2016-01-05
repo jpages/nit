@@ -1081,6 +1081,20 @@ class MOFunctionSite
 	do
 		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod), true)).init_abstract
 	end
+
+	# TODO
+	# redef fun compute_concretes(concretes)
+	# do
+	# 	# Compute inter-procedural concrete types
+	# 	if expr_recv.compute_concretes(null) == null then return null
+
+	# 	if not expr_recv isa MOFunctionSite then
+	# 		# See in all callees
+	# 		print "Concretes callees of {self} = {concretes_callees}"
+	# 	end
+
+	# 	return null
+	# end
 end
 
 # A call to a method which has no return
@@ -1268,28 +1282,6 @@ redef class VirtualMachine
 
 	# All MONewPattern
 	var all_new_patterns = new List[MONewPattern]
-
-	# TODO: delete this if because it is already done in virtual_machine.nit
-	# redef fun load_class(mclass)
-	# do
-	# 	super
-
-	# 	# For all superclasses (including self)
-	# 	for superclass in mclass.ordering do
-	# 		for pattern in superclass.sites_patterns do
-	# 			# We only update callsite patterns
-	# 			if not pattern isa MOCallSitePattern then continue
-
-	# 			var lp_rsc = pattern.gp.lookup_first_definition(sys.vm.mainmodule, pattern.rsc.intro.bound_mtype)
-
-	# 			if not pattern.gp.living_mpropdefs.has(lp_rsc) then
-	# 				pattern.gp.living_mpropdefs.add(lp_rsc)
-	# 			end
-
-	# 			pattern.add_lp(lp_rsc)
-	# 		end
-	# 	end
-	# end
 end
 
 redef class MType

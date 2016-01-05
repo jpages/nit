@@ -105,6 +105,30 @@ redef class VirtualMachine
 			end
 		end
 	end
+
+	redef fun load_class_indirect(mclass)
+	do
+		if mclass.abstract_loaded then return
+
+		super(mclass)
+
+		# Update Patterns and sites
+
+		# Some method patterns can be static and become in SST
+		for pattern in mclass.sites_patterns do
+			# We are only interested in callsite patterns
+			if not pattern isa MOCallSitePattern then continue
+
+			# If the pattern has a static implementation, recompute it because the loading
+			# could have added another method to call
+			if pattern.get_impl(vm) isa StaticImpl then
+				print "Implementation before {pattern.get_impl(vm)}"
+				pattern.impl = null
+				pattern.compute_impl
+				print "Implementation after recomputation {pattern.get_impl(vm)}"
+			end
+		end
+	end
 end
 
 redef class AAttrFormExpr
@@ -469,6 +493,34 @@ redef class MPropDef
 	end
 end
 
+redef class MClass
+	# This method is called when `current_class` class is moved in virtual table of `self`
+	# *`offset` The offset of block of methods of `current_class` in `self`
+	redef fun moved_class_methods(vm, current_class, offset)
+	do
+		super
+
+		for pic_pattern in current_class.pic_patterns do
+			# The pic_class has several positions in the class hierarchy,
+			# the PICPattern implementation became perfect hashing
+			pic_pattern.propagate_ph_impl
+		end
+	end
+
+	# This method is called when `current_class` class is moved in virtual table of `self`
+	# *`offset` The offset of block of methods of `current_class` in `self`
+	redef fun moved_class_attributes(vm, current_class, offset)
+	do
+		super
+
+		for pic_pattern in current_class.pic_patterns do
+			# The pic_class has several positions in the class hierarchy,
+			# the PICPattern implementation became perfect hashing
+			pic_pattern.propagate_ph_impl
+		end
+	end
+end
+
 redef class PICPattern
 	# Implementation of the PICPattern
 	var impl: nullable Implementation = null is writable
@@ -538,7 +590,18 @@ redef class PICPattern
 		impl = new NullImpl(true, null, 0, pic_class)
 	end
 
-	# Tell if the pic is at unique position on whole class hierarchy
+	# The PICPattern implementation became a perfect hashing implementation with a class loading
+	# This method propagates the change to its patterns
+	fun propagate_ph_impl
+	do
+		# Replace the old implementation
+		impl = new PHImpl(false, get_block_position, pic_class.vtable.id)
+
+		# Propagate this change in patterns
+		print "Propagate a change to PHImpl in patterns {patterns}"
+	end
+
+	# Tell if the pic is at a unique position on whole class hierarchy
 	fun pic_pos_unique: Bool
 	do
 		return get_pic_position > 0
