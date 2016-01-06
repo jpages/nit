@@ -122,10 +122,8 @@ redef class VirtualMachine
 			# If the pattern has a static implementation, recompute it because the loading
 			# could have added another method to call
 			if pattern.get_impl(vm) isa StaticImpl then
-				print "Implementation before {pattern.get_impl(vm)}"
 				pattern.impl = null
 				pattern.compute_impl
-				print "Implementation after recomputation {pattern.get_impl(vm)}"
 			end
 		end
 	end
