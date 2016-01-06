@@ -116,6 +116,20 @@ redef class VirtualMachine
 
 		# Some method patterns can be static and become in SST
 		for pattern in mclass.sites_patterns do
+			# If the pattern has a NullImpl, then recompute it
+			if pattern.get_impl(vm) isa NullImpl then
+				pattern.impl = null
+				pattern.compute_impl
+			end
+
+			# Update if any mosites of this pattern with a NullImpl
+			for mosite in pattern.sites do
+				if mosite.get_impl(vm) isa NullImpl then
+					mosite.impl = null
+					mosite.get_impl(vm)
+				end
+			end
+
 			# We are only interested in callsite patterns
 			if not pattern isa MOCallSitePattern then continue
 
@@ -212,9 +226,15 @@ redef class AAttrExpr
 
 		# Test with new mechanisms
 		if mo_entity != null then
-			mo_entity.as(MOReadSite).pattern.impl = null
-			mo_entity.as(MOReadSite).impl = null
 			var impl = mo_entity.as(MOReadSite).get_impl(vm)
+
+			# TODO : debug
+			if impl isa NullImpl then
+				print "Site {mo_entity.as(MOReadSite)} with null impl"
+				print "Pattern.impl {mo_entity.as(MOReadSite).pattern.get_impl(vm)}"
+				print "PICPattern.impl {mo_entity.as(MOReadSite).pattern.pic_pattern.get_impl}"
+			end
+
 			var instance = impl.exec_attribute_read(recv)
 
 			if instance != i then
@@ -257,8 +277,6 @@ redef class AAttrAssignExpr
 
 		# Test with new mechanisms
 		if mo_entity != null then
-			mo_entity.as(MOWriteSite).pattern.impl = null
-			mo_entity.as(MOWriteSite).impl = null
 			var impl = mo_entity.as(MOWriteSite).get_impl(vm)
 
 			impl.exec_attribute_write(recv, i)
