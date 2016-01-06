@@ -10,11 +10,15 @@ redef class ToolContext
 	# If true, the execution is verified to test the model
 	var debug = new OptionBool("Launch the execution in debug mode", "--debug")
 
+	# If true, the vm will load all top-level news she met in methods during compilation
+	var improve_loading = new OptionBool("Load all top-level news in the code during compilation", "--improve-loading")
+
 	redef init
 	do
 		super
 		option_context.add_option(trace_on)
 		option_context.add_option(debug)
+		option_context.add_option(improve_loading)
 	end
 end
 
@@ -31,6 +35,9 @@ redef class Sys
 	# The debug mode of the virtual machine
 	var debug_mode: Bool = false
 
+	# If true, improve the loading of classes
+	var improve_loading: Bool = false
+
 	# Singleton of MONull
 	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
@@ -46,6 +53,7 @@ redef class ModelBuilder
 	do
 		sys.trace_on = toolcontext.trace_on.value
 		sys.debug_mode = toolcontext.debug.value
+		sys.improve_loading = toolcontext.improve_loading.value
 
 		if toolcontext.debug.value then
 			# Create the output file for debug traces
@@ -1534,6 +1542,16 @@ redef class ANewExpr
 
 		# Associate the monew with the callsite
 		monew.callsite = mocallsite
+
+		# If the option `improve_loading` is set, load the corresponding class is the new is toplevel
+		if sys.improve_loading then
+
+			# If the new is unconditionnal (i.e. at the toplevel of the eclosing method),
+			# load its corresponding class if needed
+			if self.parent.parent isa APropdef or self.parent isa APropdef then
+				vm.load_class(recvtype.as(not null).mclass)
+			end
+		end
 
 		return monew
 	end
