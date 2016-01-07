@@ -1193,6 +1193,17 @@ redef class MOSite
 
 		return res
 	end
+
+	# The number of recompilations of this entity
+	var recompilations: Int = 0
+
+	redef fun reinit_impl
+	do
+		super
+
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 end
 
 redef class MOExprSite
@@ -1216,6 +1227,17 @@ end
 
 redef class PICPattern
 	var index_x: Int is noinit
+
+	# The number of recompilations of this entity
+	var recompilations: Int = 0
+
+	redef fun reinit_impl
+	do
+		super
+
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 end
 
 redef class MethodPICPattern
@@ -1263,6 +1285,17 @@ end
 
 redef class MOSitePattern
 	var index_x: Int = 5
+
+	# The number of recompilations of this entity
+	var recompilations: Int = 0
+
+	redef fun reinit_impl
+	do
+		super
+
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 end
 
 redef class MOCallSitePattern

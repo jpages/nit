@@ -118,14 +118,15 @@ redef class VirtualMachine
 		for pattern in mclass.sites_patterns do
 			# If the pattern has a NullImpl, then recompute it
 			if pattern.get_impl(vm) isa NullImpl then
-				pattern.impl = null
+				pattern.reinit_impl
 				pattern.compute_impl
 			end
 
 			# Update if any mosites of this pattern with a NullImpl
+			# TODO: put this in pattern classes
 			for mosite in pattern.sites do
 				if mosite.get_impl(vm) isa NullImpl then
-					mosite.impl = null
+					mosite.reinit_impl
 					mosite.get_impl(vm)
 				end
 			end
@@ -133,10 +134,11 @@ redef class VirtualMachine
 			# We are only interested in callsite patterns
 			if not pattern isa MOCallSitePattern then continue
 
+			# TODO: optimize this
 			# If the pattern has a static implementation, recompute it because the loading
 			# could have added another method to call
 			if pattern.get_impl(vm) isa StaticImpl then
-				pattern.impl = null
+				pattern.reinit_impl
 				pattern.compute_impl
 			end
 		end
@@ -541,6 +543,14 @@ redef class PICPattern
 	# Implementation of the PICPattern
 	var impl: nullable Implementation = null is writable
 
+	# Assign `null` to `impl`
+	# NOTE: This method must be use to set to null an Implementation before recompute it
+	# This method can be redefined to count recompilations in the vm
+	fun reinit_impl
+	do
+		impl = null
+	end
+
 	# Compute an appropriate Implementation based on the positions of recv_class and pic_class
 	fun get_impl: Implementation
 	do
@@ -663,6 +673,14 @@ end
 redef abstract class MOSitePattern
 	# Implementation of the pattern (used if site has not concrete receivers list)
 	var impl: nullable Implementation is writable, noinit
+
+	# Assign `null` to `impl`
+	# NOTE: This method must be use to set to null an Implementation before recompute it
+	# This method can be redefined to count recompilations in the vm
+	fun reinit_impl
+	do
+		impl = null
+	end
 
 	# Get implementation, compute it if not exists
 	fun get_impl(vm: VirtualMachine): Implementation
@@ -828,7 +846,6 @@ redef class MOCallSitePattern
 		else
 			# The pic has not the same position for all loaded subclasses,
 			# see if the position is constant for subclasses of the rst
-
 			return get_pic(vm).position_methods
 		end
 	end
@@ -839,9 +856,14 @@ redef class MOCallSitePattern
 
 		super(lp)
 		if reset then
-			if impl != null and impl.as(not null).is_mutable then impl = null
+			if impl != null and impl.as(not null).is_mutable then
+				reinit_impl
+			end
+
 			for site in sites do
-				if site.impl != null and site.impl.as(not null).is_mutable then site.impl = null
+				if site.impl != null and site.impl.as(not null).is_mutable then
+					site.reinit_impl
+				end
 			end
 		end
 	end
@@ -979,13 +1001,28 @@ end
 redef abstract class MOSite
 	# Implementation of the site (null if can't determine concretes receivers)
 	# get_impl must be used to read this value
-	var impl: nullable Implementation is writable, noinit
+	var impl: nullable Implementation is writable
+
+	# Assign `null` to `impl`
+	# NOTE: This method must be use to set to null an Implementation before recompute it
+	# This method can be redefined to count recompilations in the vm
+	fun reinit_impl
+	do
+		impl = null
+	end
 
 	# Get the implementation of the site, according to preexist value
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
 		if impl != null then return impl.as(not null)
 
+		return compute_impl
+	end
+
+	# Compute an Implementation for self site and assign `impl`
+	# Return the Implementation of the Site
+	fun compute_impl: Implementation
+	do
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 			return impl.as(not null)
@@ -1040,7 +1077,7 @@ redef abstract class MOSite
 			# SST immutable because statically, it can't be more than these concrete receivers
 			set_sst_impl(vm, false)
 		else if unique_pos_indicator == -1 then
-			# Some receivers classes are not loaded yet, so we use a mutable implementation
+			# Some receiver classes are not loaded yet, so we use a mutable implementation
 			set_ph_impl(vm, true)
 		else
 			set_ph_impl(vm, false)
