@@ -620,11 +620,16 @@ redef class PICPattern
 	# This method propagates the change to its patterns
 	fun propagate_ph_impl
 	do
+		if impl != null and impl isa PHImpl then return
+
 		# Replace the old implementation
+		reinit_impl
 		impl = new PHImpl(false, get_block_position, pic_class.vtable.id)
 
 		# Propagate this change in patterns
-		print "Propagate a change to PHImpl in patterns {patterns}"
+		for pattern in patterns do
+			pattern.as(MOSitePattern).propagate_ph_impl
+		end
 	end
 
 	# Tell if the pic is at a unique position on whole class hierarchy
@@ -680,6 +685,20 @@ redef abstract class MOSitePattern
 	fun reinit_impl
 	do
 		impl = null
+	end
+
+	# Change the Implementation to a PHImpl
+	fun propagate_ph_impl
+	do
+		if impl != null and impl isa PHImpl then return
+
+		reinit_impl
+
+		set_ph_impl(vm, false, get_pic(vm).vtable.id)
+
+		for site in sites do
+			site.propagate_ph_impl
+		end
 	end
 
 	# Get implementation, compute it if not exists
@@ -1009,6 +1028,20 @@ redef abstract class MOSite
 	fun reinit_impl
 	do
 		impl = null
+	end
+
+	# Change the Implementation to ph_impl if the site has no concrete types
+	fun propagate_ph_impl
+	do
+		compute_concretes_site
+
+		if impl != null then reinit_impl
+
+		if concretes_receivers == null then
+			set_ph_impl(vm, false)
+		else
+			compute_impl_concretes(vm)
+		end
 	end
 
 	# Get the implementation of the site, according to preexist value

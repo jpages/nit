@@ -67,6 +67,8 @@ redef class MOStats
 		table_callsite_receivers(new FileWriter.open("{dir}/table_callsite_receivers-{lbl}.tex"))
 
 		table_casts_receivers(new FileWriter.open("{dir}/table_casts_receivers-{lbl}.tex"))
+
+		table_recompilations(new FileWriter.open("{dir}/table_recompilations-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -734,6 +736,76 @@ redef class MOStats
 		table += "Null & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
 		table += "\\hline\n"
 		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output number of recompilations (i.e. changes in implementations) for each entity of the model
+	private fun table_recompilations(file: FileWriter)
+	do
+		file.write("%Table recompilations: number of recompilations for each entity\n")
+		file.write("Recompilation & Methods & Attributes & Casts & Total\n")
+
+		var stats_array_size = 3
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		for pic_pattern in sys.vm.all_picpatterns do
+			var index_x: Int
+
+			if pic_pattern isa MethodPICPattern then
+				index_x = 0
+			else
+				index_x = 1
+			end
+
+			stats_array[0][index_x] += pic_pattern.recompilations
+			stats_array[0][3] += pic_pattern.recompilations
+		end
+
+		for pattern in sys.vm.all_patterns do
+			var index_x: Int
+
+			# Do not count as.(not null)
+			if pattern isa MOAsNotNullPattern then continue
+
+			if pattern isa MOCallSitePattern then
+				index_x = 0
+			else if pattern isa MOAttrPattern then
+				index_x = 1
+			else
+				# Casts
+				index_x = 2
+			end
+
+			stats_array[1][index_x] += pattern.recompilations
+			stats_array[1][3] += pattern.recompilations
+		end
+
+		for site in sys.vm.pstats.analysed_sites do
+			var index_x: Int
+			# Do not count as.(not null)
+			if site isa MOAsNotNullSite then continue
+
+			if site isa MOCallSite then
+				index_x = 0
+			else if site isa MOAttrSite then
+				index_x = 1
+			else
+				index_x = 2
+			end
+
+			stats_array[2][index_x] += site.recompilations
+			stats_array[2][3] += site.recompilations
+		end
+
+		var table = "PICPattern & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
+		table += "GPPattern & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]}\\\\\n"
+		table += "Site & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")
