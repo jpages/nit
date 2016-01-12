@@ -467,6 +467,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
+			#TODO: problème de cohérence avec le tableau 4 (pas le même total)
 			site.concretes_receivers = null
 			var concretes = site.get_concretes
 

@@ -958,6 +958,9 @@ redef class MOSite
 
 	fun incr_total
 	do
+		# Filter the receiver which come from a parameter or a literal
+		if origin == 1 or origin == 8 then return
+
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
 
