@@ -481,18 +481,6 @@ class MOStats
 
 			if impl isa StaticImpl then
 				stats_array[1][pattern.index_x] += 1
-
-				# if pattern isa MOCallSitePattern then
-				# 	var callees = new List[MMethodDef]
-				# 	callees.add(pattern.gp.lookup_first_definition(vm.mainmodule, pattern.rsc.intro.bound_mtype))
-				# 	for subclass in pattern.rsc.loaded_subclasses do
-				# 		var propdef = pattern.gp.lookup_first_definition(vm.mainmodule, subclass.intro.bound_mtype)
-				# 	end
-
-				# 	if not callees.length == 1 then
-				# 		print "Patterns.callees {pattern.callees} callees {callees}"
-				# 	end
-				# end
 			else if impl isa SSTImpl then
 				stats_array[2][pattern.index_x] += 1
 			else if impl isa PHImpl then
@@ -507,17 +495,9 @@ class MOStats
 		caption_y.add(",MOCallSitePattern, MOAttrPattern, MOSubtypeSitePattern, MOAsNotNullPattern\n")
 		caption_y.add("total,")
 		caption_y.add("static,")
-		# caption_y.add("static preexist,")
-		# caption_y.add("static npreexist,")
 		caption_y.add("sst,")
-		# caption_y.add("sst preexist,")
-		# caption_y.add("sst npreexist,")
 		caption_y.add("ph,")
-		# caption_y.add("ph preexist,")
-		# caption_y.add("ph npreexist,")
 		caption_y.add("null,")
-		# caption_y.add("null preexist,")
-		# caption_y.add("null npreexist,")
 		caption_y.add("\n,")
 
 		csv_file.write(caption_y[0])
@@ -998,6 +978,9 @@ redef class MOSite
 	# Trace origins of preexistence
 	fun incr_from_site
 	do
+		# Filter the receiver which come from a parameter or a literal
+		if origin == 1 or origin == 8 then return
+
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
 			vm.pstats.matrix[23][index_x] += 1
@@ -1058,16 +1041,13 @@ redef class MOSite
 
 		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 and not origin == 512 and not origin == 640 then
-			# We also filter the receiver which come from a parameter or a literal
-			if not origin == 1 and not origin == 8 then
-				# If the site is preexisting
-				if origin.bin_and(128) == 0 then
-					vm.pstats.matrix[29][index_x] += 1
-					vm.pstats.matrix[29][5] += 1
-				else
-					vm.pstats.matrix[30][index_x] += 1
-					vm.pstats.matrix[30][5] += 1
-				end
+			# If the site is preexisting
+			if origin.bin_and(128) == 0 then
+				vm.pstats.matrix[29][index_x] += 1
+				vm.pstats.matrix[29][5] += 1
+			else
+				vm.pstats.matrix[30][index_x] += 1
+				vm.pstats.matrix[30][5] += 1
 			end
 		end
 	end

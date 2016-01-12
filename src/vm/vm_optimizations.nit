@@ -230,13 +230,6 @@ redef class AAttrExpr
 		if mo_entity != null then
 			var impl = mo_entity.as(MOReadSite).get_impl(vm)
 
-			# TODO : debug
-			if impl isa NullImpl then
-				print "Site {mo_entity.as(MOReadSite)} with null impl"
-				print "Pattern.impl {mo_entity.as(MOReadSite).pattern.get_impl(vm)}"
-				print "PICPattern.impl {mo_entity.as(MOReadSite).pattern.pic_pattern.get_impl}"
-			end
-
 			var instance = impl.exec_attribute_read(recv)
 
 			if instance != i then
