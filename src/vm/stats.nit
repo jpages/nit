@@ -1,4 +1,3 @@
-
 # Statistics of the VM (implementations, preexistence...)
 module stats
 
@@ -276,6 +275,20 @@ class MOStats
 
 	# The directory used to store current results of statistics
 	var dir: String is noinit
+
+	# Number of methods execution of each implementation
+	var method_static = 0
+	var method_sst = 0
+	var method_ph = 0
+
+	# Number of attribute execution of each implementation
+	var attribute_sst = 0
+	var attribute_ph = 0
+
+	# Number of cast execution of each implementation
+	var cast_static = 0
+	var cast_sst = 0
+	var cast_ph = 0
 
 	init(s: String)
 	do
@@ -958,8 +971,8 @@ redef class MOSite
 
 	fun incr_total
 	do
-		# Filter the receiver which come from a parameter or a literal
-		if origin == 1 or origin == 8 then return
+		# Filter the receiver which come from primitive
+		if origin.bin_and(16) == 16 then return
 
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
@@ -982,7 +995,7 @@ redef class MOSite
 	fun incr_from_site
 	do
 		# Filter the receiver which come from a parameter or a literal
-		if origin == 1 or origin == 8 then return
+		if origin == 1 or origin == 8 or origin.bin_and(16) == 16 then return
 
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
@@ -1317,12 +1330,78 @@ redef class StaticImpl
 	redef var index_y = 6
 end
 
+redef class StaticImplMethod
+
+	redef fun exec_method(recv)
+	do
+		sys.vm.pstats.method_static += 1
+		return super
+	end
+end
+
+redef class StaticImplSubtype
+
+	redef fun exec_subtype(recv)
+	do
+		sys.vm.pstats.cast_static += 1
+		return super
+	end
+end
+
 redef class SSTImpl
 	redef var index_y = 9
+
+	redef fun exec_attribute_read(recv)
+	do
+		sys.vm.pstats.attribute_sst += 1
+		return super
+	end
+
+	redef fun exec_attribute_write(recv, instance)
+	do
+		sys.vm.pstats.attribute_sst += 1
+		super
+	end
+
+	redef fun exec_method(recv)
+	do
+		sys.vm.pstats.method_sst += 1
+		return super
+	end
+
+	redef fun exec_subtype(recv)
+	do
+		sys.vm.pstats.cast_sst += 1
+		return super
+	end
 end
 
 redef class PHImpl
 	redef var index_y = 12
+
+	redef fun exec_attribute_read(recv)
+	do
+		sys.vm.pstats.attribute_ph += 1
+		return super
+	end
+
+	redef fun exec_attribute_write(recv, value)
+	do
+		sys.vm.pstats.attribute_ph += 1
+		super
+	end
+
+	redef fun exec_method(recv)
+	do
+		sys.vm.pstats.method_ph += 1
+		return super
+	end
+
+	redef fun exec_subtype(recv)
+	do
+		sys.vm.pstats.cast_ph += 1
+		return super
+	end
 end
 
 redef class NullImpl
@@ -1442,6 +1521,8 @@ redef class MOVar
 	end
 end
 
+# TODO: handle set_executed with implementations
+
 redef class ASendExpr
 	redef fun ast2mo_method(mpropdef, called_node_ast, is_attribute)
 	do
@@ -1453,57 +1534,6 @@ redef class ASendExpr
 		end
 
 		return sup
-	end
-
-	redef fun expr(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		return super
-	end
-end
-
-redef class ASendReassignFormExpr
-	redef fun stmt(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		super
-	end
-end
-redef class AAttrExpr
-	redef fun expr(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		var res = super
-		return res
-	end
-end
-
-redef class AAttrAssignExpr
-	redef fun stmt(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-		super
-	end
-end
-
-redef class AAttrReassignExpr
-	redef fun stmt(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-		super
 	end
 end
 

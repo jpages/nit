@@ -102,6 +102,24 @@ class ConcreteTypes
 	do
 		var visitor = new FinalAttributeVisitor(self)
 
+		# Detect final classes
+		for mod in modelbuilder.model.mmodules do
+			for classdef in mod.mclassdefs do
+				# If the class is a leaf of the hierarchy
+				if classdef.mclass.in_hierarchy(mainmodule).direct_smallers.length == 0 then
+					# Add it to the collection
+					final_classes.add(classdef.mclass)
+
+					# To be more realistic, just annotate is_final classes which are introduced in the AST ou parser
+					if classdef.mclass.intro_mmodule.name == "parser" or classdef.mclass.intro_mmodule.name == "parser_nodes" then
+						classdef.mclass.is_final = true
+					end
+				else
+					classes.add(classdef.mclass)
+				end
+			end
+		end
+
 		# Collect about immutable attributes
 		for m in modelbuilder.model.mmodules do
 			for cd in m.mclassdefs do
@@ -119,24 +137,6 @@ class ConcreteTypes
 						visitor.propdef = node
 						node.visit_all(visitor)
 					end
-				end
-			end
-		end
-
-		# Statistics about final classes
-		for mod in modelbuilder.model.mmodules do
-			for classdef in mod.mclassdefs do
-				# If the class is a leaf of the hierarchy
-				if classdef.mclass.in_hierarchy(mainmodule).direct_smallers.length == 0 then
-					# Add it to the collection
-					final_classes.add(classdef.mclass)
-
-					# To be more realistic, just annotate is_final classes which are introduced in the AST ou parser
-					if classdef.mclass.intro_mmodule.name == "parser" or classdef.mclass.intro_mmodule.name == "parser_nodes" then
-						classdef.mclass.is_final = true
-					end
-				else
-					classes.add(classdef.mclass)
 				end
 			end
 		end
@@ -162,6 +162,12 @@ class ConcreteTypes
 			if node.n_expr isa ANewExpr then
 				if not node.mpropdef.mproperty.assignments.has(node.n_expr.as(not null)) then
 					node.mpropdef.mproperty.assignments.add(node.n_expr.as(not null))
+				end
+			else if node.n_expr.mtype isa MClassType then
+				# If the static type of the Right part of assignment is a final type
+				var mclass = node.n_expr.mtype.as(MClassType).mclass
+				if mclass.is_final then
+					node.mpropdef.mproperty.concrete_types.add(mclass)
 				end
 			else
 				# The attribute do not have concrete types
@@ -214,12 +220,24 @@ class FinalAttributeVisitor
 			if n isa AAttrAssignExpr then
 				if n.n_value isa ANewExpr then
 					mattribute.assignments.add(n.n_value)
+				else if n.n_value.mtype isa MClassType then
+					# If the static type of the Right part of assignment is a final type
+					var mclass = n.n_value.mtype.as(MClassType).mclass
+					if mclass.is_final then
+						mattribute.concrete_types.add(mclass)
+					end
 				else
 					mattribute.has_concrete_types = false
 				end
 			else if n isa AAttrReassignExpr then
 				if n.n_value isa ANewExpr then
 					mattribute.assignments.add(n.n_value)
+				else if n.n_value.mtype isa MClassType then
+					# If the static type of the Right part of assignment is a final type
+					var mclass = n.n_value.mtype.as(MClassType).mclass
+					if mclass.is_final then
+						mattribute.concrete_types.add(mclass)
+					end
 				else
 					mattribute.has_concrete_types = false
 				end
@@ -241,6 +259,12 @@ class FinalAttributeVisitor
 					# TODO: handle the case of primitive types
 					if n.raw_arguments[0] isa ANewExpr then
 						mattribute.assignments.add(n.raw_arguments[0])
+					else if n.raw_arguments[0].mtype isa MClassType then
+						# If the static type of the Right part of assignment is a final type
+						var mclass = n.raw_arguments[0].mtype.as(MClassType).mclass
+						if mclass.is_final then
+							mattribute.concrete_types.add(mclass)
+						end
 					else
 						mattribute.has_concrete_types = false
 					end
@@ -674,6 +698,9 @@ redef class MAttribute
 	# Indicate if we can use the concrete types of this attribute,
 	# if false, then the attribute do not have concrete types
 	var has_concrete_types = true
+
+	# The list of concrete types of the Attribute
+	var concrete_types = new List[MClass]
 end
 
 # Root hierarchy of MO entities
@@ -1145,6 +1172,8 @@ class MOReadSite
 				var mclass = assignment.as(ANewExpr).mtype.as(MClassType).mclass
 				concretes.add(mclass)
 			end
+
+			if concretes.is_empty then concretes = pattern.gp.concrete_types
 		else
 			return null
 		end

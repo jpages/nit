@@ -801,9 +801,9 @@ redef class MOCallSitePattern
 	redef fun set_static_impl(mutable)
 	do
 		if rsc.is_final then
-			impl = new StaticImplProp(mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
+			impl = new StaticImplMethod(mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
 		else
-			impl = new StaticImplProp(mutable, callees.first)
+			impl = new StaticImplMethod(mutable, callees.first)
 		end
 	end
 
@@ -1249,9 +1249,9 @@ redef class MOCallSite
 	do
 		if get_concretes == null then
 			var propdef = pattern.callees.first
-			impl = new StaticImplProp(mutable, propdef)
+			impl = new StaticImplMethod(mutable, propdef)
 		else
-			impl = new StaticImplProp(mutable, concretes_callees.first)
+			impl = new StaticImplMethod(mutable, concretes_callees.first)
 		end
 	end
 
@@ -1422,8 +1422,7 @@ abstract class StaticImpl
 end
 
 # Static implementation (used only for method call)
-# TODO: rename
-class StaticImplProp
+class StaticImplMethod
 	super StaticImpl
 
 	# The called lp

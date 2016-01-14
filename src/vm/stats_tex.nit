@@ -69,6 +69,8 @@ redef class MOStats
 		table_casts_receivers(new FileWriter.open("{dir}/table_casts_receivers-{lbl}.tex"))
 
 		table_recompilations(new FileWriter.open("{dir}/table_recompilations-{lbl}.tex"))
+
+		table_executions(new FileWriter.open("{dir}/table_executions-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -747,7 +749,7 @@ redef class MOStats
 	private fun table_recompilations(file: FileWriter)
 	do
 		file.write("%Table recompilations: number of recompilations for each entity\n")
-		file.write("Recompilation & Methods & Attributes & Casts & Total\n")
+		file.write("%Recompilation & Methods & Attributes & Casts & Total\n")
 
 		var stats_array_size = 3
 		var stats_array = new Array[Array[Int]].with_capacity(4)
@@ -807,6 +809,28 @@ redef class MOStats
 		var table = "PICPattern & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
 		table += "GPPattern & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]}\\\\\n"
 		table += "Site & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistic in .tex files for dynamic executions of sites
+	private fun table_executions(file: FileWriter)
+	do
+		file.write("%Table number of execution\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var total_methods = vm.pstats.method_ph + vm.pstats.method_sst + vm.pstats.method_static
+		var total_attributes = vm.pstats.attribute_ph + vm.pstats.attribute_sst
+		var total_casts = vm.pstats.cast_ph + vm.pstats.cast_sst + vm.pstats.cast_static
+		var grand_total = total_methods + total_attributes + total_casts
+
+		var table = "static & {vm.pstats.method_static} & {0} & {vm.pstats.cast_static} & {vm.pstats.method_static + vm.pstats.cast_static}\\\\\n"
+		table += "SST & {vm.pstats.method_sst} & {vm.pstats.attribute_sst} & {vm.pstats.cast_sst} & {vm.pstats.method_sst + vm.pstats.attribute_sst + vm.pstats.cast_sst} \\\\\n"
+		table += "PH & {vm.pstats.method_ph} & {vm.pstats.attribute_ph} & {vm.pstats.cast_ph} & {vm.pstats.method_ph + vm.pstats.attribute_ph + vm.pstats.cast_ph} \\\\\n"
+		table += "\\hline\n"
+		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")
