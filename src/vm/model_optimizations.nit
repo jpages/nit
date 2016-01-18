@@ -940,6 +940,8 @@ abstract class MOSite
 
 			concretes_receivers = concrete
 		else
+			if not isset _expr_recv then return
+
 			var res = expr_recv.compute_concretes(null)
 			if res != null then
 				concretes_receivers = res
@@ -1577,7 +1579,7 @@ redef class ANewExpr
 
 			# If the new is unconditionnal (i.e. at the toplevel of the eclosing method),
 			# load its corresponding class if needed
-			if self.parent.parent isa APropdef or self.parent isa APropdef then
+			if self.block.is_unconditionnal then
 				vm.load_class(recvtype.as(not null).mclass)
 			end
 		end

@@ -52,6 +52,9 @@ class BasicBlock
 	# used to handle circuits and recursions in computation of environments
 	var callers_blocks = new Array[BasicBlock]
 
+	# Indicate if this BasicBlock will always be executed in the program's control flow
+	var is_unconditionnal: Bool = false
+
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
 	do
@@ -378,6 +381,8 @@ class SSA
 		# Create a single block for the test of the condition
 		var block_test = new BasicBlock
 
+		if old_block.is_unconditionnal then block_test.is_unconditionnal = true
+
 		block_test.instructions.add(condition)
 
 		old_block.link(block_test)
@@ -392,6 +397,8 @@ class SSA
 		# Launch the recursions in two branches,
 		# and indicate to the branchs they need to be linked to the successor block
 		var successor_block = new BasicBlock
+
+		if old_block.is_unconditionnal then successor_block.is_unconditionnal = true
 
 		block_then.link(successor_block)
 		block_else.link(successor_block)
@@ -411,10 +418,6 @@ class SSA
 			if not else_branch isa ABlockExpr then block_else.instructions.add(else_branch)
 			else_branch.generate_basic_blocks(self, block_else, successor_block)
 		end
-
-		# for i in next_block.instructions do
-		# 	i.generate_basic_blocks(self, next_block, next_block)
-		# end
 	end
 
 	# Generate a BasicBlock structure for a while instruction
@@ -428,6 +431,7 @@ class SSA
 	do
 		# Create a single block for the test of the loop
 		var block_test = new TestLoopBlock
+		if old_block.is_unconditionnal then block_test.is_unconditionnal = true
 
 		block_test.instructions.add(condition)
 
@@ -440,6 +444,7 @@ class SSA
 
 		# The block after the while (if the test is false)
 		var successor_block = new BasicBlock
+		if old_block.is_unconditionnal then successor_block.is_unconditionnal = true
 
 		block_test.link(successor_block)
 
@@ -451,10 +456,6 @@ class SSA
 			if not while_block isa ABlockExpr then block_body.instructions.add(while_block)
 			while_block.generate_basic_blocks(self, block_body, block_test)
 		end
-
-		# for i in next_block.instructions do
-		# 	i.generate_basic_blocks(self, next_block, next_block)
-		# end
 	end
 end
 
@@ -755,6 +756,7 @@ redef class AAttrPropdef
 	redef fun generate_basic_blocks(ssa: SSA)
 	do
 		basic_block = new BasicBlock
+		basic_block.is_unconditionnal = true
 
 		# Add the self variable
 		if self.selfvariable != null then variables.add(selfvariable.as(not null))
@@ -784,6 +786,7 @@ redef class AMethPropdef
 	redef fun generate_basic_blocks(ssa: SSA)
 	do
 		basic_block = new BasicBlock
+		basic_block.is_unconditionnal = true
 
 		# Add the self variable
 		if self.selfvariable != null then variables.add(selfvariable.as(not null))
@@ -904,7 +907,13 @@ redef class AExpr
 	fun add_instruction(block: BasicBlock)
 	do
 		if not block.instructions.has(self) then block.instructions.add(self)
+
+		# Associate the basic block and the AST expression
+		self.block = block
 	end
+
+	# The BasicBlock containing this expression
+	var block: nullable BasicBlock
 end
 
 redef class AVarExpr

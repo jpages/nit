@@ -971,9 +971,6 @@ redef class MOSite
 
 	fun incr_total
 	do
-		# Filter the receiver which come from primitive
-		if origin.bin_and(16) == 16 then return
-
 		var impl = get_impl(vm)
 		var pre = expr_recv.is_pre
 
@@ -995,7 +992,7 @@ redef class MOSite
 	fun incr_from_site
 	do
 		# Filter the receiver which come from a parameter or a literal
-		if origin == 1 or origin == 8 or origin.bin_and(16) == 16 then return
+		if origin == 1 or origin == 8 then return
 
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
@@ -1009,10 +1006,8 @@ redef class MOSite
 				vm.pstats.matrix[25][index_x] += 1
 				vm.pstats.matrix[25][5] += 1
 			end
-		end
-
-		# If the receiver comes only from a callsite
-		if origin == 4 or origin == 132 then
+		else if origin == 4 or origin == 132 then
+			# If the receiver comes only from a callsite
 			# The total of callsites
 			vm.pstats.matrix[26][index_x] += 1
 			vm.pstats.matrix[26][5] += 1
@@ -1025,10 +1020,8 @@ redef class MOSite
 				vm.pstats.matrix[28][index_x] += 1
 				vm.pstats.matrix[28][5] += 1
 			end
-		end
-
-		# If the receiver comes only from an attribute read
-		if origin == 256 or origin == 384 then
+		else if origin == 256 or origin == 384 then
+			# If the receiver comes only from an attribute read
 			readsite_statistics
 
 			if origin.bin_and(128) == 0 then
@@ -1039,10 +1032,8 @@ redef class MOSite
 				vm.pstats.matrix[32][index_x] += 1
 				vm.pstats.matrix[32][5] += 1
 			end
-		end
-
-		# If the receiver comes from a cast
-		if origin == 512 or origin == 640 then
+		else if origin == 512 or origin == 640 then
+			# If the receiver comes from a cast
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
@@ -1053,18 +1044,14 @@ redef class MOSite
 				vm.pstats.matrix[79][index_x] += 1
 				vm.pstats.matrix[79][5] += 1
 			end
-		end
-
-		# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
-		if not origin == 2 and not origin == 130 and not origin == 4 and not origin == 132 and not origin == 256 and not origin == 384 and not origin == 512 and not origin == 640 then
+		else if origin.bin_and(128) == 0 then
+			# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 			# If the site is preexisting
-			if origin.bin_and(128) == 0 then
-				vm.pstats.matrix[29][index_x] += 1
-				vm.pstats.matrix[29][5] += 1
-			else
-				vm.pstats.matrix[30][index_x] += 1
-				vm.pstats.matrix[30][5] += 1
-			end
+			vm.pstats.matrix[29][index_x] += 1
+			vm.pstats.matrix[29][5] += 1
+		else
+			vm.pstats.matrix[30][index_x] += 1
+			vm.pstats.matrix[30][5] += 1
 		end
 	end
 
@@ -1159,7 +1146,6 @@ redef class MOSite
 			vm.pstats.matrix[impl.index_y][4] += 1
 			vm.pstats.matrix[impl.compute_index_y(self)][4] += 1
 
-			# Increment the total of preexisting and non-preexisting
 			if expr_recv.is_pre then
 				vm.pstats.matrix[1][4] += 1
 			else

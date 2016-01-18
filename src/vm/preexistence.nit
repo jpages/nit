@@ -92,12 +92,12 @@ redef class MPropDef
 	# The origin of the preexistence of self return variable (if any)
 	fun preexistence_origin: Int
 	do
-		if recursive_origin then
-			return 64
-		else
-			recursive_origin = true
+		# if recursive_origin then
+		# 	return 64
+		# else
+		# 	recursive_origin = true
 			return return_expr.preexistence_origin
-		end
+		# end
 	end
 end
 

@@ -121,18 +121,18 @@ redef class MOStats
 		var total_from_new = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]
 		var total_from_callsite = vm.pstats.matrix[28][0] + vm.pstats.matrix[28][1] + vm.pstats.matrix[28][2]
 		var total_from_readsite = vm.pstats.matrix[32][0] + vm.pstats.matrix[32][1] + vm.pstats.matrix[32][2]
-		var total_from_cast = vm.pstats.matrix[77][0] + vm.pstats.matrix[77][1] + vm.pstats.matrix[77][2]
+		var total_from_cast = vm.pstats.matrix[79][0] + vm.pstats.matrix[79][1] + vm.pstats.matrix[79][2]
 
 		var general_total = total_from_new + total_from_callsite + total_from_readsite + total_from_cast + other_methods + other_attributes + other_casts
 
 		var table2 = "Read & {vm.pstats.matrix[32][0]} & {vm.pstats.matrix[32][1]} & {vm.pstats.matrix[32][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
 		table2 += "New & {vm.pstats.matrix[23][0]} & {vm.pstats.matrix[23][1]} & {vm.pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
 		table2 += "Call & {vm.pstats.matrix[28][0]} & {vm.pstats.matrix[28][1]} & {vm.pstats.matrix[28][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
-		table2 += "Subtype & {vm.pstats.matrix[77][0]} & {vm.pstats.matrix[77][1]} & {vm.pstats.matrix[77][2]} & {total_from_cast} & {total_from_cast*100/general_total}\\\\\n"
+		table2 += "Subtype & {vm.pstats.matrix[79][0]} & {vm.pstats.matrix[79][1]} & {vm.pstats.matrix[79][2]} & {total_from_cast} & {total_from_cast*100/general_total}\\\\\n"
 		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {total_others*100/general_total}\\\\\n"
 		table2 += "\\hline\n"
 
-		table2 += "total & {vm.pstats.matrix[23][0] + vm.pstats.matrix[28][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[77][0] + other_methods} & {vm.pstats.matrix[23][1] + vm.pstats.matrix[28][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[77][1] + other_attributes} & {vm.pstats.matrix[23][2] + vm.pstats.matrix[28][2] + vm.pstats.matrix[32][2] + vm.pstats.matrix[77][2] + other_casts} & {general_total} & 100\\\\\n"
+		table2 += "total & {vm.pstats.matrix[23][0] + vm.pstats.matrix[28][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[79][0] + other_methods} & {vm.pstats.matrix[23][1] + vm.pstats.matrix[28][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[79][1] + other_attributes} & {vm.pstats.matrix[23][2] + vm.pstats.matrix[28][2] + vm.pstats.matrix[32][2] + vm.pstats.matrix[79][2] + other_casts} & {general_total} & 100\\\\\n"
 
 		file.write(table2)
 		file.write("\n\n")
