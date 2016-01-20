@@ -71,6 +71,8 @@ redef class MOStats
 		table_recompilations(new FileWriter.open("{dir}/table_recompilations-{lbl}.tex"))
 
 		table_executions(new FileWriter.open("{dir}/table_executions-{lbl}.tex"))
+
+		table_site_implementations(new FileWriter.open("{dir}/table_implementations-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -826,11 +828,43 @@ redef class MOStats
 		var total_casts = vm.pstats.cast_ph + vm.pstats.cast_sst + vm.pstats.cast_static
 		var grand_total = total_methods + total_attributes + total_casts
 
-		var table = "static & {vm.pstats.method_static} & {0} & {vm.pstats.cast_static} & {vm.pstats.method_static + vm.pstats.cast_static}\\\\\n"
+		var table = "monomorphs & {vm.pstats.monomorph_method_executions} & {vm.pstats.monomorph_attribute_executions} & {vm.pstats.monomorph_cast_executions} & {vm.pstats.monomorph_method_executions + vm.pstats.monomorph_attribute_executions + vm.pstats.monomorph_cast_executions}\\\\\n"
+		table += "static & {vm.pstats.method_static} & {0} & {vm.pstats.cast_static} & {vm.pstats.method_static + vm.pstats.cast_static}\\\\\n"
 		table += "SST & {vm.pstats.method_sst} & {vm.pstats.attribute_sst} & {vm.pstats.cast_sst} & {vm.pstats.method_sst + vm.pstats.attribute_sst + vm.pstats.cast_sst} \\\\\n"
 		table += "PH & {vm.pstats.method_ph} & {vm.pstats.attribute_ph} & {vm.pstats.cast_ph} & {vm.pstats.method_ph + vm.pstats.attribute_ph + vm.pstats.cast_ph} \\\\\n"
 		table += "\\hline\n"
 		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistics about MOSites and their implementations
+	private fun table_site_implementations(file: FileWriter)
+	do
+		file.write("%Table implementations of sites\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var table = "monomorphs & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][3]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][3]}\\\\\n"
+		table += "static preexisting & {vm.pstats.matrix[7][0]} & {vm.pstats.matrix[7][1]} & {vm.pstats.matrix[7][3]} & {vm.pstats.matrix[7][0] + vm.pstats.matrix[7][1] + vm.pstats.matrix[7][3]}\\\\\n"
+		table += "static non-preexisting & {vm.pstats.matrix[8][0]} & {vm.pstats.matrix[8][1]} & {vm.pstats.matrix[8][3]} & {vm.pstats.matrix[8][0] + vm.pstats.matrix[8][1] + vm.pstats.matrix[8][3]}\\\\\n"
+
+		table += "SST & {vm.pstats.matrix[9][0]} & {vm.pstats.matrix[9][1]} & {vm.pstats.matrix[9][2]} & {vm.pstats.matrix[9][0] + vm.pstats.matrix[9][1] + vm.pstats.matrix[9][2]} \\\\\n"
+		table += "SST preexisting & {vm.pstats.matrix[10][0]} & {vm.pstats.matrix[10][1]} & {vm.pstats.matrix[10][2]} & {vm.pstats.matrix[10][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[10][2]} \\\\\n"
+		table += "SST non-preexisting & {vm.pstats.matrix[11][0]} & {vm.pstats.matrix[11][1]} & {vm.pstats.matrix[11][2]} & {vm.pstats.matrix[11][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[11][2]} \\\\\n"
+
+		table += "PH & {vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]} \\\\\n"
+		table += "PH non-preexisting & {vm.pstats.matrix[13][0]} & {vm.pstats.matrix[13][1]} & {vm.pstats.matrix[13][2]} & {vm.pstats.matrix[13][0] + vm.pstats.matrix[13][1] + vm.pstats.matrix[13][2]} \\\\\n"
+		table += "PH non-preexisting & {vm.pstats.matrix[14][0]} & {vm.pstats.matrix[14][1]} & {vm.pstats.matrix[14][2]} & {vm.pstats.matrix[14][0] + vm.pstats.matrix[14][1] + vm.pstats.matrix[14][2]} \\\\\n"
+
+		table += "Null & {vm.pstats.matrix[15][0]} & {vm.pstats.matrix[15][1]} & {vm.pstats.matrix[15][2]} & {vm.pstats.matrix[15][0] + vm.pstats.matrix[15][1] + vm.pstats.matrix[15][2]} \\\\\n"
+		table += "Null non-preexisting & {vm.pstats.matrix[16][0]} & {vm.pstats.matrix[16][1]} & {vm.pstats.matrix[16][2]} & {vm.pstats.matrix[16][0] + vm.pstats.matrix[16][1] + vm.pstats.matrix[16][2]} \\\\\n"
+		table += "Null non-preexisting & {vm.pstats.matrix[17][0]} & {vm.pstats.matrix[17][1]} & {vm.pstats.matrix[17][2]} & {vm.pstats.matrix[17][0] + vm.pstats.matrix[17][1] + vm.pstats.matrix[17][2]} \\\\\n"
+
+		table += "\\hline\n"
+		table += "total & {vm.pstats.matrix[6][0] + vm.pstats.matrix[9][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[15][0]} & {vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1] + vm.pstats.matrix[15][1]} & {vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2] + vm.pstats.matrix[15][2]} & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1] + vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")

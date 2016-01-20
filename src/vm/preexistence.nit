@@ -348,6 +348,19 @@ end
 redef class MOSite
 	fun site_preexist: Int
 	do
+		expr_recv.expr_preexist
+
+		# Determine if the site is trivially monomorph
+		if not is_monomorph then
+			# compute_concretes_site
+			var origin = expr_recv.preexistence_origin
+
+			# The new must be unique and must be loaded
+			if origin == 2 and get_concretes != null and get_concretes.length == 1 then
+				is_monomorph = true
+			end
+		end
+
 		return expr_recv.expr_preexist
 	end
 end

@@ -290,6 +290,16 @@ class MOStats
 	var cast_sst = 0
 	var cast_ph = 0
 
+	# The number of executions of monomorphic sites
+	var monomorph_method_executions = 0
+	var monomorph_attribute_executions = 0
+	var monomorph_cast_executions = 0
+
+	# The number of site executions
+	var monomorph_methods = 0
+	var monomorph_attributes = 0
+	var monomorph_casts = 0
+
 	init(s: String)
 	do
 		# Create a directory with the current date to store the results
@@ -931,6 +941,16 @@ redef class MOSite
 
 			# Increment statistics on callsites
 			incr_stats_sites
+
+			if self.is_monomorph then
+				if self isa MOCallSite then
+					vm.pstats.monomorph_methods += 1
+				else if self isa MOAttrSite then
+					vm.pstats.monomorph_attributes += 1
+				else
+					vm.pstats.monomorph_casts += 1
+				end
+			end
 		else
 			# Increment the total of sites with a primitive receiver
 			sys.vm.pstats.nb_primitive_sites += 1
@@ -1320,7 +1340,12 @@ redef class StaticImplMethod
 
 	redef fun exec_method(recv)
 	do
-		sys.vm.pstats.method_static += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_method_executions += 1
+		else
+			sys.vm.pstats.method_static += 1
+		end
+
 		return super
 	end
 end
@@ -1329,7 +1354,12 @@ redef class StaticImplSubtype
 
 	redef fun exec_subtype(recv)
 	do
-		sys.vm.pstats.cast_static += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_cast_executions += 1
+		else
+			sys.vm.pstats.cast_static += 1
+		end
+
 		return super
 	end
 end
@@ -1339,13 +1369,23 @@ redef class SSTImpl
 
 	redef fun exec_attribute_read(recv)
 	do
-		sys.vm.pstats.attribute_sst += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_attribute_executions += 1
+		else
+			sys.vm.pstats.attribute_sst += 1
+		end
+
 		return super
 	end
 
 	redef fun exec_attribute_write(recv, instance)
 	do
-		sys.vm.pstats.attribute_sst += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_attribute_executions += 1
+		else
+			sys.vm.pstats.attribute_sst += 1
+		end
+
 		super
 	end
 

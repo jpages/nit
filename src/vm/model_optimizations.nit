@@ -918,6 +918,9 @@ abstract class MOSite
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
 	var concretes_receivers: nullable List[MClass] is noinit, writable
 
+	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol
+	var is_monomorph: Bool = false is writable
+
 	# True if the site has been executed
 	var is_executed: Bool = false
 
@@ -939,6 +942,9 @@ abstract class MOSite
 			concrete.add(pattern.rsc)
 
 			concretes_receivers = concrete
+
+			# If the static type is final and the class is already loaded, then it is monomorph
+			if pattern.rsc.abstract_loaded then is_monomorph = true
 		else
 			if not isset _expr_recv then return
 
@@ -1147,6 +1153,9 @@ end
 # A call to an initializer
 class MOInitSite
 	super MOProcedureSite
+
+	# A call to an initializer is always static
+	redef var is_monomorph = true
 end
 
 # MO of read attribute
