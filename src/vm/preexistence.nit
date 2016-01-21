@@ -3,9 +3,6 @@ module preexistence
 
 import model_optimizations
 
-# TODO: preexist_analysed is used because there is not "is_compiled" boolean of MPropDef (only on APropdef),
-# and we need to know for preexistence analysis if a candidate local property is compiled or not.
-
 redef class ToolContext
 	# Disable inter-procedural analysis and 'new' cases
 	var disable_preexistence_extensions = new OptionBool("Disable preexistence extensions", "--no-preexist-ext")
@@ -351,15 +348,17 @@ redef class MOSite
 		expr_recv.expr_preexist
 
 		# Determine if the site is trivially monomorph
-		if not is_monomorph then
+		if first_analysis then
 			# compute_concretes_site
 			var origin = expr_recv.preexistence_origin
 
 			# The new must be unique and must be loaded
-			if origin == 2 and get_concretes != null and get_concretes.length == 1 then
+			if origin == 2 and get_concretes != null and get_concretes.length == 1 and get_concretes.first.loaded then
 				is_monomorph = true
 			end
 		end
+
+		if first_analysis then first_analysis = false
 
 		return expr_recv.expr_preexist
 	end

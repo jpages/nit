@@ -921,6 +921,10 @@ abstract class MOSite
 	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol
 	var is_monomorph: Bool = false is writable
 
+	# Indicate if this is the first time the preexistence is computed for this site,
+	# used for statistics
+	var first_analysis: Bool = true is writable
+
 	# True if the site has been executed
 	var is_executed: Bool = false
 
@@ -944,7 +948,7 @@ abstract class MOSite
 			concretes_receivers = concrete
 
 			# If the static type is final and the class is already loaded, then it is monomorph
-			if pattern.rsc.abstract_loaded then is_monomorph = true
+			if first_analysis and pattern.rsc.abstract_loaded then is_monomorph = true
 		else
 			if not isset _expr_recv then return
 

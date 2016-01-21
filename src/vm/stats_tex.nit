@@ -97,7 +97,8 @@ redef class MOStats
 		total_pre = vm.pstats.matrix[1][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[1][2]
 		total_npre = vm.pstats.matrix[2][0] + vm.pstats.matrix[2][1] + vm.pstats.matrix[2][2]
 
-		var table1 = "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
+		var table1 = "monomorphics & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
 		table1 += "total & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]} & {vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]} & {vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"

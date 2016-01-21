@@ -908,6 +908,18 @@ redef class MOSite
 
 		# If the receiver is not a primitive
 		if not origin.bin_and(16) == 16 then
+			if self.is_monomorph then
+				if self isa MOCallSite then
+					vm.pstats.monomorph_methods += 1
+				else if self isa MOAttrSite then
+					vm.pstats.monomorph_attributes += 1
+				else
+					vm.pstats.monomorph_casts += 1
+				end
+
+				return
+			end
+
 			incr_from_site
 			incr_concrete_site
 			incr_self
@@ -941,16 +953,6 @@ redef class MOSite
 
 			# Increment statistics on callsites
 			incr_stats_sites
-
-			if self.is_monomorph then
-				if self isa MOCallSite then
-					vm.pstats.monomorph_methods += 1
-				else if self isa MOAttrSite then
-					vm.pstats.monomorph_attributes += 1
-				else
-					vm.pstats.monomorph_casts += 1
-				end
-			end
 		else
 			# Increment the total of sites with a primitive receiver
 			sys.vm.pstats.nb_primitive_sites += 1
