@@ -532,12 +532,10 @@ redef class MMethodDef
 
 		var preexist: Int
 
-		if not disable_preexistence_extensions then
-			for newexpr in monews do
-				assert not newexpr.pattern.cls.mclass_type.is_primitive_type
+		for newexpr in monews do
+			assert not newexpr.pattern.cls.mclass_type.is_primitive_type
 
-				preexist = newexpr.expr_preexist
-			end
+			preexist = newexpr.expr_preexist
 		end
 
 		# If a returnvar is present, then compute its preexistence
@@ -621,12 +619,12 @@ end
 redef class MONew
 	redef fun compute_preexist
 	do
-		if disable_preexistence_extensions then
-			# Non perennial and not preexistant
-			return 24
-		else if pattern.is_loaded then
+		if pattern.is_loaded then
 			# Preexisting and perennial
 			return 3
+		else if disable_preexistence_extensions then
+			# Perennial and not preexisting
+			return 24
 		else
 			# Non-preexisting and non perennial
 			return 8
