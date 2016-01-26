@@ -1393,7 +1393,12 @@ redef class SSTImpl
 
 	redef fun exec_method(recv)
 	do
-		sys.vm.pstats.method_sst += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_method_executions += 1
+		else
+			sys.vm.pstats.method_sst += 1
+		end
+
 		return super
 	end
 

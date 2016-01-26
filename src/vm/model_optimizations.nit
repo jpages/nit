@@ -13,16 +13,30 @@ redef class ToolContext
 	# If true, the vm will load all top-level news she met in methods during compilation
 	var improve_loading = new OptionBool("Load all top-level news in the code during compilation", "--improve-loading")
 
+	# Disable inter-procedural analysis and 'new' cases
+	var disable_preexistence_extensions = new OptionBool("Disable preexistence extensions", "--no-preexist-ext")
+
+	# Disable inter-procedural analysis
+	var disable_method_return = new OptionBool("Disable preexistence extensions on method call", "--disable-meth-return")
+
 	redef init
 	do
 		super
 		option_context.add_option(trace_on)
 		option_context.add_option(debug)
 		option_context.add_option(improve_loading)
+		option_context.add_option(disable_preexistence_extensions)
+		option_context.add_option(disable_method_return)
 	end
 end
 
 redef class Sys
+	# Tell if preexistence extensions are disabled
+	var disable_preexistence_extensions: Bool is noinit
+
+	# Tell if inter-procedural analysis is disabled
+	var disable_method_return: Bool is noinit
+
 	# Display trace if --mo-trace is set
 	fun trace(buf: String) do if trace_on then print(buf)
 
@@ -54,6 +68,9 @@ redef class ModelBuilder
 		sys.trace_on = toolcontext.trace_on.value
 		sys.debug_mode = toolcontext.debug.value
 		sys.improve_loading = toolcontext.improve_loading.value
+
+		sys.disable_preexistence_extensions = toolcontext.disable_preexistence_extensions.value
+		sys.disable_method_return = toolcontext.disable_method_return.value
 
 		if toolcontext.debug.value then
 			# Create the output file for debug traces
@@ -119,6 +136,9 @@ class ConcreteTypes
 				end
 			end
 		end
+
+		# Attribute concretes types are disabled in original preexistence
+		if sys.disable_preexistence_extensions then return
 
 		# Collect about immutable attributes
 		for m in modelbuilder.model.mmodules do

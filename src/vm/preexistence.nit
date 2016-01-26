@@ -3,38 +3,6 @@ module preexistence
 
 import model_optimizations
 
-redef class ToolContext
-	# Disable inter-procedural analysis and 'new' cases
-	var disable_preexistence_extensions = new OptionBool("Disable preexistence extensions", "--no-preexist-ext")
-
-	# Disable inter-procedural analysis
-	var disable_method_return = new OptionBool("Disable preexistence extensions on method call", "--disable-meth-return")
-
-	redef init
-	do
-		super
-		option_context.add_option(disable_preexistence_extensions)
-		option_context.add_option(disable_method_return)
-	end
-end
-
-redef class Sys
-	# Tell if preexistence extensions are disabled
-	var disable_preexistence_extensions: Bool is noinit
-
-	# Tell if inter-procedural analysis is disabled
-	var disable_method_return: Bool is noinit
-end
-
-redef class ModelBuilder
-	redef fun run_virtual_machine(mainmodule, arguments)
-	do
-		sys.disable_preexistence_extensions = toolcontext.disable_preexistence_extensions.value
-		sys.disable_method_return = toolcontext.disable_method_return.value
-		super(mainmodule, arguments)
-	end
-end
-
 redef class VirtualMachine
 	redef fun load_class(mclass)
 	do

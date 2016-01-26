@@ -97,12 +97,12 @@ redef class MOStats
 		total_pre = vm.pstats.matrix[1][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[1][2]
 		total_npre = vm.pstats.matrix[2][0] + vm.pstats.matrix[2][1] + vm.pstats.matrix[2][2]
 
-		var table1 = "monomorphics & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		var table1 = "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
-		table1 += "total & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]} & {vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]} & {vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"
-		table1 += "preexistence rate & {vm.pstats.matrix[1][0]*100/(vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0])}\\% & {vm.pstats.matrix[1][1]*100/(vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1])}\\% & {vm.pstats.matrix[1][2]*100/(vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\n"
+		table1 += "total polymorph & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]} & {vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]} & {vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"
+		table1 += "preexistence rate & {vm.pstats.matrix[1][0]*100/(vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0])}\\% & {vm.pstats.matrix[1][1]*100/(vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1])}\\% & {vm.pstats.matrix[1][2]*100/(vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\\\n"
 
 		file.write(table1)
 		file.write("\n\n")
@@ -245,8 +245,8 @@ redef class MOStats
 		var total_preexisting = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
 		var total_nonpreexisting = vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
 
-		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\%\\\\\n"
-		table4 += "non preexisting & {vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\% \\\\\n"
+		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\\\\n"
+		table4 += "non preexisting & {vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\\\\n"
 		table4 += "\\hline\n"
 
 		table4 += "total inlinable & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
@@ -857,11 +857,11 @@ redef class MOStats
 		table += "SST non-preexisting & {vm.pstats.matrix[11][0]} & {vm.pstats.matrix[11][1]} & {vm.pstats.matrix[11][2]} & {vm.pstats.matrix[11][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[11][2]} \\\\\n"
 
 		table += "PH & {vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]} \\\\\n"
-		table += "PH non-preexisting & {vm.pstats.matrix[13][0]} & {vm.pstats.matrix[13][1]} & {vm.pstats.matrix[13][2]} & {vm.pstats.matrix[13][0] + vm.pstats.matrix[13][1] + vm.pstats.matrix[13][2]} \\\\\n"
+		table += "PH preexisting & {vm.pstats.matrix[13][0]} & {vm.pstats.matrix[13][1]} & {vm.pstats.matrix[13][2]} & {vm.pstats.matrix[13][0] + vm.pstats.matrix[13][1] + vm.pstats.matrix[13][2]} \\\\\n"
 		table += "PH non-preexisting & {vm.pstats.matrix[14][0]} & {vm.pstats.matrix[14][1]} & {vm.pstats.matrix[14][2]} & {vm.pstats.matrix[14][0] + vm.pstats.matrix[14][1] + vm.pstats.matrix[14][2]} \\\\\n"
 
 		table += "Null & {vm.pstats.matrix[15][0]} & {vm.pstats.matrix[15][1]} & {vm.pstats.matrix[15][2]} & {vm.pstats.matrix[15][0] + vm.pstats.matrix[15][1] + vm.pstats.matrix[15][2]} \\\\\n"
-		table += "Null non-preexisting & {vm.pstats.matrix[16][0]} & {vm.pstats.matrix[16][1]} & {vm.pstats.matrix[16][2]} & {vm.pstats.matrix[16][0] + vm.pstats.matrix[16][1] + vm.pstats.matrix[16][2]} \\\\\n"
+		table += "Null preexisting & {vm.pstats.matrix[16][0]} & {vm.pstats.matrix[16][1]} & {vm.pstats.matrix[16][2]} & {vm.pstats.matrix[16][0] + vm.pstats.matrix[16][1] + vm.pstats.matrix[16][2]} \\\\\n"
 		table += "Null non-preexisting & {vm.pstats.matrix[17][0]} & {vm.pstats.matrix[17][1]} & {vm.pstats.matrix[17][2]} & {vm.pstats.matrix[17][0] + vm.pstats.matrix[17][1] + vm.pstats.matrix[17][2]} \\\\\n"
 
 		table += "\\hline\n"
