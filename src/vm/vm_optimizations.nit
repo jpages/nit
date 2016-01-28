@@ -1100,6 +1100,7 @@ redef abstract class MOSite
 			return
 		end
 
+		# TODO
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
@@ -1123,7 +1124,7 @@ redef abstract class MOSite
 
 		if get_concretes != null then
 			for recv in get_concretes do
-				if not recv.abstract_loaded then return -1
+				if not recv.loaded then return -1
 
 				if get_block_position(vm, recv) < 0 then
 					return 0
@@ -1133,7 +1134,6 @@ redef abstract class MOSite
 			return 1
 		end
 
-		# In case of a bug, return 0 here to be sure
 		return 0
 	end
 
@@ -1250,11 +1250,11 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		if get_concretes == null then
-			var propdef = pattern.callees.first
-			impl = new StaticImplMethod(self, mutable, propdef)
+		if concretes_receivers == null then
+			impl = new StaticImplMethod(self, mutable, pattern.callees.first)
 		else
-			impl = new StaticImplMethod(self, mutable, concretes_callees.first)
+			assert concrete_callees.length > 0
+			impl = new StaticImplMethod(self, mutable, concrete_callees.first)
 		end
 	end
 
@@ -1277,12 +1277,18 @@ redef class MOCallSite
 		# If the pattern can be static, return true
 		if super then return true
 
-		compute_concretes_site
+		if is_monomorph then return true
 
+		monomorphic_analysis
+		compute_concretes_site
 		if get_concretes == null then
 			return false
 		else
-			return concretes_callees.length == 1
+			if concrete_callees.length == 1 then
+				return true
+			else
+				return false
+			end
 		end
 	end
 end

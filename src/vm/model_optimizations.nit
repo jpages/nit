@@ -643,16 +643,6 @@ redef class MPropDef
 			var global_method = mproperty.as(MMethod)
 			if not sys.vm.compiled_global_methods.has(global_method) then
 				sys.vm.compiled_global_methods.add(global_method)
-
-				if global_method.patterns.length == 0 then
-					print "GP sans pattern {global_method.name}"
-
-					for pattern in callers do
-						for mosite in pattern.sites do
-							if mosite.is_executed then print "Executed for {global_method.name} {mosite}"
-						end
-					end
-				end
 			end
 		end
 
@@ -662,18 +652,15 @@ redef class MPropDef
 			pattern.cuc -= 1
 		end
 
-		# if mclassdef.mclass.concrete_caller_sites != null then
-		# 	for site in mclassdef.mclass.concrete_caller_sites do
+		for site in mosites do
+			# Determine if the site is monomorphic
+			site.monomorphic_analysis
 
-		# 	end
-		# end
+			# Initialize concrete receivers of sites
+			if not site.is_monomorph then site.compute_concretes_site
+		end
 
 		is_compiled = true
-
-		for site in mosites do
-			# Init the concrete receivers
-			site.compute_concretes_site
-		end
 	end
 
 	# Return expression of the propdef (null if procedure)
@@ -755,7 +742,8 @@ abstract class MOExpr
 
 		var mclass = ast.mtype.get_mclass(sys.vm, lp)
 
-		if mclass != null and mclass.is_final then
+		#TODO
+		if mclass != null and mclass.is_final and mclass.loaded then
 			concretes = new List[MClass]
 			concretes.add(mclass)
 			return concretes
@@ -938,12 +926,9 @@ abstract class MOSite
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
 	var concretes_receivers: nullable List[MClass] is noinit, writable
 
-	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol
+	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol,
+	# A monomorphic site is coming from a unique new of a loaded class or typed by a final class (loaded or not)
 	var is_monomorph: Bool = false is writable
-
-	# Indicate if this is the first time the preexistence is computed for this site,
-	# used for statistics
-	var first_analysis: Bool = true is writable
 
 	# True if the site has been executed
 	var is_executed: Bool = false
@@ -956,34 +941,52 @@ abstract class MOSite
 
 	fun pattern_factory(rst: MType, gp: MProperty, rsc: MClass): P is abstract
 
-	fun compute_concretes_site
+	# Set the flag `is_monomorph` if needed
+	fun monomorphic_analysis
 	do
-		if concretes_receivers != null then return
-
-		# If the receiver class is a final class, then the expression has concrete receiver
-		if pattern.rsc.is_final then
+		# If the static type is final, then it is monomorph
+		if pattern.rsc.is_final and pattern.rsc.loaded then
+			is_monomorph = true
 			var concrete = new List[MClass]
 			concrete.add(pattern.rsc)
 
 			concretes_receivers = concrete
+		end
 
-			# If the static type is final and the class is already loaded, then it is monomorph
-			if first_analysis and pattern.rsc.abstract_loaded then is_monomorph = true
-		else
-			if not isset _expr_recv then return
+		# If the site is coming from a new of a loaded class
+		if expr_recv isa MONew and expr_recv.as(MONew).pattern.cls.loaded then
+			is_monomorph = true
+			var concrete = new List[MClass]
+			concrete.add(expr_recv.as(MONew).pattern.cls)
 
-			var res = expr_recv.compute_concretes(null)
-			if res != null then
-				concretes_receivers = res
+			concretes_receivers = concrete
+		end
 
-				# for concrete in res do
-				# 	if concrete.concrete_caller_sites == null then
-				# 		concrete.concrete_caller_sites = new List[MOSite]
-				# 	end
+		# The receiver of the site is coming from a variable with a unique loaded new in dependency
+		if expr_recv isa MOSSAVar and expr_recv.as(MOSSAVar).dependency isa MONew then
+			var new_class = expr_recv.as(MOSSAVar).dependency.as(MONew).pattern.cls
+			# TODO the class must be loaded
+			if new_class.loaded then return
 
-				# 	concrete.concrete_caller_sites.add(self)
-				# end
-			end
+			is_monomorph = true
+			var concrete = new List[MClass]
+			concrete.add(new_class)
+
+			concretes_receivers = concrete
+		end
+	end
+
+	fun compute_concretes_site
+	do
+		# Do not compute concrete_type in original preexistence
+		if sys.disable_preexistence_extensions then	return
+		if concretes_receivers != null then return
+
+		if not isset _expr_recv then return
+
+		var res = expr_recv.compute_concretes(null)
+		if res != null then
+			concretes_receivers = res
 		end
 	end
 
@@ -1119,16 +1122,18 @@ class MOCallSite
 		end
 	end
 
-	fun concretes_callees: List[MMethodDef]
+	fun concrete_callees: List[MMethodDef]
 	do
 		var callees = new List[MMethodDef]
 
 		# Force the recomputation of concretes_receivers
-		concretes_receivers = null
+		if not is_monomorph then
+			concretes_receivers = null
+			compute_concretes_site
+		end
 
-		compute_concretes_site
-
-		for rcv in get_concretes.as(not null) do
+		for rcv in concretes_receivers.as(not null) do
+			# if not rcv.loaded then continue
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
 
 			if not callees.has(propdef) then

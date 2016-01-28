@@ -313,21 +313,6 @@ end
 redef class MOSite
 	fun site_preexist: Int
 	do
-		expr_recv.expr_preexist
-
-		# Determine if the site is trivially monomorph
-		if first_analysis then
-			# compute_concretes_site
-			var origin = expr_recv.preexistence_origin
-
-			# The new must be unique and must be loaded
-			if origin == 2 and get_concretes != null and get_concretes.length == 1 and get_concretes.first.loaded then
-				is_monomorph = true
-			end
-		end
-
-		if first_analysis then first_analysis = false
-
 		return expr_recv.expr_preexist
 	end
 end
@@ -352,10 +337,10 @@ redef class MOCallSite
 		var gp = pattern.gp
 
 		# Compute the concrete receivers of this site
-		compute_concretes_site
+		if not is_monomorph then compute_concretes_site
 
 		if concretes_receivers != null then
-			callees = concretes_callees
+			callees = concrete_callees
 
 			for callee in callees do
 				if not callee.is_compiled then return 8
