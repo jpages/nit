@@ -1279,7 +1279,6 @@ redef class MOCallSite
 
 		if is_monomorph then return true
 
-		monomorphic_analysis
 		compute_concretes_site
 		if get_concretes == null then
 			return false

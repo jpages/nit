@@ -1048,13 +1048,12 @@ redef class MOSite
 
 			if origin.bin_and(128) == 0 then
 				# Preexisting attribute with concrete types
-				# # TODO: debug concrete types of attributes
-				# compute_concretes_site
-				# if concretes_receivers != null then
-				# 	print "MOSite {self} with concretes_receivers {concretes_receivers.as(not null)} origin = {origin} preexistence = {expr_recv.expr_preexist}"
-				# else
-				# 	print "MOSite from a readsite and no concretes {is_monomorph} origin = {origin} preexistence = {expr_recv.expr_preexist}"
-				# end
+				# TODO: debug concrete types of attributes
+				if concretes_receivers != null then
+					print "MOSite {self} with concretes_receivers {concretes_receivers.as(not null)} origin = {origin} preexistence = {expr_recv.expr_preexist}"
+				else
+					print "MOSite from a readsite and no concretes {is_monomorph} origin = {origin} preexistence = {expr_recv.expr_preexist}"
+				end
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
 			else

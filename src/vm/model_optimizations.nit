@@ -993,7 +993,7 @@ abstract class MOSite
 	# Get concretes receivers (or return empty list)
 	fun get_concretes: nullable List[MClass]
 	do
-		compute_concretes_site
+		if not is_monomorph then compute_concretes_site
 
 		return concretes_receivers
 	end
