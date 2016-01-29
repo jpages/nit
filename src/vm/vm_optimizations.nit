@@ -75,6 +75,8 @@ redef class VirtualMachine
 				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
 				print "Pattern {callsite.mocallsite.pattern} {callsite.mocallsite.pattern.callees}"
 			end
+
+			return self.call(impl.exec_method(recv), args)
 		else
 			# TODO: handle this
 			# print "CallSite without MOCallSite {callsite}"
@@ -1253,7 +1255,6 @@ redef class MOCallSite
 		if concretes_receivers == null then
 			impl = new StaticImplMethod(self, mutable, pattern.callees.first)
 		else
-			assert concrete_callees.length > 0
 			impl = new StaticImplMethod(self, mutable, concrete_callees.first)
 		end
 	end
@@ -1279,7 +1280,6 @@ redef class MOCallSite
 
 		if is_monomorph then return true
 
-		compute_concretes_site
 		if get_concretes == null then
 			return false
 		else

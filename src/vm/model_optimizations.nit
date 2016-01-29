@@ -955,6 +955,8 @@ abstract class MOSite
 
 		# If the site is coming from a new of a loaded class
 		if expr_recv isa MONew and expr_recv.as(MONew).pattern.cls.loaded then
+			if expr_recv.as(MONew).pattern.cls.is_abstract then return
+
 			is_monomorph = true
 			var concrete = new List[MClass]
 			concrete.add(expr_recv.as(MONew).pattern.cls)
@@ -965,8 +967,9 @@ abstract class MOSite
 		# The receiver of the site is coming from a variable with a unique loaded new in dependency
 		if expr_recv isa MOSSAVar and expr_recv.as(MOSSAVar).dependency isa MONew then
 			var new_class = expr_recv.as(MOSSAVar).dependency.as(MONew).pattern.cls
-			# TODO the class must be loaded
-			if new_class.loaded then return
+			# The corresponding class must be loaded
+			if not new_class.loaded then return
+			if new_class.is_abstract then return
 
 			is_monomorph = true
 			var concrete = new List[MClass]
@@ -980,9 +983,11 @@ abstract class MOSite
 	do
 		# Do not compute concrete_type in original preexistence
 		if sys.disable_preexistence_extensions then	return
-		if concretes_receivers != null then return
 
+		# TODO: fix this bug related to --improve-loading and remove the following line
 		if not isset _expr_recv then return
+
+		if concretes_receivers != null then return
 
 		var res = expr_recv.compute_concretes(null)
 		if res != null then
