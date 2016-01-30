@@ -689,7 +689,11 @@ redef class MMethod
 		super
 
 		for pattern in patterns do
-			pattern.add_lp(mpropdef)
+			# Verify that the class of `mpropdef` is a subclass of the patternin which
+			# we want to add this local method
+			if sys.vm.is_subclass(mpropdef.mclassdef.mclass, pattern.rsc) then
+				pattern.add_lp(mpropdef)
+			end
 		end
 	end
 end
@@ -1138,8 +1142,12 @@ class MOCallSite
 		end
 
 		for rcv in concretes_receivers.as(not null) do
-			# if not rcv.loaded then continue
+			if not rcv.abstract_loaded then continue
+
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+			if pattern.rsc.to_s == "ForeignCallbackSet" or pattern.rsc.to_s == "Message"then
+				print "{pattern.rsc}#{pattern.gp} is_monomorph {is_monomorph} propdef found {propdef}"
+			end
 
 			if not callees.has(propdef) then
 				callees.add(propdef)

@@ -73,7 +73,8 @@ redef class VirtualMachine
 			var impl = callsite.mocallsite.get_impl(sys.vm)
 			if impl.exec_method(recv) != propdef then
 				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
-				print "Pattern {callsite.mocallsite.pattern} {callsite.mocallsite.pattern.callees}"
+				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
+				print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 			end
 
 			return self.call(impl.exec_method(recv), args)
@@ -802,6 +803,7 @@ end
 redef class MOCallSitePattern
 	redef fun set_static_impl(mutable)
 	do
+		if rsc.to_s == "ForeignCallbackSet" then print "\t\t\tcallees.first"
 		if rsc.is_final then
 			impl = new StaticImplMethod(self, mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
 		else
@@ -812,7 +814,7 @@ redef class MOCallSitePattern
 	redef fun can_be_static
 	do
 		# If the rsc is a final class
-		if rsc.is_final and callees.length != 0 then return true
+		if rsc.is_final and rsc.loaded then return true
 
 		return callees.length == 1
 	end
@@ -1252,7 +1254,12 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		if concretes_receivers == null then
+		if pattern.rsc.to_s == "ForeignCallbackSet" or pattern.rsc.to_s == "FFILanguageAssignationPhase" then
+			print "\t\t\t{pattern.callees}"
+			print "{pattern.rsc}#{pattern.gp}"
+		end
+
+		if pattern.callees.length == 1 then
 			impl = new StaticImplMethod(self, mutable, pattern.callees.first)
 		else
 			impl = new StaticImplMethod(self, mutable, concrete_callees.first)
