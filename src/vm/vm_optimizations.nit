@@ -803,7 +803,6 @@ end
 redef class MOCallSitePattern
 	redef fun set_static_impl(mutable)
 	do
-		if rsc.to_s == "ForeignCallbackSet" then print "\t\t\tcallees.first"
 		if rsc.is_final then
 			impl = new StaticImplMethod(self, mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
 		else
@@ -1254,11 +1253,6 @@ end
 redef class MOCallSite
 	redef fun set_static_impl(vm, mutable)
 	do
-		if pattern.rsc.to_s == "ForeignCallbackSet" or pattern.rsc.to_s == "FFILanguageAssignationPhase" then
-			print "\t\t\t{pattern.callees}"
-			print "{pattern.rsc}#{pattern.gp}"
-		end
-
 		if pattern.callees.length == 1 then
 			impl = new StaticImplMethod(self, mutable, pattern.callees.first)
 		else
