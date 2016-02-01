@@ -389,16 +389,19 @@ redef class MOStats
 		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
 
-			# Do not count the site if it come from a primitive
+			# Do not count the site if it comes from a primitive
 			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
+			# Do not count monomorph sites
+			if site.is_monomorph then continue
+
 			site.concretes_receivers = null
 			var concretes = site.get_concretes
 
-			# We only count MOSite with a final receiver
+			# We only count MOSite with a concrete receiver
 			if concretes == null then continue
 
 			if site isa MOCallSite then
@@ -472,7 +475,9 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			#TODO: problème de cohérence avec le tableau 4 (pas le même total)
+			# Do not count monomorph sites
+			if site.is_monomorph then continue
+
 			site.concretes_receivers = null
 			var concretes = site.get_concretes
 
@@ -632,6 +637,9 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
+			# Do not count monomorph sites
+			if site.is_monomorph then continue
+
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += 1
@@ -704,6 +712,9 @@ redef class MOStats
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
+
+			# Do not count monomorph sites
+			if site.is_monomorph then continue
 
 			if site isa MOCallSite then
 				index_x = 0

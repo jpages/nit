@@ -1145,10 +1145,6 @@ class MOCallSite
 			if not rcv.abstract_loaded then continue
 
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
-			if pattern.rsc.to_s == "ForeignCallbackSet" or pattern.rsc.to_s == "Message"then
-				print "{pattern.rsc}#{pattern.gp} is_monomorph {is_monomorph} propdef found {propdef}"
-			end
-
 			if not callees.has(propdef) then
 				callees.add(propdef)
 			end

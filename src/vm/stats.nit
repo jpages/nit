@@ -901,6 +901,8 @@ redef class MOSite
 	fun stats(vm: VirtualMachine)
 	do
 		# Compute the concrete types of this site
+		concretes_receivers = null
+		monomorphic_analysis
 		compute_concretes_site
 
 		expr_recv.expr_preexist
@@ -1046,14 +1048,8 @@ redef class MOSite
 			# If the receiver comes only from an attribute read
 			readsite_statistics
 
-			if origin.bin_and(128) == 0 then
+			if origin.bin_and(128) == 0 and get_concretes != null then
 				# Preexisting attribute with concrete types
-				# TODO: debug concrete types of attributes
-				if concretes_receivers != null then
-					print "MOSite {self} with concretes_receivers {concretes_receivers.as(not null)} origin = {origin} preexistence = {expr_recv.expr_preexist}"
-				else
-					print "MOSite from a readsite and no concretes {is_monomorph} origin = {origin} preexistence = {expr_recv.expr_preexist}"
-				end
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
 			else
@@ -1086,7 +1082,7 @@ redef class MOSite
 	# Increment counters for callsites with concrete receivers
 	fun incr_concrete_site
 	do
-		if get_concretes != null then
+		if concretes_receivers != null then
 			# Total of concretes for each category
 			vm.pstats.matrix[3][index_x] += 1
 
@@ -1094,7 +1090,7 @@ redef class MOSite
 			vm.pstats.matrix[3][5] += 1
 
 			# Preexisting and non-preexisting sites with concretes
-			if expr_recv.is_pre then
+			if origin.bin_and(128) == 0 then
 				vm.pstats.matrix[4][index_x] += 1
 				vm.pstats.matrix[4][5] += 1
 			else
@@ -1245,7 +1241,7 @@ redef class PICPattern
 	do
 		super
 
-		# Each time a pattern has a change in its implementation, count it
+		# Each time a picpattern has a change in its implementation, count it
 		recompilations += 1
 	end
 end
