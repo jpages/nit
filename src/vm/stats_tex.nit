@@ -404,6 +404,9 @@ redef class MOStats
 			# We only count MOSite with a concrete receiver
 			if concretes == null then continue
 
+			# Filter to keep only preexisting receivers (loaded concretes)
+			if not site.expr_recv.expr_preexist.bit_pre then continue
+
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += 1

@@ -675,6 +675,9 @@ redef class MPropDef
 	# List of object sites in this local property
 	var mosites = new List[MOSite]
 
+	# The sites which are either with a primitive receiver or monomorphics
+	var monomorph_sites = new List[MOSite]
+
 	# All MOVar inside the mpropdef, including self and returnvar
 	var variables: Array[MOVar] = new Array[MOVar]
 end
@@ -712,6 +715,20 @@ redef class MAttribute
 
 	# The list of concrete types of the Attribute
 	var concrete_types = new List[MClass]
+
+	# Compute the closed-world concrete types for this global attribute and return them
+	fun compute_concretes: List[MClass]
+	do
+		if not concrete_types.is_empty then return concrete_types
+
+		for assignment in assignments do
+			var mclass = assignment.as(ANewExpr).mtype.as(MClassType).mclass
+
+			if not concrete_types.has(mclass) then concrete_types.add(mclass)
+		end
+
+		return concrete_types
+	end
 end
 
 # Root hierarchy of MO entities
@@ -821,7 +838,7 @@ class MOPhiVar
 		for dep in dependencies do
 			var dependency_concretes = dep.compute_concretes(concretes)
 
-			# All dependencies must be concretes (coming from a new)
+			# All dependencies must be concretes
 			if dependency_concretes == null then
 				return null
 			else
@@ -980,6 +997,13 @@ abstract class MOSite
 			concrete.add(new_class)
 
 			concretes_receivers = concrete
+		end
+
+		# If the site was monomorph store it apart from polymorph sites
+		if is_monomorph then
+			lp.mosites.remove(self)
+
+			lp.monomorph_sites.add(self)
 		end
 	end
 
@@ -1213,25 +1237,19 @@ class MOReadSite
 
 	redef fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
 	do
-		# TODO : put the concrete types into the pattern of the attribute
+		var sup = super
+		if sup != null then return sup
+
 		# Compute the global (closed-world) concrete types of this attribute
 		if pattern.gp.has_concrete_types then
-			concretes = new List[MClass]
-			for assignment in pattern.gp.assignments do
-				var mclass = assignment.as(ANewExpr).mtype.as(MClassType).mclass
-				concretes.add(mclass)
-			end
+			if concretes == null then concretes = new List[MClass]
 
-			if concretes.is_empty then concretes = pattern.gp.concrete_types
-		else
-			return null
+			concretes.add_all(pattern.gp.compute_concretes)
+
+			if not concretes.is_empty then return concretes
 		end
 
-		if not concretes.is_empty then
-			return concretes
-		else
-			return null
-		end
+		return null
 	end
 end
 

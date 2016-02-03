@@ -73,6 +73,7 @@ redef class ModelBuilder
 		do
 			site.lp.preexist_analysed = false
 
+			site.expr_recv.preexist_init
 			site.site_preexist
 
 			site.impl = null
@@ -233,6 +234,9 @@ end
 class MOStats
 	# List of analysed sites
 	var analysed_sites = new List[MOSite]
+
+	# All the sites which are monomorphics
+	var analysed_monomorph_sites = new List[MOSite]
 
 	# List of compiled methods
 	var compiled_methods = new List[MPropDef]
@@ -905,7 +909,8 @@ redef class MOSite
 		monomorphic_analysis
 		compute_concretes_site
 
-		expr_recv.expr_preexist
+		expr_recv.preexist_init
+		site_preexist
 		origin = expr_recv.preexistence_origin
 
 		# If the receiver is not a primitive
@@ -938,7 +943,6 @@ redef class MOSite
 				print(buf)
 			end
 
-			var origin = expr_recv.preexistence_origin
 			sys.vm.receiver_origin[origin] += 1
 			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
 
@@ -1048,7 +1052,7 @@ redef class MOSite
 			# If the receiver comes only from an attribute read
 			readsite_statistics
 
-			if origin.bin_and(128) == 0 and get_concretes != null then
+			if origin.bin_and(128) == 0 then
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
@@ -1082,6 +1086,7 @@ redef class MOSite
 	# Increment counters for callsites with concrete receivers
 	fun incr_concrete_site
 	do
+		compute_concretes_site
 		if concretes_receivers != null then
 			# Total of concretes for each category
 			vm.pstats.matrix[3][index_x] += 1
@@ -1090,7 +1095,7 @@ redef class MOSite
 			vm.pstats.matrix[3][5] += 1
 
 			# Preexisting and non-preexisting sites with concretes
-			if origin.bin_and(128) == 0 then
+			if site_preexist.bit_pre then
 				vm.pstats.matrix[4][index_x] += 1
 				vm.pstats.matrix[4][5] += 1
 			else
@@ -1491,6 +1496,10 @@ redef class MPropDef
 		for site in self.mosites do
 			site.stats(vm)
 			sys.vm.pstats.analysed_sites.add(site)
+		end
+
+		for monomorph_site in self.monomorph_sites do
+			sys.vm.pstats.analysed_monomorph_sites.add(monomorph_site)
 		end
 
 		for newexpr in self.monews do

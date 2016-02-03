@@ -614,16 +614,15 @@ redef class MOReadSite
 			return 24
 		else
 			compute_concretes_site
-			var concretes = concretes_receivers
-			if concretes != null then
-				for concrete in concretes do
+			if concretes_receivers != null then
+				for concrete in concretes_receivers do
 					# If a least one concrete of this attribute is not loaded, is it not preexisting
 					if not concrete.abstract_loaded then
 						return 8
 					end
 				end
 
-				# Preexisting and perennial because concrete types of the attribute
+				# Preexisting and perennial because attribute's concrete types
 				# will not change in the future
 				return 3
 			else
