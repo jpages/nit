@@ -72,6 +72,8 @@ redef class MOStats
 
 		table_executions(new FileWriter.open("{dir}/table_executions-{lbl}.tex"))
 
+		table_executions_warm(new FileWriter.open("{dir}/table_executions_warm-{lbl}.tex"))
+
 		table_site_implementations(new FileWriter.open("{dir}/table_implementations-{lbl}.tex"))
 	end
 
@@ -395,9 +397,6 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			# Do not count monomorph sites
-			if site.is_monomorph then continue
-
 			site.concretes_receivers = null
 			var concretes = site.get_concretes
 
@@ -477,9 +476,6 @@ redef class MOStats
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
-
-			# Do not count monomorph sites
-			if site.is_monomorph then continue
 
 			site.concretes_receivers = null
 			var concretes = site.get_concretes
@@ -640,9 +636,6 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			# Do not count monomorph sites
-			if site.is_monomorph then continue
-
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += 1
@@ -715,9 +708,6 @@ redef class MOStats
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
-
-			# Do not count monomorph sites
-			if site.is_monomorph then continue
 
 			if site isa MOCallSite then
 				index_x = 0
@@ -847,6 +837,91 @@ redef class MOStats
 		table += "static & {vm.pstats.method_static} & {0} & {vm.pstats.cast_static} & {vm.pstats.method_static + vm.pstats.cast_static}\\\\\n"
 		table += "SST & {vm.pstats.method_sst} & {vm.pstats.attribute_sst} & {vm.pstats.cast_sst} & {vm.pstats.method_sst + vm.pstats.attribute_sst + vm.pstats.cast_sst} \\\\\n"
 		table += "PH & {vm.pstats.method_ph} & {vm.pstats.attribute_ph} & {vm.pstats.cast_ph} & {vm.pstats.method_ph + vm.pstats.attribute_ph + vm.pstats.cast_ph} \\\\\n"
+		table += "\\hline\n"
+		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistic in .tex files for dynamic executions of sites with a counter in each site,
+	# it is kind of equivalent to let the vm warm then relaunch the program
+	private fun table_executions_warm(file: FileWriter)
+	do
+		file.write("%Table number of execution warm\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var total_methods = 0
+		var total_attributes = 0
+		var total_casts = 0
+		var grand_total = 0
+
+		var stats_array_size = 3
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		for site in sys.vm.pstats.analysed_sites do
+			var index_x: Int
+
+			if site isa MOCallSite then
+				index_x = 0
+				total_methods += 1
+			else if site isa MOAttrSite then
+				index_x = 1
+				total_attributes += 1
+			else
+				# Casts
+				index_x = 2
+				total_casts += 1
+			end
+
+			grand_total += 1
+
+			var impl = site.get_impl(vm)
+			if index_x != -1 then
+				if impl isa StaticImpl then
+					stats_array[1][index_x] += 1
+					stats_array[1][3] += 1
+				else if impl isa SSTImpl then
+					stats_array[2][index_x] += 1
+					stats_array[2][3] += 1
+				else if impl isa PHImpl then
+					stats_array[3][index_x] += 1
+					stats_array[3][3] += 1
+				end
+			end
+		end
+
+		var monomorph_methods = 0
+		var monomorph_attributes = 0
+		var monomorph_casts = 0
+
+		# Monomorphic sites
+		for site in sys.vm.pstats.analysed_monomorph_sites do
+			var index_x: Int
+
+			if site isa MOCallSite then
+				index_x = 0
+				total_methods += 1
+			else if site isa MOAttrSite then
+				index_x = 1
+				total_attributes += 1
+			else
+				# Casts
+				index_x = 2
+				total_casts += 1
+			end
+
+			grand_total += 1
+		end
+
+		var table = "monomorphs & {monomorph_methods} & {monomorph_attributes} & {monomorph_casts} & {monomorph_methods + monomorph_attributes + monomorph_casts}\\\\\n"
+		table += "static & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
+		table += "SST & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "PH & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
 		table += "\\hline\n"
 		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
 

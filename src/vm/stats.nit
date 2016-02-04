@@ -906,7 +906,6 @@ redef class MOSite
 	do
 		# Compute the concrete types of this site
 		concretes_receivers = null
-		monomorphic_analysis
 		compute_concretes_site
 
 		expr_recv.preexist_init
@@ -1215,6 +1214,9 @@ redef class MOSite
 		# Each time a pattern has a change in its implementation, count it
 		recompilations += 1
 	end
+
+	# The number of executions of this site
+	var executions = 0
 end
 
 redef class MOExprSite
@@ -1355,6 +1357,8 @@ redef class StaticImplMethod
 			sys.vm.pstats.method_static += 1
 		end
 
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 end
@@ -1368,6 +1372,8 @@ redef class StaticImplSubtype
 		else
 			sys.vm.pstats.cast_static += 1
 		end
+
+		mo_entity.as(MOSite).executions += 1
 
 		return super
 	end
@@ -1384,6 +1390,8 @@ redef class SSTImpl
 			sys.vm.pstats.attribute_sst += 1
 		end
 
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 
@@ -1394,6 +1402,8 @@ redef class SSTImpl
 		else
 			sys.vm.pstats.attribute_sst += 1
 		end
+
+		mo_entity.as(MOSite).executions += 1
 
 		super
 	end
@@ -1406,12 +1416,17 @@ redef class SSTImpl
 			sys.vm.pstats.method_sst += 1
 		end
 
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 
 	redef fun exec_subtype(recv)
 	do
 		sys.vm.pstats.cast_sst += 1
+
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 end
@@ -1422,24 +1437,35 @@ redef class PHImpl
 	redef fun exec_attribute_read(recv)
 	do
 		sys.vm.pstats.attribute_ph += 1
+
+		mo_entity.as(MOSite).executions += 1
 		return super
 	end
 
 	redef fun exec_attribute_write(recv, value)
 	do
 		sys.vm.pstats.attribute_ph += 1
+
+		mo_entity.as(MOSite).executions += 1
+
 		super
 	end
 
 	redef fun exec_method(recv)
 	do
 		sys.vm.pstats.method_ph += 1
+
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 
 	redef fun exec_subtype(recv)
 	do
 		sys.vm.pstats.cast_ph += 1
+
+		mo_entity.as(MOSite).executions += 1
+
 		return super
 	end
 end
@@ -1499,6 +1525,7 @@ redef class MPropDef
 		end
 
 		for monomorph_site in self.monomorph_sites do
+			monomorph_site.stats(vm)
 			sys.vm.pstats.analysed_monomorph_sites.add(monomorph_site)
 		end
 
