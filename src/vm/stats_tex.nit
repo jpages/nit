@@ -868,29 +868,29 @@ redef class MOStats
 
 			if site isa MOCallSite then
 				index_x = 0
-				total_methods += 1
+				total_methods += site.executions
 			else if site isa MOAttrSite then
 				index_x = 1
-				total_attributes += 1
+				total_attributes += site.executions
 			else
 				# Casts
 				index_x = 2
-				total_casts += 1
+				total_casts += site.executions
 			end
 
-			grand_total += 1
+			grand_total += site.executions
 
 			var impl = site.get_impl(vm)
 			if index_x != -1 then
 				if impl isa StaticImpl then
-					stats_array[1][index_x] += 1
-					stats_array[1][3] += 1
+					stats_array[1][index_x] += site.executions
+					stats_array[1][3] += site.executions
 				else if impl isa SSTImpl then
-					stats_array[2][index_x] += 1
-					stats_array[2][3] += 1
+					stats_array[2][index_x] += site.executions
+					stats_array[2][3] += site.executions
 				else if impl isa PHImpl then
-					stats_array[3][index_x] += 1
-					stats_array[3][3] += 1
+					stats_array[3][index_x] += site.executions
+					stats_array[3][3] += site.executions
 				end
 			end
 		end
@@ -905,17 +905,20 @@ redef class MOStats
 
 			if site isa MOCallSite then
 				index_x = 0
-				total_methods += 1
+				total_methods += site.executions
+				monomorph_methods += site.executions
 			else if site isa MOAttrSite then
 				index_x = 1
-				total_attributes += 1
+				total_attributes += site.executions
+				monomorph_attributes += site.executions
 			else
 				# Casts
 				index_x = 2
-				total_casts += 1
+				total_casts += site.executions
+				monomorph_casts += site.executions
 			end
 
-			grand_total += 1
+			grand_total += site.executions
 		end
 
 		var table = "monomorphs & {monomorph_methods} & {monomorph_attributes} & {monomorph_casts} & {monomorph_methods + monomorph_attributes + monomorph_casts}\\\\\n"
