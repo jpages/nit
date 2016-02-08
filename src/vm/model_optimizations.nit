@@ -999,7 +999,7 @@ abstract class MOSite
 			concretes_receivers = concrete
 		end
 
-		# If the site was monomorph store it apart from polymorph sites
+		# If the site was monomorph, stores it apart from polymorph sites
 		if is_monomorph then
 			lp.mosites.remove(self)
 
@@ -1188,18 +1188,24 @@ class MOFunctionSite
 	end
 
 	# TODO
-	# redef fun compute_concretes(concretes)
-	# do
-	# 	# Compute inter-procedural concrete types
-	# 	if expr_recv.compute_concretes(null) == null then return null
+	#redef fun compute_concretes(concretes)
+	#do
+		# Compute inter-procedural concrete types
+	#	if expr_recv.compute_concretes(null) == null then return null
 
-	# 	if not expr_recv isa MOFunctionSite then
-	# 		# See in all callees
-	# 		print "Concretes callees of {self} = {concretes_callees}"
-	# 	end
+		# If we have concrete callees
+	#	var callees = new List[MMethodDef]
+	#	if concretes_receivers != null then
+	#		callees = concrete_callees
+	#	else
+			# Use pattern's callees
+	#		callees = pattern.callees
+	#	end
 
-	# 	return null
-	# end
+	#	var types = new List[MClass]
+
+	#	return null
+	#end
 end
 
 # A call to a method which has no return

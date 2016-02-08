@@ -272,7 +272,7 @@ redef class MOSSAVar
 
 	redef fun preexistence_origin: Int
 	do
-		return dependency.preexistence_origin
+		return super.bin_or(dependency.preexistence_origin)
 	end
 end
 
@@ -306,7 +306,7 @@ redef class MOPhiVar
 			res = res.bin_or(dep.preexistence_origin)
 		end
 
-		return res
+		return super.bin_or(res)
 	end
 end
 

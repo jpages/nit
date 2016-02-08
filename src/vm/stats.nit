@@ -1040,7 +1040,7 @@ redef class MOSite
 			vm.pstats.matrix[26][5] += 1
 
 			# If the receiver is preexisting
-			if origin.bin_and(128) == 0 and not sys.disable_preexistence_extensions then
+			if expr_recv.is_pre then
 				vm.pstats.matrix[27][index_x] += 1
 				vm.pstats.matrix[27][5] += 1
 			else
@@ -1051,10 +1051,15 @@ redef class MOSite
 			# If the receiver comes only from an attribute read
 			readsite_statistics
 
-			if origin.bin_and(128) == 0 then
+			if expr_recv.is_pre then
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
+
+				print "{origin}"
+				if concretes_receivers != null then
+					print "concretes not null {concretes_receivers.as(not null)}"
+				end
 			else
 				vm.pstats.matrix[32][index_x] += 1
 				vm.pstats.matrix[32][5] += 1
@@ -1064,14 +1069,14 @@ redef class MOSite
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
-			if origin.bin_and(128) == 0 then
+			if expr_recv.is_pre then
 				vm.pstats.matrix[78][index_x] += 1
 				vm.pstats.matrix[78][5] += 1
 			else
 				vm.pstats.matrix[79][index_x] += 1
 				vm.pstats.matrix[79][5] += 1
 			end
-		else if origin.bin_and(128) == 0 then
+		else if expr_recv.is_pre then
 			# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 			# If the site is preexisting
 			vm.pstats.matrix[29][index_x] += 1
@@ -1085,7 +1090,6 @@ redef class MOSite
 	# Increment counters for callsites with concrete receivers
 	fun incr_concrete_site
 	do
-		compute_concretes_site
 		if concretes_receivers != null then
 			# Total of concretes for each category
 			vm.pstats.matrix[3][index_x] += 1
@@ -1094,7 +1098,7 @@ redef class MOSite
 			vm.pstats.matrix[3][5] += 1
 
 			# Preexisting and non-preexisting sites with concretes
-			if site_preexist.bit_pre then
+			if expr_recv.is_pre then
 				vm.pstats.matrix[4][index_x] += 1
 				vm.pstats.matrix[4][5] += 1
 			else
