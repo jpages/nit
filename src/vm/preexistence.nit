@@ -617,7 +617,7 @@ redef class MOReadSite
 			if concretes_receivers != null then
 				for concrete in concretes_receivers do
 					# If a least one concrete of this attribute is not loaded, is it not preexisting
-					if not concrete.abstract_loaded then
+					if not concrete.abstract_loaded or not concrete.loaded then
 						return 8
 					end
 				end

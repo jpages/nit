@@ -1055,11 +1055,6 @@ redef class MOSite
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
-
-				print "{origin}"
-				if concretes_receivers != null then
-					print "concretes not null {concretes_receivers.as(not null)}"
-				end
 			else
 				vm.pstats.matrix[32][index_x] += 1
 				vm.pstats.matrix[32][5] += 1
@@ -1105,6 +1100,8 @@ redef class MOSite
 				vm.pstats.matrix[5][index_x] += 1
 				vm.pstats.matrix[5][5] += 1
 			end
+
+			print "concretes_receivers {expr_recv.is_pre} {expr_recv}.{self} with {concretes_receivers.as(not null)}"
 		end
 	end
 
