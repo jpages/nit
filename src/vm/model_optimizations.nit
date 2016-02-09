@@ -1187,25 +1187,34 @@ class MOFunctionSite
 		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod), true)).init_abstract
 	end
 
-	# TODO
-	#redef fun compute_concretes(concretes)
-	#do
-		# Compute inter-procedural concrete types
-	#	if expr_recv.compute_concretes(null) == null then return null
+	# Compute inter-procedural concrete types
+	redef fun compute_concretes(concretes)
+	do
+		# The set of callees of this callsite
+		var callees = new List[MMethodDef]
 
-		# If we have concrete callees
-	#	var callees = new List[MMethodDef]
-	#	if concretes_receivers != null then
-	#		callees = concrete_callees
-	#	else
-			# Use pattern's callees
-	#		callees = pattern.callees
-	#	end
+		# If we have concrete receivers use them to get the concrete callees
+		if concretes_receivers != null then
+			# TODO
+			print "Concrete receivers != null"
+			for rcv in concretes_receivers.as(not null) do
+				if not rcv.abstract_loaded then continue
 
-	#	var types = new List[MClass]
+				var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+				if not callees.has(propdef) then
+					callees.add(propdef)
+				end
+			end
+		else
+			# If not, use pattern's callees
+			callees = pattern.callees
+		end
 
-	#	return null
-	#end
+		print "Callees of {expr_recv}.{self} = {callees}"
+		var types = new List[MClass]
+
+		return null
+	end
 end
 
 # A call to a method which has no return

@@ -1100,8 +1100,6 @@ redef class MOSite
 				vm.pstats.matrix[5][index_x] += 1
 				vm.pstats.matrix[5][5] += 1
 			end
-
-			print "concretes_receivers {expr_recv.is_pre} {expr_recv}.{self} with {concretes_receivers.as(not null)}"
 		end
 	end
 
