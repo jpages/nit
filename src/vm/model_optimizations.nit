@@ -1161,6 +1161,7 @@ class MOCallSite
 
 		# Force the recomputation of concretes_receivers
 		if not is_monomorph then
+			# TODO : to remove
 			concretes_receivers = null
 			compute_concretes_site
 		end
@@ -1190,13 +1191,17 @@ class MOFunctionSite
 	# Compute inter-procedural concrete types
 	redef fun compute_concretes(concretes)
 	do
+		# Concrete types of method calls are not consider in original preexistence
+		if sys.disable_preexistence_extensions then return null
+
+		var sup = super
+		if sup != null then return sup
+
 		# The set of callees of this callsite
 		var callees = new List[MMethodDef]
 
 		# If we have concrete receivers use them to get the concrete callees
 		if concretes_receivers != null then
-			# TODO
-			print "Concrete receivers != null"
 			for rcv in concretes_receivers.as(not null) do
 				if not rcv.abstract_loaded then continue
 
@@ -1210,10 +1215,46 @@ class MOFunctionSite
 			callees = pattern.callees
 		end
 
-		print "Callees of {expr_recv}.{self} = {callees}"
-		var types = new List[MClass]
+		# The concrete types of this callsite is the union of concrete types of all callees
+		var concrete_types = new HashSet[MClass]
 
-		return null
+		for callee in callees do
+			# If one of the callee is not yet compiled do not consider concrete types
+			if not callee.is_compiled then return null
+
+			# The return_expr is either a SSAVar of a PhiVar
+			if callee.return_expr isa MOSSAVar then
+				# Compute the concrete type of the return expression
+				var return_concretes = callee.return_expr.compute_concretes(concretes)
+
+				if return_concretes != null then
+					concrete_types.add_all(return_concretes)
+				else
+					return null
+				end
+			else
+				for dep in callee.return_expr.as(MOPhiVar).dependencies do
+					# Compute the concrete type of the return expression
+					var return_concretes = dep.compute_concretes(concretes)
+
+					if return_concretes != null then
+						concrete_types.add_all(return_concretes)
+					else
+						return null
+					end
+				end
+			end
+		end
+
+		if not concrete_types.is_empty then
+			# Convert the HashSet to a List and return it
+			var res = new List[MClass]
+			res.add_all(concrete_types)
+
+			return res
+		else
+			return null
+		end
 	end
 end
 
