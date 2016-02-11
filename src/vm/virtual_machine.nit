@@ -244,7 +244,7 @@ class VirtualMachine super NaiveInterpreter
 					var propdef = lp.mproperty.lookup_first_definition(mainmodule, mclass.intro.bound_mtype)
 
 					if not propdef.mproperty.living_mpropdefs.has(propdef) then
-						propdef.mproperty.add_propdef(propdef)
+						propdef.mproperty.add_propdef(propdef, self)
 					end
 				end
 			end
@@ -667,9 +667,6 @@ redef class MClass
 			# `propdef` is the most specific implementation for this MMethod
 			var propdef = m.lookup_first_definition(vm.mainmodule, self.intro.bound_mtype)
 			methods.push(propdef)
-
-			# Add this methoddef to the corresponding global property
-			#if not m.living_mpropdefs.has(propdef) then m.add_propdef(propdef)
 		end
 
 		# Call a method in C to put propdefs of self methods in the vtables
@@ -937,7 +934,7 @@ redef class MMethod
 	var living_mpropdefs: Array[MMethodDef] = new Array[MMethodDef]
 
 	# Add a living mpropdef to the collection `living_mpropdefs`
-	fun add_propdef(mpropdef: MMethodDef)
+	fun add_propdef(mpropdef: MMethodDef, vm: VirtualMachine)
 	do
 		living_mpropdefs.add(mpropdef)
 	end

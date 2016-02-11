@@ -81,6 +81,10 @@ redef class ModelBuilder
 			site.stats(sys.vm)
 		end
 
+		for monomorph_site in vm.pstats.analysed_monomorph_sites do
+			monomorph_site.stats(vm)
+		end
+
 		for method in sys.vm.pstats.compiled_methods do
 			if method isa MMethodDef then
 				sys.vm.pstats.get_method_return_origin(method)
@@ -835,9 +839,14 @@ class MOStats
 		loaded_superclasses_attributes = counters.loaded_superclasses_attributes
 
 		analysed_sites.add_all(counters.analysed_sites)
+		analysed_monomorph_sites.add_all(counters.analysed_monomorph_sites)
 		compiled_methods.add_all(counters.compiled_methods)
 		compiled_new.add_all(counters.compiled_new)
 		nb_ast_sites = counters.nb_ast_sites
+
+		monomorph_methods = counters.monomorph_methods
+		monomorph_attributes = counters.monomorph_attributes
+		monomorph_casts = counters.monomorph_casts
 
 		new_sites = sys.vm.all_new_sites.length
 		object_sites = sys.vm.all_moentities.length
@@ -1523,9 +1532,9 @@ redef class MPropDef
 			sys.vm.pstats.analysed_sites.add(site)
 		end
 
-		for monomorph_site in self.monomorph_sites do
-			monomorph_site.stats(vm)
-			sys.vm.pstats.analysed_monomorph_sites.add(monomorph_site)
+		for site in self.monomorph_sites do
+			site.stats(vm)
+			sys.vm.pstats.analysed_monomorph_sites.add(site)
 		end
 
 		for newexpr in self.monews do

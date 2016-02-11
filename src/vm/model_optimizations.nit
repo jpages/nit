@@ -687,22 +687,79 @@ redef class MMethod
 
 	redef type PATTERN: MOCallSitePattern
 
-	redef fun add_propdef(mpropdef)
+	redef fun add_propdef(mpropdef, vm)
 	do
 		super
 
 		for pattern in patterns do
-			# Verify that the class of `mpropdef` is a subclass of the patternin which
+			# Verify that the class of `mpropdef` is a subclass of the pattern in which
 			# we want to add this local method
 			if sys.vm.is_subclass(mpropdef.mclassdef.mclass, pattern.rsc) then
 				pattern.add_lp(mpropdef)
 			end
 		end
+
+		# Analyze the concrete types of the return expression of the added propdef
+		mpropdef.compute_concretes(vm)
 	end
 end
 
 redef class MMethodDef
 	redef type P: MOCallSitePattern
+
+	# The concrete types of the method's return
+	var concrete_types: nullable List[MClass]
+
+	# Compute the concrete types of the return expression, and assignments
+	# `concrete_type`
+	fun compute_concretes(vm: VirtualMachine): nullable List[MClass]
+	do
+		concrete_types = null
+
+		if not msignature.return_mtype == null then
+			# The method is not a procedure
+			var mclass_return = msignature.return_mtype.as(not null).get_mclass(vm, self)
+
+			if mclass_return.is_final then
+				concrete_types = new List[MClass]
+				concrete_types.add(mclass_return.as(not null))
+			end
+		end
+
+		# While the method is not compiled, we can just check whether its return type
+		# is final or not
+		if not is_compiled or concrete_types != null then
+			return concrete_types
+		end
+
+		# If the method is compiled, analyze its return expression
+		concrete_types = new List[MClass]
+
+		# The return_expr is either a SSAVar of a PhiVar
+		if return_expr isa MOSSAVar then
+			# Compute the concrete type of the return expression
+			concrete_types = return_expr.compute_concretes(null)
+
+			if concrete_types != null then
+				return concrete_types
+			else
+				return null
+			end
+		else
+			for dep in return_expr.as(MOPhiVar).dependencies do
+				# Compute the concrete type of the return expression
+				var return_concretes = dep.compute_concretes(null)
+
+				if return_concretes != null then
+					concrete_types.as(not null).add_all(return_concretes)
+				else
+					return null
+				end
+			end
+
+			return concrete_types
+		end
+	end
 end
 
 redef class MAttribute
@@ -1219,30 +1276,12 @@ class MOFunctionSite
 		var concrete_types = new HashSet[MClass]
 
 		for callee in callees do
-			# If one of the callee is not yet compiled do not consider concrete types
-			if not callee.is_compiled then return null
+			var return_concretes = callee.compute_concretes(sys.vm)
 
-			# The return_expr is either a SSAVar of a PhiVar
-			if callee.return_expr isa MOSSAVar then
-				# Compute the concrete type of the return expression
-				var return_concretes = callee.return_expr.compute_concretes(concretes)
-
-				if return_concretes != null then
-					concrete_types.add_all(return_concretes)
-				else
-					return null
-				end
+			if return_concretes != null then
+				concrete_types.add_all(return_concretes)
 			else
-				for dep in callee.return_expr.as(MOPhiVar).dependencies do
-					# Compute the concrete type of the return expression
-					var return_concretes = dep.compute_concretes(concretes)
-
-					if return_concretes != null then
-						concrete_types.add_all(return_concretes)
-					else
-						return null
-					end
-				end
+				return null
 			end
 		end
 

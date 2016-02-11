@@ -972,9 +972,9 @@ redef class MOStats
 			end
 		end
 
-		var monomorph_methods = 0
-		var monomorph_attributes = 0
-		var monomorph_casts = 0
+		var callsite_executions = 0
+		var attribute_executions = 0
+		var cast_executions = 0
 
 		# Monomorphic sites
 		for site in sys.vm.pstats.analysed_monomorph_sites do
@@ -983,22 +983,22 @@ redef class MOStats
 			if site isa MOCallSite then
 				index_x = 0
 				total_methods += site.executions
-				monomorph_methods += site.executions
+				callsite_executions += site.executions
 			else if site isa MOAttrSite then
 				index_x = 1
 				total_attributes += site.executions
-				monomorph_attributes += site.executions
+				attribute_executions += site.executions
 			else
 				# Casts
 				index_x = 2
 				total_casts += site.executions
-				monomorph_casts += site.executions
+				cast_executions += site.executions
 			end
 
 			grand_total += site.executions
 		end
 
-		var table = "monomorphs & {monomorph_methods} & {monomorph_attributes} & {monomorph_casts} & {monomorph_methods + monomorph_attributes + monomorph_casts}\\\\\n"
+		var table = "monomorph & {callsite_executions} & {attribute_executions} & {cast_executions} & {callsite_executions + attribute_executions + cast_executions}\\\\\n"
 		table += "static & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
 		table += "SST & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
 		table += "PH & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
@@ -1016,7 +1016,7 @@ redef class MOStats
 		file.write("%Table implementations of sites\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
-		var table = "monomorphs & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		var table = "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][3]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][3]}\\\\\n"
 		table += "static preexisting & {vm.pstats.matrix[7][0]} & {vm.pstats.matrix[7][1]} & {vm.pstats.matrix[7][3]} & {vm.pstats.matrix[7][0] + vm.pstats.matrix[7][1] + vm.pstats.matrix[7][3]}\\\\\n"
 		table += "static non-preexisting & {vm.pstats.matrix[8][0]} & {vm.pstats.matrix[8][1]} & {vm.pstats.matrix[8][3]} & {vm.pstats.matrix[8][0] + vm.pstats.matrix[8][1] + vm.pstats.matrix[8][3]}\\\\\n"
