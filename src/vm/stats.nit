@@ -844,10 +844,6 @@ class MOStats
 		compiled_new.add_all(counters.compiled_new)
 		nb_ast_sites = counters.nb_ast_sites
 
-		monomorph_methods = counters.monomorph_methods
-		monomorph_attributes = counters.monomorph_attributes
-		monomorph_casts = counters.monomorph_casts
-
 		new_sites = sys.vm.all_new_sites.length
 		object_sites = sys.vm.all_moentities.length
 
