@@ -716,6 +716,8 @@ redef class MMethodDef
 	do
 		concrete_types = null
 
+		# While the method is not compiled, we can just check whether its return type
+		# is final or not
 		if not msignature.return_mtype == null then
 			# The method is not a procedure
 			var mclass_return = msignature.return_mtype.as(not null).get_mclass(vm, self)
@@ -723,42 +725,18 @@ redef class MMethodDef
 			if mclass_return.is_final then
 				concrete_types = new List[MClass]
 				concrete_types.add(mclass_return.as(not null))
+
+				return concrete_types
 			end
 		end
 
-		# While the method is not compiled, we can just check whether its return type
-		# is final or not
-		if not is_compiled or concrete_types != null then
-			return concrete_types
-		end
+		if not is_compiled then return null
 
 		# If the method is compiled, analyze its return expression
 		concrete_types = new List[MClass]
 
-		# The return_expr is either a SSAVar of a PhiVar
-		if return_expr isa MOSSAVar then
-			# Compute the concrete type of the return expression
-			concrete_types = return_expr.compute_concretes(null)
-
-			if concrete_types != null then
-				return concrete_types
-			else
-				return null
-			end
-		else
-			for dep in return_expr.as(MOPhiVar).dependencies do
-				# Compute the concrete type of the return expression
-				var return_concretes = dep.compute_concretes(null)
-
-				if return_concretes != null then
-					concrete_types.as(not null).add_all(return_concretes)
-				else
-					return null
-				end
-			end
-
-			return concrete_types
-		end
+		# Compute the concrete type of the return expression
+		return return_expr.compute_concretes(null)
 	end
 end
 
@@ -817,6 +795,7 @@ abstract class MOExpr
 	do
 		# FinalSite rule
 		if ast == null then return null
+		if ast.mtype == null then return null
 
 		var mclass = ast.mtype.get_mclass(sys.vm, lp)
 

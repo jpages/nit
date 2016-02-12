@@ -339,6 +339,23 @@ redef class MOCallSite
 		# Compute the concrete receivers of this site
 		if not is_monomorph then compute_concretes_site
 
+		# Compute concrete types returned by the callsite expression
+		var return_concretes = compute_concretes
+		if return_concretes != null then
+			# If we have concrete types compute the preexistence value with them
+			var all_loaded = true
+			for concrete in return_concretes do
+				if not concrete.abstract_loaded then all_loaded = false
+			end
+
+			# Returns a preexistence value based on concrete types
+			if all_loaded then
+				return 3
+			else
+				return 8
+			end
+		end
+
 		if concretes_receivers != null then
 			callees = concrete_callees
 
@@ -369,7 +386,7 @@ redef class MOCallSite
 			preval = preval.merge(prelp)
 		end
 
-		if preval.bit_npre then return preval
+		if preval.bit_npre then	return preval
 
 		var rec: Bool = false
 		var pval: Int
