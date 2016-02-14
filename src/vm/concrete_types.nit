@@ -262,5 +262,11 @@ class ConcreteTypes
 
 	# Indicate if all concrete types of the expression are immutables,
 	# (coming from a new, a readsite, a final expression)
-	var immutable: Bool = false
+	var immutable: Bool = false is writable
+
+	# Redef to not duplicate concrete types
+	redef fun add(o)
+	do
+		if not has(o) then super
+	end
 end

@@ -501,11 +501,11 @@ redef class MMethodDef
 	redef type P: MOCallSitePattern
 
 	# The concrete types of the method's return
-	var concrete_types: nullable List[MClass]
+	var concrete_types: nullable ConcreteTypes
 
-	# Compute the concrete types of the return expression, and assignments
+	# Compute the concrete types of the return expression, and assign
 	# `concrete_type`
-	fun compute_concretes(vm: VirtualMachine): nullable List[MClass]
+	fun compute_concretes(vm: VirtualMachine): nullable ConcreteTypes
 	do
 		concrete_types = null
 
@@ -516,7 +516,7 @@ redef class MMethodDef
 			var mclass_return = msignature.return_mtype.as(not null).get_mclass(vm, self)
 
 			if mclass_return.is_final then
-				concrete_types = new List[MClass]
+				concrete_types = new ConcreteTypes
 				concrete_types.add(mclass_return.as(not null))
 
 				return concrete_types
@@ -526,7 +526,7 @@ redef class MMethodDef
 		if not is_compiled then return null
 
 		# If the method is compiled, analyze its return expression
-		concrete_types = new List[MClass]
+		concrete_types = new ConcreteTypes
 
 		# Compute the concrete type of the return expression
 		return return_expr.compute_concretes(null)
@@ -559,7 +559,7 @@ abstract class MOExpr
 		ast = node
 	end
 
-	fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
+	fun compute_concretes(concretes: nullable ConcreteTypes): nullable ConcreteTypes
 	do
 		# FinalSite rule
 		if ast == null then return null
@@ -569,7 +569,8 @@ abstract class MOExpr
 
 		#TODO
 		if mclass != null and mclass.is_final and mclass.loaded then
-			concretes = new List[MClass]
+			concretes = new ConcreteTypes
+			concretes.immutable = true
 			concretes.add(mclass)
 			return concretes
 		else
@@ -636,7 +637,7 @@ class MOPhiVar
 		super
 
 		if concretes == null then
-			concretes = new List[MClass]
+			concretes = new ConcreteTypes
 		end
 
 		for dep in dependencies do
@@ -689,7 +690,8 @@ class MONew
 	redef fun compute_concretes(concretes)
 	do
 		if concretes == null then
-			concretes = new List[MClass]
+			concretes = new ConcreteTypes
+			concretes.immutable = true # A new is imutable
 		end
 
 		# TODO: if the class is abstract do not consider concrete types,
@@ -1020,12 +1022,13 @@ class MOFunctionSite
 		end
 
 		# The concrete types of this callsite is the union of concrete types of all callees
-		var concrete_types = new HashSet[MClass]
+		var concrete_types = new ConcreteTypes
 
 		for callee in callees do
 			var return_concretes = callee.compute_concretes(sys.vm)
 
-			if return_concretes != null then
+			# The return must have immutable concrete types to be considered
+			if return_concretes != null and return_concretes.immutable then
 				concrete_types.add_all(return_concretes)
 			else
 				return null
@@ -1033,11 +1036,7 @@ class MOFunctionSite
 		end
 
 		if not concrete_types.is_empty then
-			# Convert the HashSet to a List and return it
-			var res = new List[MClass]
-			res.add_all(concrete_types)
-
-			return res
+			return concrete_types
 		else
 			return null
 		end
@@ -1077,14 +1076,17 @@ class MOReadSite
 	# Tell if the attribute is immutable, useless at the moment
 	var immutable = false
 
-	redef fun compute_concretes(concretes: nullable List[MClass]): nullable List[MClass]
+	redef fun compute_concretes(concretes: nullable ConcreteTypes): nullable ConcreteTypes
 	do
 		var sup = super
 		if sup != null then return sup
 
 		# Compute the global (closed-world) concrete types of this attribute
 		if pattern.gp.has_concrete_types then
-			if concretes == null then concretes = new List[MClass]
+			if concretes == null then
+				concretes = new ConcreteTypes
+				concretes.immutable = true
+			end
 
 			concretes.add_all(pattern.gp.compute_concretes)
 
