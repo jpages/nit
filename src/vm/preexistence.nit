@@ -339,6 +339,9 @@ redef class MOCallSite
 		# Compute the concrete receivers of this site
 		if not is_monomorph then compute_concretes_site
 
+		# If the receiver is not preexisting, do not continue the analysis in chained called
+		if not expr_recv.is_pre or not is_monomorph then return expr_recv.expr_preexist
+
 		# Compute concrete types returned by the callsite expression
 		var return_concretes = compute_concretes
 		if return_concretes != null then
@@ -367,9 +370,6 @@ redef class MOCallSite
 			callees = pattern.callees
 			if callees.length == 0 then return 1
 		end
-
-		# If the receiver is not preexisting, do not continue the analysis in chained called
-		if not expr_recv.is_pre then return expr_recv.expr_preexist
 
 		var preval = expr_recv.expr_preexist
 
