@@ -239,12 +239,6 @@ abstract class MOPropSitePattern
 	# The global property
 	var gp: GP
 
-	# Candidates local properties owning by the GP
-	var callees = new List[LP]
-
-	# Number of calls on uncompiled methods
-	var cuc = 0
-
 	init
 	do
 		super
@@ -257,7 +251,7 @@ abstract class MOPropSitePattern
 
 	redef fun trace
 	do
-		return super + "#{gp} nb_callees {callees.length} nb_sites {sites.length} rsc_loaded = {rsc.abstract_loaded}"
+		return super + "#{gp} rsc_loaded = {rsc.abstract_loaded} nb_sites {sites.length} "
 	end
 end
 
@@ -281,7 +275,7 @@ class MOSubtypeSitePattern
 
 	redef fun trace
 	do
-		return super + "target = {target} {target.name}"
+		return super + " nb_site {sites.length} target = {target} {target_mclass.name}"
 	end
 
 	redef fun get_pic(vm) do return target.as(MClassType).mclass
@@ -319,6 +313,12 @@ class MOCallSitePattern
 	# Indicate if the corresponding property has a return,
 	# if not, then this pattern references procedure sites
 	var is_function: Bool
+
+	# Candidates local properties owning by the GP
+	var callees = new List[LP]
+
+	# Number of calls on uncompiled methods
+	var cuc = 0
 
 	init(rst: MType, rsc: MClass, gp: MMethod, function: Bool)
 	do
@@ -361,7 +361,7 @@ class MOCallSitePattern
 
 	redef fun trace
 	do
-		return super + " cuc = {cuc}"
+		return super + " cuc = {cuc} + nb_callees {callees.length}"
 	end
 
 	redef fun pic_pattern_factory(rsc, pic)
@@ -442,7 +442,7 @@ redef class MPropDef
 		sys.vm.compiled_mproperties.add(self)
 
 		for pattern in callers do
-			pattern.cuc -= 1
+			if pattern isa MOCallSitePattern then pattern.cuc -= 1
 		end
 
 		for site in mosites do

@@ -919,6 +919,9 @@ redef class MOSite
 
 		# If the receiver is not a primitive
 		if not origin.bin_and(16) == 16 then
+			# Increment statistics on callsites
+			incr_stats_sites
+
 			if self.is_monomorph then
 				if self isa MOCallSite then
 					vm.pstats.monomorph_methods += 1
@@ -960,9 +963,6 @@ redef class MOSite
 
 			# Increment the total for implementation of the previous line
 			incr_total
-
-			# Increment statistics on callsites
-			incr_stats_sites
 		else
 			# Increment the total of sites with a primitive receiver
 			sys.vm.pstats.nb_primitive_sites += 1
@@ -972,6 +972,7 @@ redef class MOSite
 	# Print the pattern (RST/GP or target class for subtype test)
 	fun pattern2str: String is abstract
 
+	# Statistics on the return of callsites (call-expressions not necessarily used as a receiver)
 	fun incr_stats_sites
 	do
 		if not is_executed then
