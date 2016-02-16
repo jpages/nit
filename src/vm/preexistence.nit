@@ -340,23 +340,19 @@ redef class MOCallSite
 		if not is_monomorph then compute_concretes_site
 
 		# If the receiver is not preexisting, do not continue the analysis in chained called
+		#TODO: deactivate is_monomorph in the following test
 		if not expr_recv.is_pre or not is_monomorph then return expr_recv.expr_preexist
 
 		# Compute concrete types returned by the callsite expression
 		var return_concretes = compute_concretes
-		if return_concretes != null then
+		if return_concretes != null and not return_concretes.is_empty then
 			# If we have concrete types compute the preexistence value with them
-			var all_loaded = true
 			for concrete in return_concretes do
-				if not concrete.abstract_loaded then all_loaded = false
+				if not concrete.abstract_loaded then return 8
 			end
 
-			# Returns a preexistence value based on concrete types
-			if all_loaded then
-				return 3
-			else
-				return 8
-			end
+			# All concrete types are loaded
+			return 3
 		end
 
 		if concretes_receivers != null then
