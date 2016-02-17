@@ -437,7 +437,17 @@ redef class AIsaExpr
 		end
 
 		if mo_entity != null then
-			# var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
+			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
+
+			var res_mo = subtype_commons(recv.mtype, mtype)
+			if res_mo != null then
+				if res_mo != subtype_res then
+					print "ERROR"
+				end
+
+				return v.bool_instance(subtype_res)
+			end
+
 			# if impl.exec_subtype(recv) != subtype_res then
 			# 	print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
 			# 	print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
@@ -517,6 +527,25 @@ redef class AAsCastExpr
 		else
 			# Use the slow path (default)
 			res = v.is_subtype(recv.mtype, amtype)
+		end
+
+		if mo_entity != null then
+			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
+
+			var res_mo = subtype_commons(recv.mtype, mtype)
+			if res_mo != null then
+				if res_mo != res then
+					print "ERROR"
+				end
+
+				return recv
+			end
+
+			# if impl.exec_subtype(recv) != res then
+			# 	print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} recv.mtype {recv.mtype} target_type {mtype}"
+			# 	print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+			# 	print "Exec recv {recv.mtype} target {mtype}"
+			# end
 		end
 
 		if not res then
@@ -955,17 +984,17 @@ redef class MOSubtypeSitePattern
 			end
 		else
 			# The rst is not loaded but the pic is
-			if get_pic(vm).abstract_loaded then
+			# if get_pic(vm).abstract_loaded then
 				if can_be_static then
 					set_static_impl(true)
 				else
 					# By default, use perfect hashing
 					set_ph_impl(vm, false, get_pic(vm).vtable.id)
 				end
-			else
-				# The RST and the PIC are not loaded, make a null implementation by default
-				impl = new NullImpl(self, true, 0, get_pic(vm))
-			end
+			# else
+			# 	# The RST and the PIC are not loaded, make a null implementation by default
+			# 	impl = new NullImpl(self, true, 0, get_pic(vm))
+			# end
 		end
 	end
 
@@ -1275,16 +1304,21 @@ redef abstract class MOSite
 	end
 end
 
-#TODO: compute_impl_concretes
 redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
 
 	redef fun get_pic(vm) do return target.get_mclass(vm, lp).as(not null)
 
-	# redef fun compute_impl_concretes
-	# do
-	# 	# With concretes we precisely now what are the sources of the test
-	# end
+	# Compute an Implementation for self site and assign `impl`
+	# Return the Implementation of the Site
+	redef fun compute_impl: Implementation
+	do
+		impl = pattern.get_impl(vm)
+		impl.mo_entity = self
+
+		#TODO: compute_impl_concretes
+		return impl.as(not null)
+	end
 
 	redef fun set_static_impl(vm, mutable)
 	do
