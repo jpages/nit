@@ -319,6 +319,8 @@ end
 
 redef class MOCallSite
 	var counter = 0
+
+	# TODO: implement the mutability of preexistence
 	redef fun compute_preexist
 	do
 		# If the preexistence extension is deactivated, the callsite is not preexistant

@@ -892,17 +892,16 @@ redef class MOSubtypeSitePattern
 		if rsc.abstract_loaded then
 			if can_be_static then
 				set_static_impl(true)
-			else
+			else if can_be_sst then
 				set_sst_impl(vm, true)
+			else
+				# By default, use perfect hashing
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		else
-			# The rst is not loaded but the pic is,
-			# we can compute the implementation with pic's informations
+			# The rst is not loaded but the pic is
 			if get_pic(vm).abstract_loaded then
-				var pos_cls = get_block_position
-				if get_pic(vm).is_instance_of_object(vm) then
-					set_sst_impl(vm, false)
-				else if can_be_static then
+				if can_be_static then
 					set_static_impl(true)
 				else
 					# By default, use perfect hashing
@@ -913,6 +912,36 @@ redef class MOSubtypeSitePattern
 				impl = new NullImpl(self, true, 0, get_pic(vm))
 			end
 		end
+	end
+
+	# Indicates if self can be implemented with sst,
+	# i.e. if for all subclasses of the rst, the pic class is always at the same position
+	fun can_be_sst: Bool
+	do
+		# The set of loaded classes which are subtype of both the source and the target of the test
+		var classes = new List[MClass]
+
+		for mclass in rsc.loaded_subclasses do
+			if vm.is_subclass(mclass, target_mclass) then
+				classes.add(mclass)
+			end
+		end
+
+		# `classes` now contains all classes that can actually be tested against the target
+		assert not classes.is_empty
+
+		# The position of the target in the first subclass of the rst
+		var first_position = classes.first.get_position_methods(target_mclass)
+
+		# Go check if all other subclasses have the same position than the first one
+		for mclass in classes do
+			var pos = mclass.get_position_methods(target_mclass)
+
+			# If one position differs then the cast must be implemented with perfect hashing
+			if pos != first_position then return false
+		end
+
+		return true
 	end
 
 	redef fun can_be_static
@@ -926,8 +955,6 @@ redef class MOSubtypeSitePattern
 		# If the rsc if a subclass of the target, then the test will always be true
 		if vm.is_subclass(rsc, target_mclass) then return true
 
-		# If the target of the cast is always a superclass of the RST we can optimize,
-		# or if the target of the cast will always be false, we can also optimize
 		return false
 	end
 
