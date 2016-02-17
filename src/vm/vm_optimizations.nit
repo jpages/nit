@@ -1260,20 +1260,6 @@ redef class MOCallSite
 		end
 	end
 
-	# Clone a MOSite
-	# redef fun clone: MOSite
-	# do
-	# 	var copy = new MOCallSite(lp, ast.as(not null), callsite)
-	# 	copy.pattern = pattern
-
-	# 	if concretes_receivers != null then
-	# 		copy.concretes_receivers = new List[MClass]
-	# 		copy.concretes_receivers.add_all(concretes_receivers.as(not null))
-	# 	end
-
-	# 	return copy
-	# end
-
 	redef fun can_be_static
 	do
 		# If the pattern can be static, return true

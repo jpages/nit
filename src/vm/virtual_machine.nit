@@ -59,6 +59,8 @@ class VirtualMachine super NaiveInterpreter
 	end
 
 	# Runtime subtyping test
+	# This method contains general parts of the test (nullable, formal types etc),
+	# the real subtyping test class against class is made in a sub-method
 	redef fun is_subtype(sub, sup: MType): Bool
 	do
 		if sub == sup then return true
@@ -110,18 +112,10 @@ class VirtualMachine super NaiveInterpreter
 
 		assert sup isa MClassType
 
-		# and `sup` can be discovered inside a Generic type during the subtyping test
-		if not sub.mclass.loaded then load_class(sub.mclass)
-
-		# If the target of the test is not-loaded yet, the subtyping-test will be false
-		if not sup.mclass.abstract_loaded then return false
-
-		# For now, always use perfect hashing for subtyping test
-		var super_id = sup.mclass.vtable.id
-		var mask = sub.mclass.vtable.mask
-
-		var res = inter_is_subtype_ph(super_id, mask, sub.mclass.vtable.internal_vtable)
+		# Executes the real test (class against class)
+		var res = subtyping_test(sub.mclass, sup.mclass)
 		if res == false then return false
+
 		# sub and sup can be generic types, each argument of generics has to be tested
 
 		if not sup isa MGenericType then return true
@@ -137,7 +131,23 @@ class VirtualMachine super NaiveInterpreter
 		return true
 	end
 
+	# Executes a subtyping test between sub and sup and returns the answer
+	fun subtyping_test(sub: MClass, sup: MClass): Bool
+	do
+		if not sub.loaded then load_class(sub)
+
+		# If the target of the test is not-loaded yet, the subtyping-test will be false
+		if not sup.abstract_loaded then return false
+
+		# For now, always use perfect hashing for subtyping test
+		var super_id = sup.vtable.id
+		var mask = sub.vtable.mask
+
+		return inter_is_subtype_ph(super_id, mask, sub.vtable.internal_vtable)
+	end
+
 	# Return true if `sub` if a subclass of `sup`
+	# This method uses the model to answer and does not need the two classes to be loaded
 	fun is_subclass(sub: MClass, sup: MClass): Bool
 	do
 		if sub == sup then return true
