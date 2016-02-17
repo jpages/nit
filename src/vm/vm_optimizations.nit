@@ -338,6 +338,61 @@ redef class CallSite
 	end
 end
 
+redef class ASubtypeExpr
+	# The common part of the subtyping test, test nullables, nulls etc.
+	# If the subtyping test can be answered with that returns the result, else `null`
+	fun subtype_commons(sub: MType, sup: MType): nullable Bool
+	do
+		if sub == sup then return true
+
+		var anchor = vm.frame.arguments.first.mtype.as(MClassType)
+
+		# `sub` or `sup` are formal or virtual types, resolve them to concrete types
+		if sub isa MFormalType then
+			sub = sub.resolve_for(anchor.mclass.mclass_type, anchor, vm.mainmodule, false)
+		end
+		if sup isa MFormalType then
+			sup = sup.resolve_for(anchor.mclass.mclass_type, anchor, vm.mainmodule, false)
+		end
+
+		var sup_accept_null = false
+		if sup isa MNullableType then
+			sup_accept_null = true
+			sup = sup.mtype
+		else if sup isa MNullType then
+			sup_accept_null = true
+		end
+
+		# Can `sub` provides null or not?
+		# Thus we can match with `sup_accept_null`
+		# Also discard the nullable marker if it exists
+		if sub isa MNullableType then
+			if not sup_accept_null then return false
+			sub = sub.mtype
+		else if sub isa MNullType then
+			return sup_accept_null
+		end
+		# Now the case of direct null and nullable is over
+
+		if sub isa MFormalType then
+			sub = sub.anchor_to(vm.mainmodule, anchor)
+			# Manage the second layer of null/nullable
+			if sub isa MNullableType then
+				if not sup_accept_null then return false
+				sub = sub.mtype
+			else if sub isa MNullType then
+				return sup_accept_null
+			end
+		end
+
+		# `sup` accepts only null
+		if sup isa MNullType then return false
+
+		# All cases have been checked, now the test is class against class
+		return null
+	end
+end
+
 redef class AIsaExpr
 	# Identifier of the target class type
 	var id: Int is noinit
@@ -381,7 +436,7 @@ redef class AIsaExpr
 			subtype_res = v.is_subtype(recv.mtype, mtype)
 		end
 
-		if mo_entity != null and recv.mtype isa MClassType then
+		if mo_entity != null then
 			# var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
 			# if impl.exec_subtype(recv) != subtype_res then
 			# 	print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
@@ -1220,14 +1275,20 @@ redef abstract class MOSite
 	end
 end
 
+#TODO: compute_impl_concretes
 redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
 
 	redef fun get_pic(vm) do return target.get_mclass(vm, lp).as(not null)
 
+	# redef fun compute_impl_concretes
+	# do
+	# 	# With concretes we precisely now what are the sources of the test
+	# end
+
 	redef fun set_static_impl(vm, mutable)
 	do
-		if not get_pic(vm).loaded then
+		if not get_pic(vm).abstract_loaded then
 			impl = new StaticImplSubtype(self, mutable, false)
 		else
 			var target_id = get_pic(vm).vtable.as(not null).id
