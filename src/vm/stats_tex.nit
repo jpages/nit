@@ -45,10 +45,10 @@ redef class MOStats
 		end
 
 		# Do not generate table3 in original preexistence
-		# if not sys.disable_preexistence_extensions then
-		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
-		# 	table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
-		# end
+		if not sys.disable_preexistence_extensions then
+			table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
+			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
+		end
 
 		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 

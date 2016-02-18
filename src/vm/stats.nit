@@ -1432,6 +1432,9 @@ redef class SSTImpl
 
 		return super
 	end
+end
+
+redef class SSTImplSubtype
 
 	redef fun exec_subtype(recv)
 	do
