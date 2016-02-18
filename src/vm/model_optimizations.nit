@@ -1175,7 +1175,7 @@ redef class MClass
 
 		# Add the pattern to `subtype_target_patterns`
 		if not site.target_mclass.subtype_target_patterns.has(pattern) then
-			site.target_mclass.subtype_target_patterns.has(pattern)
+			site.target_mclass.subtype_target_patterns.add(pattern)
 		end
 	end
 

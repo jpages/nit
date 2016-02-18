@@ -151,8 +151,9 @@ redef class VirtualMachine
 			end
 		end
 
+		# If `mclass` was a target of a subtyping test, goes in these patterns and
+		# recompute them because they were static
 		for pattern in mclass.subtype_target_patterns do
-			print "On passe ici !!"
 			if pattern.get_impl(vm) isa StaticImpl then
 				pattern.reinit_impl
 				pattern.compute_impl
@@ -556,6 +557,7 @@ redef class AAsCastExpr
 			if res_mo != null then
 				if res_mo != res then
 					print "ERROR"
+					abort
 				end
 
 				return recv
@@ -566,7 +568,7 @@ redef class AAsCastExpr
 				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
 				print "Exec recv {recv.mtype} target {mtype}"
 
-				# abort
+				abort
 			end
 		end
 
