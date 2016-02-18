@@ -1124,6 +1124,9 @@ redef class MClass
 	# List of patterns of subtypes test
 	var subtype_pattern = new List[MOSubtypeSitePattern]
 
+	# List of subtype patterns for which self is the target
+	var subtype_target_patterns = new List[MOSubtypeSitePattern]
+
 	# The only asnotnull pattern
 	var asnotnull_pattern: nullable MOAsNotNullPattern
 
@@ -1169,6 +1172,11 @@ redef class MClass
 		end
 
 		pattern.add_site(site)
+
+		# Add the pattern to `subtype_target_patterns`
+		if not site.target_mclass.subtype_target_patterns.has(pattern) then
+			site.target_mclass.subtype_target_patterns.has(pattern)
+		end
 	end
 
 	# Create (if not exists) and set a pattern for objet prop sites

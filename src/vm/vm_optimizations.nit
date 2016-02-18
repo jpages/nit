@@ -134,15 +134,35 @@ redef class VirtualMachine
 				end
 			end
 
-			# We are only interested in callsite patterns
-			if not pattern isa MOCallSitePattern then continue
-
-			# TODO: optimize this
 			# If the pattern has a static implementation, recompute it because the loading
 			# could have added another method to call
 			if pattern.get_impl(vm) isa StaticImpl then
 				pattern.reinit_impl
 				pattern.compute_impl
+			end
+
+			if not pattern isa MOSubtypeSitePattern then continue
+
+			for mosite in pattern.sites do
+				if mosite.get_impl(vm) isa StaticImpl then
+					mosite.reinit_impl
+					mosite.get_impl(vm)
+				end
+			end
+		end
+
+		for pattern in mclass.subtype_target_patterns do
+			print "On passe ici !!"
+			if pattern.get_impl(vm) isa StaticImpl then
+				pattern.reinit_impl
+				pattern.compute_impl
+			end
+
+			for mosite in pattern.sites do
+				if mosite.get_impl(vm) isa StaticImpl then
+					mosite.reinit_impl
+					mosite.get_impl(vm)
+				end
 			end
 		end
 	end
@@ -541,11 +561,13 @@ redef class AAsCastExpr
 				return recv
 			end
 
-			# if impl.exec_subtype(recv) != res then
-			# 	print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} recv.mtype {recv.mtype} target_type {mtype}"
-			# 	print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-			# 	print "Exec recv {recv.mtype} target {mtype}"
-			# end
+			if impl.exec_subtype(recv) != res then
+				print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} recv.mtype {recv.mtype} target_type {mtype}"
+				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+				print "Exec recv {recv.mtype} target {mtype}"
+
+				# abort
+			end
 		end
 
 		if not res then
@@ -973,7 +995,7 @@ redef class MOSubtypeSitePattern
 
 	redef fun compute_impl
 	do
-		if rsc.abstract_loaded then
+		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
 			if can_be_static then
 				set_static_impl(true)
 			else if can_be_sst then
@@ -983,18 +1005,12 @@ redef class MOSubtypeSitePattern
 				set_ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		else
-			# The rst is not loaded but the pic is
-			# if get_pic(vm).abstract_loaded then
-				if can_be_static then
-					set_static_impl(true)
-				else
-					# By default, use perfect hashing
-					set_ph_impl(vm, false, get_pic(vm).vtable.id)
-				end
-			# else
-			# 	# The RST and the PIC are not loaded, make a null implementation by default
-			# 	impl = new NullImpl(self, true, 0, get_pic(vm))
-			# end
+			if can_be_static then
+				set_static_impl(true)
+			else
+				# By default, use perfect hashing
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+			end
 		end
 	end
 
@@ -1011,8 +1027,8 @@ redef class MOSubtypeSitePattern
 			end
 		end
 
+		if classes.is_empty then return false
 		# `classes` now contains all classes that can actually be tested against the target
-		assert not classes.is_empty
 
 		# The position of the target in the first subclass of the rst
 		var first_position = classes.first.get_position_methods(target_mclass)
@@ -1036,7 +1052,7 @@ redef class MOSubtypeSitePattern
 		# If the target is not loaded, the cast will always fail
 		if not target_mclass.abstract_loaded then return true
 
-		# If the rsc if a subclass of the target, then the test will always be true
+		# If the rsc is a subclass of the target, then the test will always be true
 		if vm.is_subclass(rsc, target_mclass) then return true
 
 		return false
@@ -1055,11 +1071,8 @@ redef class MOSubtypeSitePattern
 		# If the target is not loaded, the test will always fail
 		if not target_mclass.abstract_loaded then res = false
 
-		# If the rsc is a subclasse of the target, then the test will always be true
+		# If the rsc is a subclass of the target, then the test will always be true
 		if vm.is_subclass(rsc, target_mclass) then res = true
-
-		# TODO : if the RSC and the target have nothing in common (different part of the class hierarchy),
-		# then we can optimize the cast will always be false
 
 		impl = new StaticImplSubtype(self, false, res)
 	end

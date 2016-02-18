@@ -228,7 +228,6 @@ class VirtualMachine super NaiveInterpreter
 
 		mclass.allocate_vtable(self)
 
-		mclass.loaded_subclasses.add(mclass)
 		# Update `loaded_subclasses` for self
 		for superclass in mclass.in_hierarchy(mainmodule).greaters do
 			superclass.loaded_subclasses.add(mclass)
