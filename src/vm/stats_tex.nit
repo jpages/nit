@@ -45,10 +45,10 @@ redef class MOStats
 		end
 
 		# Do not generate table3 in original preexistence
-		if not sys.disable_preexistence_extensions then
-			table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
-			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
-		end
+		# if not sys.disable_preexistence_extensions then
+		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
+		# 	table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
+		# end
 
 		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 
@@ -608,7 +608,7 @@ redef class MOStats
 	# Output statistics in .tex file for site which receiver is a callsite with concrete types
 	private fun table_concrete_callsites(file: FileWriter)
 	do
-		file.write("%Table concrete receivers: MOSite with concrete receivers which is a final attribute with concrete types\n")
+		file.write("%Table concrete receivers: concrete types returned by callsites\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
 		var stats_array_size = 4
@@ -1017,9 +1017,9 @@ redef class MOStats
 		file.write("% Methods & Attributes & Casts & Total\n")
 
 		var table = "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
-		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][3]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][3]}\\\\\n"
-		table += "static preexisting & {vm.pstats.matrix[7][0]} & {vm.pstats.matrix[7][1]} & {vm.pstats.matrix[7][3]} & {vm.pstats.matrix[7][0] + vm.pstats.matrix[7][1] + vm.pstats.matrix[7][3]}\\\\\n"
-		table += "static non-preexisting & {vm.pstats.matrix[8][0]} & {vm.pstats.matrix[8][1]} & {vm.pstats.matrix[8][3]} & {vm.pstats.matrix[8][0] + vm.pstats.matrix[8][1] + vm.pstats.matrix[8][3]}\\\\\n"
+		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][2]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][2]}\\\\\n"
+		table += "static preexisting & {vm.pstats.matrix[7][0]} & {vm.pstats.matrix[7][1]} & {vm.pstats.matrix[7][2]} & {vm.pstats.matrix[7][0] + vm.pstats.matrix[7][1] + vm.pstats.matrix[7][2]}\\\\\n"
+		table += "static non-preexisting & {vm.pstats.matrix[8][0]} & {vm.pstats.matrix[8][1]} & {vm.pstats.matrix[8][2]} & {vm.pstats.matrix[8][0] + vm.pstats.matrix[8][1] + vm.pstats.matrix[8][2]}\\\\\n"
 
 		table += "SST & {vm.pstats.matrix[9][0]} & {vm.pstats.matrix[9][1]} & {vm.pstats.matrix[9][2]} & {vm.pstats.matrix[9][0] + vm.pstats.matrix[9][1] + vm.pstats.matrix[9][2]} \\\\\n"
 		table += "SST preexisting & {vm.pstats.matrix[10][0]} & {vm.pstats.matrix[10][1]} & {vm.pstats.matrix[10][2]} & {vm.pstats.matrix[10][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[10][2]} \\\\\n"
