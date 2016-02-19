@@ -275,7 +275,7 @@ class MOSubtypeSitePattern
 
 	redef fun trace
 	do
-		return super + " nb_site {sites.length} target = {target} {target_mclass.name}"
+		return super + " nb_site {sites.length} target = {target}"
 	end
 
 	redef fun get_pic(vm) do return target.as(MClassType).mclass

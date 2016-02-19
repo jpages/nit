@@ -414,7 +414,13 @@ redef class MOCallSite
 				return pval.setbit(2, 0)
 			end
 
-			return pval
+			# To be considered the preexistence of the return of callsites must be immutable
+			if pval.bit_pre_immut then
+				return pval
+			else
+				# Return a non-preexisting value
+				return pval.setbit(0, 0)
+			end
 		end
 	end
 
