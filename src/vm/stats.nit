@@ -1557,10 +1557,14 @@ redef class MPropDef
 
 	fun trace: String
 	do
-		var res = "MProperty {mproperty}, self {self}, mosites {mosites.length}, monews {monews.length}, callers {callers.length}"
+		var res = "GP {mproperty.intro_mclassdef.mclass}#{mproperty}, nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length}"
 
 		if return_expr != null then
-			res += " {return_expr.return_preexist}"
+			res += " return_preexist {return_expr.return_preexist}"
+
+			if not self isa MMethodDef then return res
+			var return_concretes = compute_concretes(sys.vm)
+			if return_concretes != null then res += " return_concretes {return_concretes}"
 		end
 
 		return res
