@@ -1371,6 +1371,8 @@ redef class StaticImplMethod
 
 		mo_entity.as(MOSite).executions += 1
 
+		mo_entity.as(MOSite).set_executed
+
 		return super
 	end
 end
@@ -1386,6 +1388,8 @@ redef class StaticImplSubtype
 		end
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
 
 		return super
 	end
@@ -1404,6 +1408,8 @@ redef class SSTImpl
 
 		mo_entity.as(MOSite).executions += 1
 
+		mo_entity.as(MOSite).set_executed
+
 		return super
 	end
 
@@ -1416,6 +1422,8 @@ redef class SSTImpl
 		end
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
 
 		super
 	end
@@ -1430,6 +1438,8 @@ redef class SSTImpl
 
 		mo_entity.as(MOSite).executions += 1
 
+		mo_entity.as(MOSite).set_executed
+
 		return super
 	end
 end
@@ -1441,6 +1451,8 @@ redef class SSTImplSubtype
 		sys.vm.pstats.cast_sst += 1
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
 
 		return super
 	end
@@ -1454,6 +1466,9 @@ redef class PHImpl
 		sys.vm.pstats.attribute_ph += 1
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
+
 		return super
 	end
 
@@ -1462,6 +1477,8 @@ redef class PHImpl
 		sys.vm.pstats.attribute_ph += 1
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
 
 		super
 	end
@@ -1472,6 +1489,8 @@ redef class PHImpl
 
 		mo_entity.as(MOSite).executions += 1
 
+		mo_entity.as(MOSite).set_executed
+
 		return super
 	end
 
@@ -1480,6 +1499,8 @@ redef class PHImpl
 		sys.vm.pstats.cast_ph += 1
 
 		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
 
 		return super
 	end
@@ -1611,8 +1632,6 @@ redef class MOVar
 	end
 end
 
-# TODO: handle set_executed with implementations
-
 redef class ASendExpr
 	redef fun ast2mo_method(mpropdef, called_node_ast, is_attribute)
 	do
@@ -1624,29 +1643,5 @@ redef class ASendExpr
 		end
 
 		return sup
-	end
-end
-
-redef class AIsaExpr
-	redef fun expr(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		var res = super
-		return res
-	end
-end
-
-redef class AAsCastForm
-	redef fun expr(v)
-	do
-		if mo_entity != null then
-			mo_entity.as(MOSite).set_executed
-		end
-
-		var res = super
-		return res
 	end
 end
