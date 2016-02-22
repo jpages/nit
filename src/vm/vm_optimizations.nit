@@ -925,7 +925,7 @@ redef class MOCallSitePattern
 		# If the rsc is a final class
 		if rsc.is_final and rsc.loaded then return true
 
-		return callees.length == 1
+		return callees.length == 1 and cuc == 0
 	end
 
 	redef fun compute_impl
@@ -1253,11 +1253,15 @@ redef abstract class MOSite
 	do
 		var position = -1
 
-		if get_concretes != null then
-			for recv in get_concretes do
+		if concretes_receivers != null then
+
+			var current_pos = get_block_position(vm, concretes_receivers.first)
+			for recv in concretes_receivers.as(not null) do
 				if not recv.loaded then return -1
 
 				if get_block_position(vm, recv) < 0 then
+					return 0
+				else if get_block_position(vm, recv) != current_pos then
 					return 0
 				end
 			end
@@ -1275,7 +1279,7 @@ redef abstract class MOSite
 	end
 
 	# Return the pic
-	# In case of the subtype test, the pic is the target class
+	# In case of the subtype test, the pic is the target classfu
 	fun get_pic(vm: VirtualMachine): MClass is abstract
 
 	# Return the offset of the "targeted property"
@@ -1409,7 +1413,7 @@ redef class MOCallSite
 		if get_concretes == null then
 			return false
 		else
-			if concrete_callees.length == 1 then
+			if concrete_callees.length == 1 and pattern.cuc == 0 then
 				return true
 			else
 				return false

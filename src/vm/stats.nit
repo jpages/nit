@@ -1045,13 +1045,6 @@ redef class MOSite
 			vm.pstats.matrix[26][index_x] += 1
 			vm.pstats.matrix[26][5] += 1
 
-			if concretes_receivers != null then
-				print "Concretes from a callsite {concretes_receivers.as(not null)} receiver preexistence {expr_recv.is_pre}"
-				for concrete in concretes_receivers.as(not null) do
-					print "\t concrete {concrete.abstract_loaded}"
-				end
-			end
-
 			# If the receiver is preexisting
 			if expr_recv.is_pre then
 				vm.pstats.matrix[27][index_x] += 1

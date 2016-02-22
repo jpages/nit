@@ -339,6 +339,14 @@ class MOCallSitePattern
 
 				add_lp(lp_rsc)
 			end
+		else
+			# Add a propdef even if the rsc is not loaded
+			var lp_rsc = gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype)
+			if not gp.living_mpropdefs.has(lp_rsc) then
+				gp.living_mpropdefs.add(lp_rsc)
+			end
+
+			add_lp(lp_rsc)
 		end
 	end
 
@@ -907,6 +915,46 @@ end
 # MO of .as(Type) expr
 class MOAsSubtypeSite
 	super MOSubtypeSite
+
+	# Compute concrete types returned by the cast
+	redef fun compute_concretes(concretes)
+	do
+		if sys.disable_preexistence_extensions then return null
+
+		var sup = super
+		if sup != null then return sup
+
+		# The candidates of the subtyping-test
+		var candidates = new ConcreteTypes
+		if concretes == null then concretes = new ConcreteTypes
+
+		# If we have concrete receivers use them compute concretes types
+		if concretes_receivers != null then
+			for rcv in concretes_receivers.as(not null) do
+				if rcv.loaded then candidates.add(rcv)
+			end
+
+			# See which concretes receivers are subtypes of the target of the cast
+			for rcv in candidates do
+				if vm.is_subclass(rcv, target_mclass) then concretes.add(rcv)
+			end
+		else
+			# We do not have concrete receivers, so the candidates are all loaded subclasses of the target
+			return null
+			# if target_mclass.abstract_loaded then concretes.add(target_mclass)
+
+			# for mclass in target_mclass.loaded_subclasses do
+			# 	if mclass.abstract_loaded then concretes.add(mclass)
+			# end
+		end
+
+		if not concretes.is_empty then
+			print "Concretes of {self}{pattern.rsc}.as({target_mclass}) = {concretes}"
+			return concretes
+		else
+			return null
+		end
+	end
 end
 
 # MO of isa expr

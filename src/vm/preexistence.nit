@@ -566,7 +566,14 @@ end
 redef class MOAsSubtypeSite
 	redef fun compute_preexist
 	do
-		return expr_recv.expr_preexist
+		# Compute the returned preexistence of this expression
+		var concretes = compute_concretes(null)
+
+		if concretes != null then
+			return 3
+		else
+			return expr_recv.expr_preexist
+		end
 	end
 end
 
