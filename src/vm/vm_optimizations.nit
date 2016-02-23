@@ -120,6 +120,12 @@ redef class VirtualMachine
 
 		# Some method patterns can be static and become in SST
 		for pattern in mclass.sites_patterns do
+			# First, we need to update callees for these patterns
+			if pattern isa MOCallSitePattern then
+				var lp_rsc = pattern.gp.lookup_first_definition(mainmodule, pattern.rsc.intro.bound_mtype)
+				pattern.add_lp(lp_rsc)
+			end
+
 			# If the pattern has a NullImpl, then recompute it
 			if pattern.get_impl(vm) isa NullImpl then
 				pattern.reinit_impl
