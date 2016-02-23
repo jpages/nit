@@ -75,6 +75,7 @@ redef class VirtualMachine
 				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
 				print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
+				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
 			end
 
 			return self.call(impl.exec_method(recv), args)
@@ -1231,7 +1232,6 @@ redef abstract class MOSite
 			return
 		end
 
-		# TODO
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
@@ -1253,6 +1253,9 @@ redef abstract class MOSite
 	do
 		var position = -1
 
+		# If the rsc does not have a unique position for its methods in all its loaded subclasses
+		if pattern.rsc.position_methods < 0 then return 0
+
 		if concretes_receivers != null then
 
 			var current_pos = get_block_position(vm, concretes_receivers.first)
@@ -1272,7 +1275,7 @@ redef abstract class MOSite
 		return 0
 	end
 
-	# TODO: comment
+	# Return the position of the block of PIC class in the receiver static class
 	private fun get_block_position(vm: VirtualMachine, recv: MClass): Int
 	do
 		return recv.get_position_methods(get_pic(vm))
