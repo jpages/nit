@@ -45,10 +45,10 @@ redef class MOStats
 		end
 
 		# Do not generate table3 in original preexistence
-		# if not sys.disable_preexistence_extensions then
-		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
-		# 	table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
-		# end
+		if not sys.disable_preexistence_extensions then
+			table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
+			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
+		end
 
 		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 
@@ -985,9 +985,9 @@ redef class MOStats
 		file.write("%Table number of execution\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
-		var total_methods = vm.pstats.method_ph + vm.pstats.method_sst + vm.pstats.method_static
-		var total_attributes = vm.pstats.attribute_ph + vm.pstats.attribute_sst
-		var total_casts = vm.pstats.cast_ph + vm.pstats.cast_sst + vm.pstats.cast_static
+		var total_methods = vm.pstats.method_ph + vm.pstats.method_sst + vm.pstats.method_static + vm.pstats.monomorph_method_executions
+		var total_attributes = vm.pstats.attribute_ph + vm.pstats.attribute_sst + vm.pstats.monomorph_attribute_executions
+		var total_casts = vm.pstats.cast_ph + vm.pstats.cast_sst + vm.pstats.cast_static + vm.pstats.monomorph_cast_executions
 		var grand_total = total_methods + total_attributes + total_casts
 
 		var table = "monomorphs & {vm.pstats.monomorph_method_executions} & {vm.pstats.monomorph_attribute_executions} & {vm.pstats.monomorph_cast_executions} & {vm.pstats.monomorph_method_executions + vm.pstats.monomorph_attribute_executions + vm.pstats.monomorph_cast_executions}\\\\\n"
