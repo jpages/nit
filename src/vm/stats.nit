@@ -8,21 +8,14 @@ redef class ToolContext
 	# Enable statistics on the model
 	var stats_on = new OptionBool("Display statistics of model optimizing / preexistence after execution", "--mo-stats")
 
-	# Enable print site state
-	var print_site_state = new OptionBool("Display state of a MOSite (preexistence, impl)", "--site-state")
-
 	redef init
 	do
 		super
 		option_context.add_option(stats_on)
-		option_context.add_option(print_site_state)
 	end
 end
 
 redef class Sys
-	# Access to print_site_state from anywhere
-	var print_site_state: Bool = false
-
 	var dump_ast: FileWriter is noinit
 
 	var dump_object_sites: FileWriter is noinit
@@ -33,8 +26,6 @@ end
 redef class ModelBuilder
 	redef fun run_virtual_machine(mainmodule, arguments)
 	do
-		sys.print_site_state = toolcontext.print_site_state.value
-
 		super(mainmodule, arguments)
 
 		if toolcontext.stats_on.value then
@@ -939,17 +930,6 @@ redef class MOSite
 			incr_self
 			incr_rst_unloaded(vm)
 
-			if print_site_state then
-				var buf = "site {self}\n"
-				buf += "\tpattern: {pattern2str}\n"
-				buf += "\tlp: {lp.mclassdef.name}::{lp.name}\n"
-				buf += "\tlocation: {ast.location}\n"
-				# TODO: fix the mutability of preexistence
-				buf += "\tpreexist/mutable: {expr_recv.is_pre}/{expr_recv.expr_preexist.bit_npre_immut}\n"
-				buf += "\timpl: {get_impl(vm)}\n"
-				print(buf)
-			end
-
 			sys.vm.receiver_origin[origin] += 1
 			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
 
@@ -1201,7 +1181,9 @@ redef class MOSite
 
 	fun trace: String
 	do
-		var res = "recv {expr_recv} "
+		var res = "{self} recv {expr_recv} "
+		if is_monomorph then res += "monomorph "
+
 		if concretes_receivers != null then
 			res += "concretes = {concretes_receivers.as(not null)}"
 		else
