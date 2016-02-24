@@ -1464,7 +1464,11 @@ redef class PHImpl
 
 	redef fun exec_attribute_read(recv)
 	do
-		sys.vm.pstats.attribute_ph += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_attribute_executions += 1
+		else
+			sys.vm.pstats.attribute_ph += 1
+		end
 
 		mo_entity.as(MOSite).executions += 1
 
@@ -1475,7 +1479,11 @@ redef class PHImpl
 
 	redef fun exec_attribute_write(recv, value)
 	do
-		sys.vm.pstats.attribute_ph += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_attribute_executions += 1
+		else
+			sys.vm.pstats.attribute_ph += 1
+		end
 
 		mo_entity.as(MOSite).executions += 1
 
@@ -1486,7 +1494,11 @@ redef class PHImpl
 
 	redef fun exec_method(recv)
 	do
-		sys.vm.pstats.method_ph += 1
+		if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_method_executions += 1
+		else
+			sys.vm.pstats.method_ph += 1
+		end
 
 		mo_entity.as(MOSite).executions += 1
 

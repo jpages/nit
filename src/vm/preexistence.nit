@@ -571,6 +571,11 @@ redef class MOAsSubtypeSite
 
 		if concretes != null then
 			# These concretes are necessarily loaded so, the expression is preexisting if the receiver is preexisting
+			for rcv in concretes do
+				if not rcv.abstract_loaded then return 8
+			end
+
+			# All concretes returned by the cast are loaded, the expression is preexisting
 			if expr_recv.expr_preexist.bit_pre then return 3
 		end
 
@@ -718,5 +723,3 @@ redef class MOCallSitePattern
 		return true
 	end
 end
-
-#TODO: propagation

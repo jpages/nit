@@ -110,6 +110,7 @@ redef class VirtualMachine
 		end
 	end
 
+	# TODO: put some parts of this in pattern classes
 	redef fun load_class_indirect(mclass)
 	do
 		if mclass.abstract_loaded then return
@@ -133,7 +134,6 @@ redef class VirtualMachine
 			end
 
 			# Update if any mosites of this pattern with a NullImpl
-			# TODO: put this in pattern classes
 			for mosite in pattern.sites do
 				if mosite.get_impl(vm) isa NullImpl then
 					mosite.reinit_impl
@@ -158,7 +158,7 @@ redef class VirtualMachine
 			end
 		end
 
-		# If `mclass` was a target of a subtyping test, goes in these patterns and
+		# If `mclass` was a target of a subtyping test, go in these patterns and
 		# recompute them because they were static
 		for pattern in mclass.subtype_target_patterns do
 			if pattern.get_impl(vm) isa StaticImpl then

@@ -917,17 +917,12 @@ class MOAsSubtypeSite
 		if sup != null then return sup
 
 		# The candidates of the subtyping-test
-		var candidates = new ConcreteTypes
 		if concretes == null then concretes = new ConcreteTypes
 
 		# If we have concrete receivers use them compute concretes types
 		if concretes_receivers != null then
-			for rcv in concretes_receivers.as(not null) do
-				if rcv.loaded then candidates.add(rcv)
-			end
-
 			# See which concretes receivers are subtypes of the target of the cast
-			for rcv in candidates do
+			for rcv in concretes_receivers.as(not null) do
 				if vm.is_subclass(rcv, target_mclass) then concretes.add(rcv)
 			end
 		else
