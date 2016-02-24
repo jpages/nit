@@ -1070,6 +1070,10 @@ redef class MOSite
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
+			if concretes_receivers != null then
+				print "concretes from a cast {concretes_receivers.as(not null)} preexistence {expr_recv.expr_preexist}"
+			end
+
 			if expr_recv.is_pre then
 				vm.pstats.matrix[78][index_x] += 1
 				vm.pstats.matrix[78][5] += 1
@@ -1274,6 +1278,10 @@ redef class MOCallSite
 	redef fun trace
 	do
 		var res = " {pattern.rsc}#{pattern.gp} args {given_args}"
+
+		if compute_concretes(null) != null then
+			res += " returned concretes = {compute_concretes(null).as(not null)}"
+		end
 
 		return super + res
 	end

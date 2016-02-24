@@ -570,10 +570,11 @@ redef class MOAsSubtypeSite
 		var concretes = compute_concretes(null)
 
 		if concretes != null then
-			return 3
-		else
-			return expr_recv.expr_preexist
+			# These concretes are necessarily loaded so, the expression is preexisting if the receiver is preexisting
+			if expr_recv.expr_preexist.bit_pre then return 3
 		end
+
+		return expr_recv.expr_preexist
 	end
 end
 
