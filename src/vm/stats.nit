@@ -1124,13 +1124,13 @@ redef class MOSite
 	# Increment counters if the receiver is `self`
 	fun incr_self
 	do
-		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
+		if expr_recv isa MOSelf then
 			vm.pstats.matrix[0][index_x] += 1
 			vm.pstats.matrix[0][5] += 1
 		end
 
 		# Recopy the total of self sites
-		if expr_recv isa MOParam and expr_recv.as(MOParam).offset == 0 then
+		if expr_recv isa MOSelf then
 			vm.pstats.matrix[65][index_x] += 1
 			vm.pstats.matrix[65][5] += 1
 
@@ -1191,6 +1191,7 @@ redef class MOSite
 		end
 
 		res += " impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
+		res += " executions {executions}"
 
 		return res
 	end

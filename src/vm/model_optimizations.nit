@@ -677,6 +677,12 @@ class MOParam
 	super MOVar
 end
 
+# The special case of Self
+class MOSelf
+	super MOParam
+
+end
+
 # MO of instantiation sites
 class MONew
 	super MOExpr
@@ -1547,7 +1553,7 @@ redef class ASelfExpr
 	do
 		if mo_entity != null then return mo_entity.as(not null)
 
-		var movar = new MOParam(mpropdef, variable.as(not null), 0)
+		var movar = new MOSelf(mpropdef, variable.as(not null), 0)
 
 		mo_entity = movar
 

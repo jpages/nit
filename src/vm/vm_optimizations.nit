@@ -128,7 +128,7 @@ redef class VirtualMachine
 			end
 
 			# If the pattern has a NullImpl, then recompute it
-			if pattern.get_impl(vm) isa NullImpl then
+			if pattern.get_impl(vm) isa NullImpl or pattern.rsc == mclass then
 				pattern.reinit_impl
 				pattern.compute_impl
 			end
@@ -136,6 +136,10 @@ redef class VirtualMachine
 			# Update if any mosites of this pattern with a NullImpl
 			for mosite in pattern.sites do
 				if mosite.get_impl(vm) isa NullImpl then
+					mosite.reinit_impl
+					mosite.get_impl(vm)
+				else if pattern.rsc == mclass then
+					# Reinit sites which had `mclass` as their rsc
 					mosite.reinit_impl
 					mosite.get_impl(vm)
 				end
