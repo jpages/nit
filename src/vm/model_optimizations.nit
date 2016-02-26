@@ -705,8 +705,26 @@ class MOSelf
 			if mclass.loaded then concretes.add(mclass)
 		end
 
-		# Add the class where is the class anyways
+		# The enclosing lp is a MMethodDef, we can restrain the concrete types of self
+		if lp isa MMethodDef then
+			for rcv in concretes do
+				# See if `rcv` redefines the enclosing lp and so can not be
+				# the self of the current class
+				var propdef = lp.mproperty.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+
+				if propdef.to_s == "hash_collection#HashSet#add" then
+					print "{propdef.has_supercall}"
+				end
+
+				# If this different lp does not contain a super-call
+				if not propdef.has_supercall then concretes.remove(rcv)
+			end
+		end
+
+		# Add the class where the self-expression is
 		if self_mclass.abstract_loaded then concretes.add(self_mclass)
+
+		# The lp is an attribute definition, so nothing to do here
 
 		if not concretes.is_empty then
 			return concretes
