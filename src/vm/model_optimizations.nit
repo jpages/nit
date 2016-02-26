@@ -681,6 +681,39 @@ end
 class MOSelf
 	super MOParam
 
+	# The class of self
+	var self_mclass: MClass is noinit
+
+	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
+	do
+		super(lp, node, v, pos)
+
+		ast = node.as(not null)
+		# Set self_mclass, the static type of self
+		self_mclass = lp.mclassdef.mclass
+		lp.mclassdef.mclass.self_sites.add(self)
+	end
+
+	redef fun compute_concretes(concretes)
+	do
+		if concretes == null then
+			concretes = new ConcreteTypes
+		end
+
+		# For now the concrete types of self are the subclasses of the current class which are instantiated
+		for mclass in self_mclass.loaded_subclasses do
+			if mclass.loaded then concretes.add(mclass)
+		end
+
+		# Add the class where is the class anyways
+		if self_mclass.abstract_loaded then concretes.add(self_mclass)
+
+		if not concretes.is_empty then
+			return concretes
+		else
+			return null
+		end
+	end
 end
 
 # MO of instantiation sites
@@ -1174,6 +1207,9 @@ redef class MClass
 	# Contrary relation of concretes_receivers
 	var concrete_caller_sites: nullable List[MOSite]
 
+	# The list of all self_expressions on which self
+	var self_sites = new List[MOSelf]
+
 	# The list of PICPatterns of this class,
 	# this class is considered the Property Introduction Class
 	# and stores alls the PICPatterns for a property which is introduced in self
@@ -1246,6 +1282,14 @@ redef class MClass
 	do
 		new_pattern.newexprs.add(newsite)
 		newsite.pattern = new_pattern
+	end
+
+	# Update the concrete types of self sites of this class
+	fun update_self_sites
+	do
+		for self_site in self_sites do
+			self_site.compute_concretes(null)
+		end
 	end
 end
 
@@ -1532,7 +1576,7 @@ redef class ANewExpr
 		# If the option `improve_loading` is set, load the corresponding class is the new is toplevel
 		if sys.improve_loading then
 
-			# If the new is unconditionnal (i.e. at the toplevel of the eclosing method),
+			# If the new is unconditionnal (i.e. at the toplevel of the enclosing method),
 			# load its corresponding class if needed
 			if self.block.is_unconditionnal then
 				vm.load_class(recvtype.as(not null).mclass)
@@ -1553,7 +1597,12 @@ redef class ASelfExpr
 	do
 		if mo_entity != null then return mo_entity.as(not null)
 
-		var movar = new MOSelf(mpropdef, variable.as(not null), 0)
+		var	movar
+		if self isa AImplicitSelfExpr and self.is_sys then
+			movar = new MOParam(mpropdef, variable.as(not null), 0)
+		else
+			movar = new MOSelf(mpropdef, self, variable.as(not null), 0)
+		end
 
 		mo_entity = movar
 

@@ -76,6 +76,7 @@ redef class VirtualMachine
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
 				print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
+				abort
 			end
 
 			return self.call(impl.exec_method(recv), args)
@@ -116,6 +117,8 @@ redef class VirtualMachine
 		if mclass.abstract_loaded then return
 
 		super(mclass)
+
+		mclass.update_self_sites
 
 		# Update Patterns and sites
 
@@ -177,6 +180,22 @@ redef class VirtualMachine
 				end
 			end
 		end
+	end
+
+	redef fun load_class(mclass)
+	do
+		if mclass.loaded then return
+
+		super(mclass)
+
+		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do propagate_loading(parent)
+	end
+
+	fun propagate_loading(mclass: MClass)
+	do
+		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do propagate_loading(parent)
+
+		mclass.update_self_sites
 	end
 end
 
