@@ -307,7 +307,7 @@ redef class MOStats
 	# Output statistics in .tex file for site which receiver is a final class
 	private fun table_final(file: FileWriter)
 	do
-		file.write("%Table final: receiver typed by a loaded final class\n")
+		file.write("%Table final: non-monomorphic sites with a receiver typed by a loaded final class\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
 		# The array to store statistics on final sites
@@ -332,7 +332,8 @@ redef class MOStats
 			if site isa MOAsNotNullSite then continue
 
 			# We only count MOSite with a final receiver
-			if not site.pattern.rsc.is_final and site.pattern.rsc.abstract_loaded then continue
+			if not site.pattern.rsc.is_final then continue
+			if not site.pattern.rsc.loaded then continue
 
 			if site isa MOCallSite then
 				index_x = 0
