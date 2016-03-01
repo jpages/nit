@@ -567,14 +567,13 @@ abstract class MOExpr
 
 		var mclass = ast.mtype.get_mclass(sys.vm, lp)
 
-		#TODO
 		if mclass != null and mclass.is_final and mclass.loaded then
 			concretes = new ConcreteTypes
 			concretes.immutable = true
 			concretes.add(mclass)
 			return concretes
 		else
-			# By default, an expression has not concretes
+			# By default, an expression does not have concretes
 			return null
 		end
 	end
@@ -694,44 +693,44 @@ class MOSelf
 		lp.mclassdef.mclass.self_sites.add(self)
 	end
 
-	redef fun compute_concretes(concretes)
-	do
-		if concretes == null then
-			concretes = new ConcreteTypes
-		end
+	# redef fun compute_concretes(concretes)
+	# do
+	# 	if concretes == null then
+	# 		concretes = new ConcreteTypes
+	# 	end
 
-		# For now the concrete types of self are the subclasses of the current class which are instantiated
-		for mclass in self_mclass.loaded_subclasses do
-			if mclass.loaded then concretes.add(mclass)
-		end
+	# 	# For now the concrete types of self are the subclasses of the current class which are instantiated
+	# 	for mclass in self_mclass.loaded_subclasses do
+	# 		if mclass.loaded then concretes.add(mclass)
+	# 	end
 
-		# The enclosing lp is a MMethodDef, we can restrain the concrete types of self
-		if lp isa MMethodDef then
-			for rcv in concretes do
-				# See if `rcv` redefines the enclosing lp and so can not be
-				# the self of the current class
-				var propdef = lp.mproperty.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
+	# 	# The enclosing lp is a MMethodDef, we can restrain the concrete types of self
+	# 	if lp isa MMethodDef then
+	# 		for rcv in concretes do
+	# 			# See if `rcv` redefines the enclosing lp and so can not be
+	# 			# the self of the current class
+	# 			var propdef = lp.mproperty.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
 
-				if propdef.to_s == "hash_collection#HashSet#add" then
-					print "{propdef.has_supercall}"
-				end
+	# 			if propdef.to_s == "hash_collection#HashSet#add" then
+	# 				print "{propdef.has_supercall}"
+	# 			end
 
-				# If this different lp does not contain a super-call
-				if not propdef.has_supercall then concretes.remove(rcv)
-			end
-		end
+	# 			# If this different lp does not contain a super-call
+	# 			if not propdef.has_supercall then concretes.remove(rcv)
+	# 		end
+	# 	end
 
-		# Add the class where the self-expression is
-		if self_mclass.abstract_loaded then concretes.add(self_mclass)
+	# 	# Add the class where the self-expression is
+	# 	if self_mclass.abstract_loaded then concretes.add(self_mclass)
 
-		# The lp is an attribute definition, so nothing to do here
+	# 	# The lp is an attribute definition, so nothing to do here
 
-		if not concretes.is_empty then
-			return concretes
-		else
-			return null
-		end
-	end
+	# 	if not concretes.is_empty then
+	# 		return concretes
+	# 	else
+	# 		return null
+	# 	end
+	# end
 end
 
 # MO of instantiation sites

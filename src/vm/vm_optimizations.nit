@@ -1232,6 +1232,20 @@ redef abstract class MOSite
 	# TODO: comment the code
 	fun compute_impl_concretes(vm: VirtualMachine)
 	do
+		if is_monomorph then
+			# Ensure that the concrete type of the site is loaded
+			if concretes_receivers.first.loaded then
+				# callsite and casts are implemented in static
+				if can_be_static then
+					set_static_impl(vm, false)
+				else
+					# Attributes are implemented in SST
+					set_sst_impl(vm, false)
+				end
+				return
+			end
+		end
+
 		# Static
 		if can_be_static then
 			if not pattern.rsc.abstract_loaded then
@@ -1245,7 +1259,7 @@ redef abstract class MOSite
 			end
 		end
 
-		# SST
+		# If the property is introduced in Object class, SST can be used
 		if get_pic(vm).is_instance_of_object(vm) then
 			set_sst_impl(vm, false)
 			return
@@ -1355,6 +1369,8 @@ redef abstract class MOSite
 		print "NYI {self}"
 		return self
 	end
+
+	
 end
 
 redef class MOSubtypeSite

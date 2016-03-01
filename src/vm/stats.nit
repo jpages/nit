@@ -920,7 +920,7 @@ redef class MOSite
 					vm.pstats.monomorph_methods += 1
 				else if self isa MOAttrSite then
 					vm.pstats.monomorph_attributes += 1
-				else
+				else if self isa MOSubtypeSite then
 					vm.pstats.monomorph_casts += 1
 				end
 
@@ -1052,10 +1052,6 @@ redef class MOSite
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
-			if concretes_receivers != null then
-				print "concretes from a cast {concretes_receivers.as(not null)} preexistence {expr_recv.expr_preexist}"
-			end
-
 			if expr_recv.is_pre then
 				vm.pstats.matrix[78][index_x] += 1
 				vm.pstats.matrix[78][5] += 1
@@ -1186,6 +1182,8 @@ redef class MOSite
 		var res = "{self} recv {expr_recv} "
 		if is_monomorph then res += "monomorph "
 
+		if pattern.rsc.is_final then res += "final_rcv = {pattern.rsc} "
+
 		if concretes_receivers != null then
 			res += "concretes = {concretes_receivers.as(not null)}"
 		else
@@ -1228,7 +1226,7 @@ redef class MOPropSite
 
 	redef fun trace
 	do
-		return super + " {pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
+		return super + " intro_mclass = {pattern.gp.intro_mclassdef.mclass}, {pattern.rsc}#{pattern.gp} is_executed = {is_executed}"
 	end
 end
 
@@ -1576,14 +1574,23 @@ redef class MPropDef
 
 	fun trace: String
 	do
-		var res = "GP {mproperty.intro_mclassdef.mclass}#{mproperty}, nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length}"
+		var res = "LP {self}, GP {mproperty.intro_mclassdef.mclass}#{mproperty}"
+		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length}"
 
 		if return_expr != null then
 			res += " return_preexist {return_expr.return_preexist}"
 
+			if not return_expr_is_object then return res
 			if not self isa MMethodDef then return res
+
 			var return_concretes = compute_concretes(sys.vm)
 			if return_concretes != null then res += " return_concretes {return_concretes}"
+
+			if not msignature.return_mtype == null then
+				var mclass_return = msignature.return_mtype.as(not null).get_mclass(vm, self)
+
+				if mclass_return.is_final then res += ", final_return {mclass_return.as(not null)}"
+			end
 		end
 
 		return res
