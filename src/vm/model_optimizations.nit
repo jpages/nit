@@ -468,6 +468,9 @@ redef class MPropDef
 	# List of object sites in this local property
 	var mosites = new List[MOSite]
 
+	# Sites with a primitive receiver
+	var primitive_sites = new List[MOSite]
+
 	# The sites which are either with a primitive receiver or monomorphics
 	var monomorph_sites = new List[MOSite]
 
@@ -554,7 +557,7 @@ abstract class MOExpr
 
 	init(lp: MPropDef, node: nullable AExpr)
 	do
-		super(lp, ast)
+		super(lp, node)
 		sys.vm.all_moexprs.add(self)
 		ast = node
 	end
@@ -591,7 +594,7 @@ abstract class MOVar
 
 	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
 	do
-		super(lp, ast)
+		super(lp, node)
 		variable = v
 		offset = pos
 	end
@@ -761,9 +764,9 @@ class MONew
 		return concretes
 	end
 
-	init(mpropdef: MPropDef, ast: AExpr)
+	init(mpropdef: MPropDef, node: AExpr)
 	do
-		super(mpropdef, ast)
+		super(mpropdef, node)
 		if not sys.vm.all_new_sites.has(self) then sys.vm.all_new_sites.add(self)
 		lp = mpropdef
 		lp.monews.add(self)
@@ -896,15 +899,20 @@ abstract class MOSite
 		return concretes_receivers
 	end
 
-	init(mpropdef: MPropDef, ast: AExpr)
+	init(mpropdef: MPropDef, node: AExpr)
 	do
-		super(mpropdef, ast)
-		self.ast = ast
+		super(mpropdef, node)
+		ast = node
 		lp = mpropdef
 
-		if not lp.mosites.has(self) then lp.mosites.add(self)
+		if ast.mtype != null and ast.mtype.is_primitive_type then
+			if not lp.primitive_sites.has(self) then lp.primitive_sites.add(self)
+			sys.vm.primitive_entities.add(self)
+		else
+			if not lp.mosites.has(self) then lp.mosites.add(self)
+			if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.add(self)
+		end
 
-		if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.add(self)
 	end
 end
 
@@ -923,10 +931,10 @@ abstract class MOExprSite
 
 	redef type P: MOExprSitePattern
 
-	init(mpropdef: MPropDef, ast: AExpr)
+	init(mpropdef: MPropDef, node: AExpr)
 	do
-		self.lp = mpropdef
-		self.ast = ast
+		lp = mpropdef
+		ast = node
 	end
 end
 
@@ -942,9 +950,9 @@ abstract class MOSubtypeSite
 	# Static MClass of the class
 	var target_mclass: MClass
 
-	init(mpropdef: MPropDef, ast: nullable AExpr, target: MType)
+	init(mpropdef: MPropDef, node: nullable AExpr, target: MType)
 	do
-		super(mpropdef, ast.as(not null))
+		super(mpropdef, node.as(not null))
 		var mclass = target.get_mclass(sys.vm, mpropdef)
 		self.target = mclass.mclass_type
 		self.target_mclass = mclass.as(not null)
@@ -1032,14 +1040,17 @@ class MOCallSite
 	# Values of each arguments
 	var given_args = new List[MOExpr]
 
-	init(mpropdef: MPropDef, ast: AExpr, cs: CallSite)
+	init(mpropdef: MPropDef, node: AExpr, cs: CallSite)
 	do
 		lp = mpropdef
-		self.ast = ast
 		callsite = cs
 		callsite.mocallsite = self
 
-		if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.has(self)
+		if node.mtype != null and node.mtype.is_primitive_type then
+			sys.vm.primitive_entities.add(self)
+		else
+			sys.vm.all_moentities.add(self)
+		end
 	end
 
 	redef fun pretty_print(file)
@@ -1329,6 +1340,9 @@ redef class VirtualMachine
 	# The list of all object entities
 	var all_moentities = new HashSet[MOEntity]
 
+	# Primitive entities of the model (callsites with a primitive receiver...)
+	var primitive_entities = new HashSet[MOEntity]
+
 	# The list of all MOSuper
 	var mo_supers = new List[MOSuper]
 
@@ -1346,16 +1360,10 @@ redef class MType
 	# True if self is a primitive type
 	fun is_primitive_type: Bool
 	do
-		if not need_anchor then
-			var superclasses = collect_mtypes(sys.vm.mainmodule)
-
-			for sup in superclasses do
-				if sup.to_s == "Discrete" or sup.to_s == "nullable Discrete" then return true
-				if sup.to_s == "Numeric" or sup.to_s == "nullable Numeric" then return true
-			end
-
-			if self.to_s == "Bool" or self.to_s == "nullable Bool"then return true
-		end
+		if name == "Discrete" or name == "nullable Discrete" then return true
+		if name == "Numeric" or name == "nullable Numeric" then return true
+		if name == "Bool" or name == "nullable Bool" then return true
+		if name == "Int" or name == "nullable Int" then return true
 
 		return false
 	end

@@ -541,7 +541,7 @@ class MOStats
 	do
 		var file = new FileWriter.open("{dir}/trace_sites.txt")
 
-		print "sys.vm.all_moentities {sys.vm.all_moentities.length}"
+		print "sys.vm.all_moentities {sys.vm.all_moentities.length + sys.vm.primitive_entities.length}"
 		for mosite in sys.vm.all_moentities do
 			if mosite isa MOSite then
 				# Do not print the primitive sites
@@ -693,7 +693,7 @@ class MOStats
 
 		vm.pstats.matrix[42][0] = sys.vm.pstats.nb_ast_sites
 		vm.pstats.matrix[43][0] = sys.vm.all_new_sites.length
-		vm.pstats.matrix[44][0] = sys.vm.all_moentities.length
+		vm.pstats.matrix[44][0] = sys.vm.all_moentities.length + sys.vm.primitive_entities.length
 		vm.pstats.matrix[45][0] = sys.vm.mo_supers.length
 		vm.pstats.matrix[46][0] = sys.vm.pstats.nb_primitive_sites
 
@@ -836,7 +836,7 @@ class MOStats
 		nb_ast_sites = counters.nb_ast_sites
 
 		new_sites = sys.vm.all_new_sites.length
-		object_sites = sys.vm.all_moentities.length
+		object_sites = sys.vm.all_moentities.length + sys.vm.primitive_entities.length
 
 		matrix = new Array[Array[Int]].with_capacity(counters.matrix.length)
 		for i in [0..counters.matrix.length[ do
