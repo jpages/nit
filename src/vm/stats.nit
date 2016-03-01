@@ -901,8 +901,10 @@ redef class MOSite
 	fun stats(vm: VirtualMachine)
 	do
 		# Compute the concrete types of this site
-		concretes_receivers = null
-		compute_concretes_site
+		if not is_monomorph then
+			concretes_receivers = null
+			compute_concretes_site
+		end
 
 		expr_recv.preexist_init
 		site_preexist
