@@ -807,7 +807,7 @@ abstract class MOSite
 	var pattern: P is writable, noinit
 
 	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
-	var concretes_receivers: nullable List[MClass] is noinit, writable
+	var concretes_receivers: nullable ConcreteTypes is noinit, writable
 
 	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol,
 	# A monomorphic site is coming from a unique new of a loaded class or typed by a final class (loaded or not)
@@ -830,7 +830,8 @@ abstract class MOSite
 		# If the static type is final, then it is monomorph
 		if pattern.rsc.is_final and pattern.rsc.loaded then
 			is_monomorph = true
-			var concrete = new List[MClass]
+			var concrete = new ConcreteTypes
+			concrete.immutable = true
 			concrete.add(pattern.rsc)
 
 			concretes_receivers = concrete
@@ -841,9 +842,10 @@ abstract class MOSite
 			if expr_recv.as(MONew).pattern.cls.is_abstract then return
 
 			is_monomorph = true
-			var concrete = new List[MClass]
-			concrete.add(expr_recv.as(MONew).pattern.cls)
+			var concrete = new ConcreteTypes
+			concrete.immutable = true
 
+			concrete.add(expr_recv.as(MONew).pattern.cls)
 			concretes_receivers = concrete
 		end
 
@@ -855,7 +857,8 @@ abstract class MOSite
 			if new_class.is_abstract then return
 
 			is_monomorph = true
-			var concrete = new List[MClass]
+			var concrete = new ConcreteTypes
+			concrete.immutable = true
 			concrete.add(new_class)
 
 			concretes_receivers = concrete

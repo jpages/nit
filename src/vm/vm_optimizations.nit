@@ -1364,13 +1364,18 @@ redef abstract class MOSite
 		impl = new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
 	end
 
-	fun clone: MOSite
+	# Compute and return the conservative implementation of this site
+	# The conservative implementation is the Implementation that will never require recompiling the site
+	fun conservative_implementation: Implementation
 	do
-		print "NYI {self}"
-		return self
+		# SST for a property introduced in Object
+		if get_pic(vm).is_instance_of_object(vm) then
+			return new SSTImpl(self, false, get_block_position(vm, pattern.rsc) + get_offset(vm))
+		else
+			# By default, perfect hashing
+			return new PHImpl(self, false, get_offset(vm), get_pic(vm).vtable.id)
+		end
 	end
-
-	
 end
 
 redef class MOSubtypeSite
@@ -1398,6 +1403,17 @@ redef class MOSubtypeSite
 			var source_vt = pattern.rsc.vtable.as(not null)
 			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
 			impl = new StaticImplSubtype(self, mutable, cast_value)
+		end
+	end
+
+	redef fun conservative_implementation: Implementation
+	do
+		# Static for casts when the target type is final
+		if target_mclass.is_final then
+			return new StaticImplSubtype(self, false, true)
+		else
+			# Else we use the default computation of conservative implementation
+			return super
 		end
 	end
 end
@@ -1468,21 +1484,19 @@ redef class MOCallSite
 			end
 		end
 	end
-end
 
-redef class MOReadSite
-	# Clone a MOSite
-	redef fun clone: MOSite
+	redef fun conservative_implementation: Implementation
 	do
-		var copy = new MOReadSite(lp, ast.as(not null))
-		copy.pattern = pattern
-
+		# Static, when the concrete types of the receiver are known
 		if concretes_receivers != null then
-			copy.concretes_receivers = new List[MClass]
-			copy.concretes_receivers.add_all(concretes_receivers.as(not null))
+			var callees = concrete_callees
+
+			if callees.length == 1 then
+				return new StaticImplMethod(self, false, concrete_callees.first)
+			end
 		end
 
-		return copy
+		return super
 	end
 end
 
