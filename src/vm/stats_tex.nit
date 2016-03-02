@@ -325,9 +325,6 @@ redef class MOStats
 		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
 
-			# Do not count the site if it come from a primitive
-			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
-
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
@@ -395,9 +392,6 @@ redef class MOStats
 
 		for site in sys.vm.pstats.analysed_sites do
 			var index_x: Int
-
-			# Do not count the site if it comes from a primitive
-			if site.expr_recv.preexistence_origin.bin_and(16) == 16 then continue
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
@@ -476,9 +470,6 @@ redef class MOStats
 
 			var origin = site.expr_recv.preexistence_origin
 
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
-
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
@@ -550,9 +541,6 @@ redef class MOStats
 			var index_x: Int
 
 			var origin = site.expr_recv.preexistence_origin
-
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
 
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
@@ -630,9 +618,6 @@ redef class MOStats
 
 			var origin = site.expr_recv.preexistence_origin
 
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
-
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
@@ -708,9 +693,6 @@ redef class MOStats
 
 			var origin = site.expr_recv.preexistence_origin
 
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
-
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
@@ -785,8 +767,6 @@ redef class MOStats
 			var index_x: Int
 
 			var origin = site.expr_recv.preexistence_origin
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
 
 			# We only count callsite receivers
 			if not (origin == 4 or origin == 132) then continue
@@ -858,8 +838,6 @@ redef class MOStats
 			var index_x: Int
 
 			var origin = site.expr_recv.preexistence_origin
-			# Do not count the site if it come from a primitive
-			if origin.bin_and(16) == 16 then continue
 
 			# We only count castsites receivers
 			if not (origin == 512 or origin == 640) then continue

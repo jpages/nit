@@ -459,8 +459,15 @@ redef class MPropDef
 	# Return expression of the propdef (null if procedure)
 	var return_expr: nullable MOVar is noinit, writable
 
-	# An object is never return if return_expr is not a MOVar
-	fun return_expr_is_object: Bool do return return_expr isa MOVar
+	# Return true if the return type of `self` is not a primitive object
+	fun return_expr_is_object: Bool
+	do
+		if mproperty.intro isa MMethodDef and mproperty.intro.as(MMethodDef).msignature.return_mtype != null then
+			return mproperty.intro.as(MMethodDef).msignature.return_mtype.is_primitive_type
+		else
+			return false
+		end
+	end
 
 	# List of instantiations sites in this local property
 	var monews = new List[MONew]
@@ -1696,8 +1703,14 @@ redef class ASendExpr
 		var cs = callsite.as(not null)
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
 
+		# Test if the return type of the introduction property is a primitive
+		var primitive_return = false
+		if cs.mpropdef.msignature.return_mtype != null then
+			primitive_return = cs.mpropdef.mproperty.intro.msignature.return_mtype.is_primitive_type
+		end
+
 		var mocallsite: MOCallSite
-		if cs.mpropdef.msignature.as(not null).return_mtype != null then
+		if cs.mpropdef.msignature.return_mtype != null and not primitive_return then
 			# The mproperty is a function
 			mocallsite = new MOFunctionSite(mpropdef, self, cs)
 		else

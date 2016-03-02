@@ -543,12 +543,7 @@ class MOStats
 
 		print "sys.vm.all_moentities {sys.vm.all_moentities.length + sys.vm.primitive_entities.length}"
 		for mosite in sys.vm.all_moentities do
-			if mosite isa MOSite then
-				# Do not print the primitive sites
-				if mosite.expr_recv.preexistence_origin.bin_and(16) != 16 then
-					file.write("{mosite.trace} {mosite}\n")
-				end
-			end
+			if mosite isa MOSite then file.write("{mosite.trace} {mosite}\n")
 
 			if sys.debug_mode then
 				if mosite.ast != null then
@@ -695,7 +690,7 @@ class MOStats
 		vm.pstats.matrix[43][0] = sys.vm.all_new_sites.length
 		vm.pstats.matrix[44][0] = sys.vm.all_moentities.length + sys.vm.primitive_entities.length
 		vm.pstats.matrix[45][0] = sys.vm.mo_supers.length
-		vm.pstats.matrix[46][0] = sys.vm.pstats.nb_primitive_sites
+		vm.pstats.matrix[46][0] = sys.vm.primitive_entities.length
 
 		vm.pstats.matrix[48][0] = nb_procedure
 		vm.pstats.matrix[49][0] = nb_method_return
@@ -910,45 +905,39 @@ redef class MOSite
 		site_preexist
 		origin = expr_recv.preexistence_origin
 
-		# If the receiver is not a primitive
-		if not origin.bin_and(16) == 16 then
-			# Increment statistics on callsites
-			incr_stats_sites
+		# Increment statistics on callsites
+		incr_stats_sites
 
-			if self.is_monomorph then
-				if self isa MOCallSite then
-					vm.pstats.monomorph_methods += 1
-				else if self isa MOAttrSite then
-					vm.pstats.monomorph_attributes += 1
-				else if self isa MOSubtypeSite then
-					vm.pstats.monomorph_casts += 1
-				end
-
-				return
-			end
-
-			incr_from_site
-			incr_concrete_site
-			incr_self
-			incr_rst_unloaded(vm)
-
-			sys.vm.receiver_origin[origin] += 1
-			sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
-
-			# Trace the origin of preexistence of callsites
+		if self.is_monomorph then
 			if self isa MOCallSite then
-				sys.vm.trace_origin[trace_origin] += 1
-				sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
+				vm.pstats.monomorph_methods += 1
+			else if self isa MOAttrSite then
+				vm.pstats.monomorph_attributes += 1
+			else if self isa MOSubtypeSite then
+				vm.pstats.monomorph_casts += 1
 			end
 
-			vm.pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
-
-			# Increment the total for implementation of the previous line
-			incr_total
-		else
-			# Increment the total of sites with a primitive receiver
-			sys.vm.pstats.nb_primitive_sites += 1
+			return
 		end
+
+		incr_from_site
+		incr_concrete_site
+		incr_self
+		incr_rst_unloaded(vm)
+
+		sys.vm.receiver_origin[origin] += 1
+		sys.vm.receiver_origin[sys.vm.receiver_origin.length -1] += 1
+
+		# Trace the origin of preexistence of callsites
+		if self isa MOCallSite then
+			sys.vm.trace_origin[trace_origin] += 1
+			sys.vm.trace_origin[sys.vm.trace_origin.length-1] += 1
+		end
+
+		vm.pstats.matrix[get_impl(vm).compute_index_y(self)][index_x] += 1
+
+		# Increment the total for implementation of the previous line
+		incr_total
 	end
 
 	# Print the pattern (RST/GP or target class for subtype test)
@@ -1262,11 +1251,18 @@ redef class MOCallSite
 	do
 		var res = " {pattern.rsc}#{pattern.gp} args {given_args}"
 
-		if compute_concretes(null) != null then
-			res += " returned concretes = {compute_concretes(null).as(not null)}"
-		end
-
 		return super + res
+	end
+end
+
+redef class MOFunctionSite
+	redef fun trace
+	do
+		if compute_concretes(null) != null then
+			return super + " returned concretes = {compute_concretes(null).as(not null)}"
+		else
+			return super
+		end
 	end
 end
 
