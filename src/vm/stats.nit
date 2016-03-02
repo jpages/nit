@@ -1574,10 +1574,10 @@ redef class MPropDef
 		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length}"
 
 		if return_expr != null then
-			res += " return_preexist {return_expr.return_preexist}"
-
 			if not return_expr_is_object then return res
 			if not self isa MMethodDef then return res
+
+			res += " return_preexist {return_expr.return_preexist}"
 
 			var return_concretes = compute_concretes(sys.vm)
 			if return_concretes != null then res += " return_concretes {return_concretes}"

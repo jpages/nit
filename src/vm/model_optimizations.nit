@@ -463,9 +463,9 @@ redef class MPropDef
 	fun return_expr_is_object: Bool
 	do
 		if mproperty.intro isa MMethodDef and mproperty.intro.as(MMethodDef).msignature.return_mtype != null then
-			return mproperty.intro.as(MMethodDef).msignature.return_mtype.is_primitive_type
+			return not mproperty.intro.as(MMethodDef).msignature.return_mtype.is_primitive_type
 		else
-			return false
+			return true
 		end
 	end
 
