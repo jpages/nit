@@ -826,6 +826,9 @@ abstract class MOSite
 	# True if the site has been executed
 	var is_executed: Bool = false
 
+	# Indicate if this site has a primitive receiver
+	var is_primitive: Bool = false
+
 	fun set_executed
 	do
 		is_executed = true
@@ -915,6 +918,7 @@ abstract class MOSite
 		if ast.mtype != null and ast.mtype.is_primitive_type then
 			if not lp.primitive_sites.has(self) then lp.primitive_sites.add(self)
 			sys.vm.primitive_entities.add(self)
+			is_primitive = true
 		else
 			if not lp.mosites.has(self) then lp.mosites.add(self)
 			if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.add(self)
@@ -1055,6 +1059,7 @@ class MOCallSite
 
 		if node.mtype != null and node.mtype.is_primitive_type then
 			sys.vm.primitive_entities.add(self)
+			is_primitive = true
 		else
 			sys.vm.all_moentities.add(self)
 		end

@@ -1000,7 +1000,7 @@ redef class MOStats
 		end
 
 		for site in sys.vm.pstats.analysed_sites do
-			var index_x: Int
+			var index_x: Int = -1
 
 			if site isa MOCallSite then
 				index_x = 0
@@ -1008,7 +1008,7 @@ redef class MOStats
 			else if site isa MOAttrSite then
 				index_x = 1
 				total_attributes += site.executions
-			else
+			else if site isa MOSubtypeSite then
 				# Casts
 				index_x = 2
 				total_casts += site.executions
@@ -1044,7 +1044,7 @@ redef class MOStats
 			else if site isa MOAttrSite then
 				total_attributes += site.executions
 				attribute_executions += site.executions
-			else
+			else if site isa MOSubtypeSite then
 				# Casts
 				total_casts += site.executions
 				cast_executions += site.executions

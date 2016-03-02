@@ -1343,6 +1343,8 @@ redef class StaticImplMethod
 
 	redef fun exec_method(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_method_executions += 1
 		else
@@ -1361,6 +1363,8 @@ redef class StaticImplSubtype
 
 	redef fun exec_subtype(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_cast_executions += 1
 		else
@@ -1380,6 +1384,8 @@ redef class SSTImpl
 
 	redef fun exec_attribute_read(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_attribute_executions += 1
 		else
@@ -1395,6 +1401,8 @@ redef class SSTImpl
 
 	redef fun exec_attribute_write(recv, instance)
 	do
+		if mo_entity.as(MOSite).is_primitive then super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_attribute_executions += 1
 		else
@@ -1410,6 +1418,8 @@ redef class SSTImpl
 
 	redef fun exec_method(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_method_executions += 1
 		else
@@ -1428,6 +1438,8 @@ redef class SSTImplSubtype
 
 	redef fun exec_subtype(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		sys.vm.pstats.cast_sst += 1
 
 		mo_entity.as(MOSite).executions += 1
@@ -1443,6 +1455,8 @@ redef class PHImpl
 
 	redef fun exec_attribute_read(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_attribute_executions += 1
 		else
@@ -1458,6 +1472,8 @@ redef class PHImpl
 
 	redef fun exec_attribute_write(recv, value)
 	do
+		if mo_entity.as(MOSite).is_primitive then super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_attribute_executions += 1
 		else
@@ -1473,6 +1489,8 @@ redef class PHImpl
 
 	redef fun exec_method(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		if mo_entity.as(MOSite).is_monomorph then
 			sys.vm.pstats.monomorph_method_executions += 1
 		else
@@ -1488,6 +1506,8 @@ redef class PHImpl
 
 	redef fun exec_subtype(recv)
 	do
+		if mo_entity.as(MOSite).is_primitive then return super
+
 		sys.vm.pstats.cast_ph += 1
 
 		mo_entity.as(MOSite).executions += 1
