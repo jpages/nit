@@ -210,6 +210,16 @@ redef class VirtualMachine
 
 		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do propagate_loading(parent)
 
+		# for pattern in mclass.sites_patterns do
+		# 	pattern.reinit_impl
+		# 	pattern.get_impl(vm)
+
+		# 	for site in pattern.sites do
+		# 		site.reinit_impl
+		# 		site.get_impl(vm)
+		# 	end
+		# end
+
 		# Recompute the implementation of sites with `mclass` as a concrete
 		for site in mclass.concrete_sites do
 			site.reinit_impl
@@ -985,6 +995,11 @@ redef class MOCallSitePattern
 
 	redef fun compute_impl
 	do
+		if can_be_static then
+			set_static_impl(true)
+			return
+		end
+
 		if rsc.abstract_loaded then
 			if can_be_static then
 				set_static_impl(true)
@@ -1271,13 +1286,16 @@ redef abstract class MOSite
 		impl.mo_entity = self
 
 		if can_be_static and not impl isa StaticImpl then
+			assert self isa MOCallSite
 			if concretes_receivers != null then
 				print "{concretes_receivers.as(not null)}"
-				assert self isa MOCallSite
 				print "{concrete_callees} {concrete_callees.first.is_compiled}"
 			end
 
-			
+			print "site {self} {pattern.rsc}{pattern.as(MOCallSitePattern).gp}"
+			print "pattern.can_be_static {pattern.as(MOCallSitePattern).can_be_static} {pattern.get_impl(vm)}"
+			print "self.can_be_static {self.can_be_static}"
+			abort
 		end
 
 		return impl.as(not null)
