@@ -368,6 +368,12 @@ class MOCallSitePattern
 	do
 		return new MethodPICPattern(rsc, pic)
 	end
+
+	# Decrement the number of uncompiled callees
+	fun decrement_cuc
+	do
+		cuc -= 1
+	end
 end
 
 # Common pattern of all attribute reads and writes
@@ -441,16 +447,16 @@ redef class MPropDef
 
 		sys.vm.compiled_mproperties.add(self)
 
-		for pattern in callers do
-			if pattern isa MOCallSitePattern then pattern.cuc -= 1
-		end
-
 		for site in mosites do
 			# Determine if the site is monomorphic
 			site.monomorphic_analysis
 
 			# Initialize concrete receivers of sites
 			if not site.is_monomorph then site.compute_concretes_site
+		end
+
+		for pattern in callers do
+			if pattern isa MOCallSitePattern then pattern.decrement_cuc
 		end
 
 		is_compiled = true
@@ -898,6 +904,9 @@ abstract class MOSite
 		var res = expr_recv.compute_concretes(null)
 		if res != null then
 			concretes_receivers = res
+
+			# The classes of the concrete need to know they are used as concrete types
+			notify_classes
 		end
 	end
 
@@ -907,6 +916,14 @@ abstract class MOSite
 		if not is_monomorph then compute_concretes_site
 
 		return concretes_receivers
+	end
+
+	# Indicate to the class inside the concrete types that `self` used them as concretes
+	fun notify_classes
+	do
+		for mclass in concretes_receivers do
+			if not mclass.concrete_sites.has(self) then mclass.concrete_sites.add(self)
+		end
 	end
 
 	init(mpropdef: MPropDef, node: AExpr)
@@ -1082,13 +1099,6 @@ class MOCallSite
 	do
 		var callees = new List[MMethodDef]
 
-		# Force the recomputation of concretes_receivers
-		if not is_monomorph then
-			# TODO : to remove
-			concretes_receivers = null
-			compute_concretes_site
-		end
-
 		for rcv in concretes_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue
 
@@ -1247,8 +1257,8 @@ redef class MClass
 	# The only asnotnull pattern
 	var asnotnull_pattern: nullable MOAsNotNullPattern
 
-	# Contrary relation of concretes_receivers
-	var concrete_caller_sites: nullable List[MOSite]
+	# Contrary relation of concretes_receivers, the sites in which self appears as a concrete
+	var concrete_sites = new List[MOSite]
 
 	# The list of all self_expressions on which self
 	var self_sites = new List[MOSelf]
@@ -1320,7 +1330,7 @@ redef class MClass
 		pattern.add_site(site)
 	end
 
-	# Add newsite expression in the NewPattern assocociated to this class
+	# Add newsite expression in the NewPattern associated to this class
 	fun set_new_pattern(newsite: MONew)
 	do
 		new_pattern.newexprs.add(newsite)

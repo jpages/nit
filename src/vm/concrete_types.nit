@@ -265,8 +265,8 @@ class ConcreteTypes
 	var immutable: Bool = false is writable
 
 	# Redef to not duplicate concrete types
-	redef fun add(o)
+	redef fun add(mclass)
 	do
-		if not has(o) then super
+		if not has(mclass) then super
 	end
 end
