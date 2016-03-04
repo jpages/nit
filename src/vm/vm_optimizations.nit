@@ -71,48 +71,52 @@ redef class VirtualMachine
 		# Test with new mechanisms
 		if callsite.mocallsite != null then
 			var impl = callsite.mocallsite.get_impl(sys.vm)
-			if impl.exec_method(recv) != propdef then
-				print "ERROR dispatch found {impl} {impl.exec_method(recv)} required {propdef}"
-				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-				print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
-				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
-				abort
-			end
 
 			# Reset the implementation
 			callsite.mocallsite.impl = null
 			var impl2 = callsite.mocallsite.get_impl(sys.vm)
 
+			if impl.exec_method(recv) != propdef then
+				print "\n\nERROR dispatch found {impl} {impl.exec_method(recv)} impl2 {impl2} required {propdef}"
+				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
+				print "preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
+				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
+
+				callsite.mocallsite.ast.dump_tree
+
+				# abort
+			end
+
 			if impl isa StaticImplMethod then
 				if not impl2 isa StaticImplMethod then
 					print "impl {impl} impl2 {impl2} {callsite.mocallsite.can_be_static}"
-					print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-					if callsite.mocallsite.concretes_receivers != null then
-						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)}"
-						print "Concrete callees {callsite.mocallsite.concrete_callees}"
-						print "Concrete callees {callsite.mocallsite.concrete_callees.first.is_compiled}"
-						print "pattern.cuc {callsite.mocallsite.pattern.cuc} {callsite.mocallsite.pattern.can_be_static}"
-					end
-					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}\n\n"
+					# print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
+					# if callsite.mocallsite.concretes_receivers != null then
+					# 	print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)}"
+					# 	print "Concrete callees {callsite.mocallsite.concrete_callees}"
+					# 	print "Concrete callees {callsite.mocallsite.concrete_callees.first.is_compiled}"
+					# 	print "pattern.cuc {callsite.mocallsite.pattern.cuc} {callsite.mocallsite.pattern.can_be_static}"
+					# end
+					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}\n\n"
 				end
 			else if impl isa SSTImpl then
 				if not impl2 isa SSTImpl then
-					print "impl {impl} impl2 {impl2}"
-					print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
-					print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees} cuc {callsite.mocallsite.pattern.cuc}"
+					print "\n\nimpl {impl} impl2 {impl2}"
+					# print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
+					# print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees} cuc {callsite.mocallsite.pattern.cuc}"
 					if callsite.mocallsite.concretes_receivers != null then
-						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)}"
-						print "Concrete callees {callsite.mocallsite.concrete_callees}"
+						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} monomorph {callsite.mocallsite.is_monomorph}"
+						print "Concrete callees {callsite.mocallsite.concrete_callees} loaded ? {callsite.mocallsite.concretes_receivers.first.loaded}"
 					end
-					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
+					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
 				end
 			else if impl isa PHImpl then
 				if not impl2 isa PHImpl then
 					print "impl {impl} impl2 {impl2}"
-					print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
-					print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-					print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
-					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
+					# print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
+					# print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
+					# print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
+					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
 				end
 			end
 
@@ -1266,9 +1270,10 @@ redef abstract class MOSite
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 		else
+			monomorphic_analysis
 			compute_concretes_site
 
-			if concretes_receivers == null then
+			if concretes_receivers == null and not is_monomorph then
 				# Recopy the implementation of the pattern
 				var pattern_impl = pattern.get_impl(vm)
 				if pattern_impl isa StaticImpl then
@@ -1284,19 +1289,6 @@ redef abstract class MOSite
 		end
 
 		impl.mo_entity = self
-
-		if can_be_static and not impl isa StaticImpl then
-			assert self isa MOCallSite
-			if concretes_receivers != null then
-				print "{concretes_receivers.as(not null)}"
-				print "{concrete_callees} {concrete_callees.first.is_compiled}"
-			end
-
-			print "site {self} {pattern.rsc}{pattern.as(MOCallSitePattern).gp}"
-			print "pattern.can_be_static {pattern.as(MOCallSitePattern).can_be_static} {pattern.get_impl(vm)}"
-			print "self.can_be_static {self.can_be_static}"
-			abort
-		end
 
 		return impl.as(not null)
 	end
@@ -1535,7 +1527,7 @@ redef class MOCallSite
 
 		if not pattern.rsc.abstract_loaded then return false
 
-		# if is_monomorph then return true
+		if is_monomorph then return true
 
 		if concretes_receivers == null then
 			return false

@@ -846,6 +846,15 @@ abstract class MOSite
 	# Set the flag `is_monomorph` if needed
 	fun monomorphic_analysis
 	do
+		# Special cases of constructors
+		if self isa MOInitSite then
+			var concrete = new ConcreteTypes
+			concrete.immutable = true
+			concrete.add(pattern.rsc)
+
+			concretes_receivers = concrete
+		end
+
 		# If the static type is final, then it is monomorph
 		if pattern.rsc.is_final and pattern.rsc.loaded then
 			is_monomorph = true
@@ -855,6 +864,8 @@ abstract class MOSite
 
 			concretes_receivers = concrete
 		end
+
+		if not isset _expr_recv then return
 
 		# If the site is coming from a new of a loaded class
 		if expr_recv isa MONew and expr_recv.as(MONew).pattern.cls.loaded then
@@ -888,6 +899,7 @@ abstract class MOSite
 			lp.mosites.remove(self)
 
 			lp.monomorph_sites.add(self)
+			notify_classes
 		end
 	end
 
@@ -1098,6 +1110,9 @@ class MOCallSite
 	fun concrete_callees: List[MMethodDef]
 	do
 		var callees = new List[MMethodDef]
+
+		monomorphic_analysis
+		compute_concretes_site
 
 		for rcv in concretes_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue
