@@ -944,7 +944,26 @@ abstract class MOSite
 		ast = node
 		lp = mpropdef
 
-		if ast.mtype != null and ast.mtype.is_primitive_type then
+		# The receiver type
+		var rcv_ast: nullable AExpr = null
+
+		if ast isa ASendExpr then
+			rcv_ast = ast.as(ASendExpr).n_expr
+		else if ast isa AAttrFormExpr then
+			rcv_ast = ast.as(AAttrFormExpr).n_expr
+		else if ast isa AAsCastForm then
+			rcv_ast = ast.as(AAsCastForm).n_expr
+		else if ast isa AIsaExpr then
+			rcv_ast = ast.as(AIsaExpr).n_expr
+		else if ast isa ANewExpr then
+			rcv_ast = ast
+		else if ast isa ASuperExpr then
+			rcv_ast = ast
+		else
+			print node
+		end
+
+		if rcv_ast.mtype != null and rcv_ast.mtype.is_primitive_type then
 			if not lp.primitive_sites.has(self) then lp.primitive_sites.add(self)
 			sys.vm.primitive_entities.add(self)
 			is_primitive = true
@@ -952,7 +971,6 @@ abstract class MOSite
 			if not lp.mosites.has(self) then lp.mosites.add(self)
 			if not sys.vm.all_moentities.has(self) then sys.vm.all_moentities.add(self)
 		end
-
 	end
 end
 
@@ -1086,7 +1104,9 @@ class MOCallSite
 		callsite = cs
 		callsite.mocallsite = self
 
-		if node.mtype != null and node.mtype.is_primitive_type then
+		if node isa ANewExpr then
+			sys.vm.all_moentities.add(self)
+		else if node.as(ASendExpr).n_expr.mtype != null and node.as(ASendExpr).n_expr.mtype.is_primitive_type then
 			sys.vm.primitive_entities.add(self)
 			is_primitive = true
 		else
@@ -1401,6 +1421,7 @@ redef class MType
 		if name == "Numeric" or name == "nullable Numeric" then return true
 		if name == "Bool" or name == "nullable Bool" then return true
 		if name == "Int" or name == "nullable Int" then return true
+		if name == "Char" or name == "nullable Char" then return true
 
 		return false
 	end

@@ -555,6 +555,15 @@ class MOStats
 			end
 		end
 
+		var primitives_file = new FileWriter.open("{dir}/trace_primitive_sites.txt")
+
+		# Trace primitive sites
+		for mosite in sys.vm.primitive_entities do
+			if mosite isa MOSite then primitives_file.write("{mosite.trace} {mosite}\n")
+		end
+
+		primitives_file.close
+
 		if sys.debug_mode then
 			for ast_site in sys.all_ast_sites do
 				if ast_site.mo_entity != null then
