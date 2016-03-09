@@ -1267,12 +1267,12 @@ redef abstract class MOSite
 	# Return the Implementation of the Site
 	fun compute_impl: Implementation
 	do
+		monomorphic_analysis
+		compute_concretes_site
+
 		if not get_pic(vm).abstract_loaded then
 			set_null_impl
 		else
-			monomorphic_analysis
-			compute_concretes_site
-
 			if concretes_receivers == null and not is_monomorph then
 				# Recopy the implementation of the pattern
 				var pattern_impl = pattern.get_impl(vm)
@@ -1378,7 +1378,7 @@ redef abstract class MOSite
 	end
 
 	# Return the pic
-	# In case of the subtype test, the pic is the target classfu
+	# In case of the subtype test, the pic is the target class
 	fun get_pic(vm: VirtualMachine): MClass is abstract
 
 	# Return the offset of the "targeted property"
@@ -1440,6 +1440,9 @@ redef class MOSubtypeSite
 	# Return the Implementation of the Site
 	redef fun compute_impl: Implementation
 	do
+		monomorphic_analysis
+		compute_concretes_site
+
 		impl = pattern.get_impl(vm)
 		impl.mo_entity = self
 

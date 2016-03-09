@@ -265,8 +265,10 @@ redef class MOVar
 end
 
 redef class MOSSAVar
+	var counter = 0
 	redef fun compute_preexist
 	do
+		counter += 1
 		return dependency.expr_preexist
 	end
 
@@ -281,11 +283,9 @@ redef class MOPhiVar
 	redef fun compute_preexist
 	do
 		counter += 1
-
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then
-
 				if counter == 30 then
 					counter = 0
 					return preval
@@ -318,9 +318,59 @@ redef class MOSite
 end
 
 redef class MOCallSite
+	redef fun preexistence_origin: Int
+	do
+		return super.bin_or(4)
+	end
+
+	var nb_callees = 0
+
+	# Trace the origin of preexistence of a site
+	# 1: positive cuc
+	# 2: at least one preexisting callee
+	# 4: at least one non-preexisting callee
+	# 8: the callee is a procedure
+	# 16: the expression is preexisting
+	# 32: concretes types
+	# 64: generic/formal receiver
+	fun trace_origin: Int
+	do
+		var res = 0
+		if pattern.cuc > 0 then res = res.bin_or(1)
+
+		# Search for a preexisting (or not) return of a callee
+		for callee in pattern.callees do
+			if callee.return_expr == null then
+				res = res.bin_or(8)
+			else
+				if callee.return_expr.is_pre then
+					res = res.bin_or(2)
+				else
+					res = res.bin_or(4)
+				end
+			end
+		end
+
+		if is_pre then res = res.bin_or(16)
+
+		if concretes_receivers != null then res = res.bin_or(32)
+
+		if ast.get_receiver.mtype isa MFormalType then res = res.bin_or(64)
+
+		return res
+	end
+end
+
+redef class MOProcedureSite
+	redef fun compute_preexist
+	do
+		return expr_recv.expr_preexist
+	end
+end
+
+redef class MOFunctionSite
 	var counter = 0
 
-	# TODO: implement the mutability of preexistence
 	redef fun compute_preexist
 	do
 		# If the preexistence extension is deactivated, the callsite is not preexistant
@@ -328,12 +378,12 @@ redef class MOCallSite
 			return 8
 		end
 
-		if counter == 30 then
-			print "Counter = 30 {self}"
+		counter += 1
+
+		if counter == 50 then
+			counter = 0
 			return 8
 		end
-
-		counter += 1
 
 		var callees: nullable List[MPropDef]
 		var gp = pattern.gp
@@ -422,71 +472,6 @@ redef class MOCallSite
 				return pval.setbit(0, 0)
 			end
 		end
-	end
-
-	redef fun preexistence_origin: Int
-	do
-		return super.bin_or(4)
-	end
-
-	redef fun preexistence_origin_recursive: Int
-	do
-		var callees: nullable List[MPropDef]
-		var gp = pattern.gp
-
-		if get_concretes != null then
-			callees = new List[MPropDef]
-			for rcv in concretes_receivers.as(not null) do
-				callees.add_all(pattern.callees)
-			end
-		else
-			callees = pattern.callees
-			if callees.length == 0 then return 32
-		end
-
-		var res = 0
-		for lp in callees do
-			res = res.bin_or(lp.return_expr.preexistence_origin_recursive)
-		end
-
-		return res
-	end
-
-	var nb_callees = 0
-
-	# Trace the origin of preexistence of a site
-	# 1: positive cuc
-	# 2: at least one preexisting callee
-	# 4: at least one non-preexisting callee
-	# 8: the callee is a procedure
-	# 16: the expression is preexisting
-	# 32: concretes types
-	# 64: generic/formal receiver
-	fun trace_origin: Int
-	do
-		var res = 0
-		if pattern.cuc > 0 then res = res.bin_or(1)
-
-		# Search for a preexisting (or not) return of a callee
-		for callee in pattern.callees do
-			if callee.return_expr == null then
-				res = res.bin_or(8)
-			else
-				if callee.return_expr.is_pre then
-					res = res.bin_or(2)
-				else
-					res = res.bin_or(4)
-				end
-			end
-		end
-
-		if is_pre then res = res.bin_or(16)
-
-		if concretes_receivers != null then res = res.bin_or(32)
-
-		if ast.get_receiver.mtype isa MFormalType then res = res.bin_or(64)
-
-		return res
 	end
 end
 

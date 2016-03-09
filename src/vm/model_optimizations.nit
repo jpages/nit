@@ -898,7 +898,10 @@ abstract class MOSite
 		if is_monomorph then
 			lp.mosites.remove(self)
 
-			lp.monomorph_sites.add(self)
+			if not is_primitive then
+				lp.monomorph_sites.add(self)
+			end
+
 			notify_classes
 		end
 	end
@@ -1131,7 +1134,6 @@ class MOCallSite
 	do
 		var callees = new List[MMethodDef]
 
-		monomorphic_analysis
 		compute_concretes_site
 
 		for rcv in concretes_receivers.as(not null) do
