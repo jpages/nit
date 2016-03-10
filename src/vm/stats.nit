@@ -228,16 +228,16 @@ end
 # Stats of the optimizing model
 class MOStats
 	# List of analysed sites
-	var analysed_sites = new List[MOSite]
+	var analysed_sites = new HashSet[MOSite]
 
 	# All the sites which are monomorphics
-	var analysed_monomorph_sites = new List[MOSite]
+	var analysed_monomorph_sites = new HashSet[MOSite]
 
 	# List of compiled methods
 	var compiled_methods = new List[MPropDef]
 
 	# List of new site compiled
-	var compiled_new = new List[MONew]
+	var compiled_new = new HashSet[MONew]
 
 	# The number of new sites in AST
 	var new_sites: Int = 0

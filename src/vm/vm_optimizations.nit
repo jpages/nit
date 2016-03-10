@@ -102,13 +102,13 @@ redef class VirtualMachine
 			else if impl isa SSTImpl then
 				if not impl2 isa SSTImpl then
 					print "\n\nimpl {impl} impl2 {impl2}"
-					# print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
-					# print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees} cuc {callsite.mocallsite.pattern.cuc}"
+					print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees} cuc {callsite.mocallsite.pattern.cuc}"
 					if callsite.mocallsite.concretes_receivers != null then
 						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} monomorph {callsite.mocallsite.is_monomorph}"
 						print "Concrete callees {callsite.mocallsite.concrete_callees} loaded ? {callsite.mocallsite.concretes_receivers.first.loaded}"
+						print "pattern.rsc.abstract_loaded = {callsite.mocallsite.pattern.rsc.abstract_loaded}"
 					end
-					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
+					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
 				end
 			else if impl isa PHImpl then
 				if not impl2 isa PHImpl then
@@ -158,8 +158,6 @@ redef class VirtualMachine
 		if mclass.abstract_loaded then return
 
 		super(mclass)
-
-		mclass.update_self_sites
 
 		# Update Patterns and sites
 

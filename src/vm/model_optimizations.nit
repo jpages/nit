@@ -476,16 +476,16 @@ redef class MPropDef
 	end
 
 	# List of instantiations sites in this local property
-	var monews = new List[MONew]
+	var monews = new HashSet[MONew]
 
 	# List of object sites in this local property
-	var mosites = new List[MOSite]
+	var mosites = new HashSet[MOSite]
 
 	# Sites with a primitive receiver
-	var primitive_sites = new List[MOSite]
+	var primitive_sites = new HashSet[MOSite]
 
-	# The sites which are either with a primitive receiver or monomorphics
-	var monomorph_sites = new List[MOSite]
+	# The sites which are monomorphics
+	var monomorph_sites = new HashSet[MOSite]
 
 	# All MOVar inside the mpropdef, including self and returnvar
 	var variables: Array[MOVar] = new Array[MOVar]
