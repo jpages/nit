@@ -20,6 +20,9 @@ redef class ToolContext
 	# Disable inter-procedural analysis
 	var disable_method_return = new OptionBool("Disable preexistence extensions on method call", "--disable-meth-return")
 
+	# If true, consider the preexistence of sites in the protocol
+	var preexistence_protocol = new OptionBool("Consider sites' preexistence in the protocol", "--preexistence-protocol")
+
 	redef init
 	do
 		super
@@ -435,6 +438,9 @@ redef class MPropDef
 
 	var is_compiled: Bool = false
 
+	# Classes to load at the end of compilation (relative to --improve-loading)
+	var to_load = new HashSet[MClass]
+
 	# Compile the property
 	fun compile_mo
 	do
@@ -446,6 +452,10 @@ redef class MPropDef
 		end
 
 		sys.vm.compiled_mproperties.add(self)
+
+		for mclass in to_load do
+			sys.vm.load_class(mclass)
+		end
 
 		for site in mosites do
 			# Determine if the site is monomorphic
@@ -856,7 +866,7 @@ abstract class MOSite
 		end
 
 		# If the static type is final, then it is monomorph
-		if pattern.rsc.is_final and pattern.rsc.loaded then
+		if pattern.rsc.is_final then
 			is_monomorph = true
 			var concrete = new ConcreteTypes
 			concrete.immutable = true
@@ -865,10 +875,8 @@ abstract class MOSite
 			concretes_receivers = concrete
 		end
 
-		if not isset _expr_recv then return
-
 		# If the site is coming from a new of a loaded class
-		if expr_recv isa MONew and expr_recv.as(MONew).pattern.cls.loaded then
+		if expr_recv isa MONew then
 			if expr_recv.as(MONew).pattern.cls.is_abstract then return
 
 			is_monomorph = true
@@ -883,7 +891,7 @@ abstract class MOSite
 		if expr_recv isa MOSSAVar and expr_recv.as(MOSSAVar).dependency isa MONew then
 			var new_class = expr_recv.as(MOSSAVar).dependency.as(MONew).pattern.cls
 			# The corresponding class must be loaded
-			if not new_class.loaded then return
+			# if not new_class.loaded then return
 			if new_class.is_abstract then return
 
 			is_monomorph = true
@@ -910,9 +918,6 @@ abstract class MOSite
 	do
 		# Do not compute concrete_type in original preexistence
 		if sys.disable_preexistence_extensions then	return
-
-		# TODO: fix this bug related to --improve-loading and remove the following line
-		if not isset _expr_recv then return
 
 		if concretes_receivers != null then return
 
@@ -1134,8 +1139,6 @@ class MOCallSite
 	do
 		var callees = new List[MMethodDef]
 
-		compute_concretes_site
-
 		for rcv in concretes_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue
 
@@ -1187,10 +1190,12 @@ class MOFunctionSite
 
 		# The concrete types of this callsite is the union of concrete types of all callees
 		var concrete_types = new ConcreteTypes
+		concrete_types.immutable = false
 
 		for callee in callees do
 			var return_concretes = callee.compute_concretes(sys.vm)
 
+			if return_concretes != null then print "return_concretes of {callee} = {return_concretes.as(not null)} {return_concretes.immutable}"
 			# The return must have immutable concrete types to be considered
 			if return_concretes != null and return_concretes.immutable then
 				concrete_types.add_all(return_concretes)
@@ -1667,7 +1672,8 @@ redef class ANewExpr
 			# If the new is unconditionnal (i.e. at the toplevel of the enclosing method),
 			# load its corresponding class if needed
 			if self.block.is_unconditionnal then
-				vm.load_class(recvtype.as(not null).mclass)
+				# vm.load_class(recvtype.as(not null).mclass)
+				mpropdef.to_load.add(recvtype.as(not null).mclass)
 			end
 		end
 

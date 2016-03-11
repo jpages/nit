@@ -82,9 +82,12 @@ redef class VirtualMachine
 				print "preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
 
-				callsite.mocallsite.ast.dump_tree
+				callsite.mocallsite.compute_concretes_site
 
-				# abort
+				print "Concretes {callsite.mocallsite.concretes_receivers.to_s}"
+				callsite.mocallsite.ast.dump_tree
+				print stack_trace
+				abort
 			end
 
 			if impl isa StaticImplMethod then
@@ -107,6 +110,7 @@ redef class VirtualMachine
 						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} monomorph {callsite.mocallsite.is_monomorph}"
 						print "Concrete callees {callsite.mocallsite.concrete_callees} loaded ? {callsite.mocallsite.concretes_receivers.first.loaded}"
 						print "pattern.rsc.abstract_loaded = {callsite.mocallsite.pattern.rsc.abstract_loaded}"
+						print "can_be_static {callsite.mocallsite.can_be_static}"
 					end
 					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
 				end
@@ -160,6 +164,10 @@ redef class VirtualMachine
 		super(mclass)
 
 		# Update Patterns and sites
+		for site in mclass.concrete_sites do
+			site.reinit_impl
+			site.get_impl(self)
+		end
 
 		# Some method patterns can be static and become in SST
 		for pattern in mclass.sites_patterns do
@@ -172,7 +180,6 @@ redef class VirtualMachine
 			pattern.reinit_impl
 			pattern.compute_impl
 
-			# Update if any mosites of this pattern with a NullImpl
 			for mosite in pattern.sites do
 				mosite.reinit_impl
 				mosite.get_impl(vm)
@@ -210,7 +217,11 @@ redef class VirtualMachine
 
 		super(mclass)
 
-		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do propagate_loading(parent)
+		# Recompute the implementation of sites with `mclass` as a concrete
+		for site in mclass.concrete_sites do
+			site.reinit_impl
+			site.get_impl(self)
+		end
 
 		# for pattern in mclass.sites_patterns do
 		# 	pattern.reinit_impl
@@ -221,19 +232,6 @@ redef class VirtualMachine
 		# 		site.get_impl(vm)
 		# 	end
 		# end
-
-		# Recompute the implementation of sites with `mclass` as a concrete
-		for site in mclass.concrete_sites do
-			site.reinit_impl
-			site.get_impl(self)
-		end
-	end
-
-	fun propagate_loading(mclass: MClass)
-	do
-		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do propagate_loading(parent)
-
-		mclass.update_self_sites
 	end
 end
 
@@ -1256,15 +1254,19 @@ redef abstract class MOSite
 	# Get the implementation of the site, according to preexist value
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
-		if impl != null then return impl.as(not null)
-
-		return compute_impl
+		if impl != null then
+			return impl.as(not null)
+		else
+			return compute_impl
+		end
 	end
 
 	# Compute an Implementation for self site and assign `impl`
 	# Return the Implementation of the Site
 	fun compute_impl: Implementation
 	do
+		# Force the recomputation
+		concretes_receivers = null
 		monomorphic_analysis
 		compute_concretes_site
 
@@ -1287,7 +1289,6 @@ redef abstract class MOSite
 		end
 
 		impl.mo_entity = self
-
 		return impl.as(not null)
 	end
 
