@@ -197,16 +197,12 @@ redef class VirtualMachine
 		# If `mclass` was a target of a subtyping test, go in these patterns and
 		# recompute them because they were static
 		for pattern in mclass.subtype_target_patterns do
-			if pattern.get_impl(vm) isa StaticImpl then
-				pattern.reinit_impl
-				pattern.compute_impl
-			end
+			pattern.reinit_impl
+			pattern.compute_impl
 
 			for mosite in pattern.sites do
-				if mosite.get_impl(vm) isa StaticImpl then
-					mosite.reinit_impl
-					mosite.get_impl(vm)
-				end
+				mosite.reinit_impl
+				mosite.get_impl(vm)
 			end
 		end
 	end
@@ -217,19 +213,43 @@ redef class VirtualMachine
 
 		super(mclass)
 
-		# Recompute the implementation of sites with `mclass` as a concrete
-		for site in mclass.concrete_sites do
-			site.reinit_impl
-			site.get_impl(self)
-		end
+		# for site in all_moentities do
+		# 	if not site isa MOSite then continue
+		# 	site.reinit_impl
+		# 	site.get_impl(self)
+		# end
+
+		# # Recompute the implementation of sites with `mclass` as a concrete
+		# for site in mclass.concrete_sites do
+		# 	site.reinit_impl
+		# 	site.get_impl(self)
+		# end
 
 		# for pattern in mclass.sites_patterns do
 		# 	pattern.reinit_impl
-		# 	pattern.get_impl(vm)
+		# 	pattern.get_impl(self)
 
 		# 	for site in pattern.sites do
 		# 		site.reinit_impl
-		# 		site.get_impl(vm)
+		# 		site.get_impl(self)
+		# 	end
+		# end
+
+		# for sup in mclass.in_hierarchy(mainmodule).greaters do
+		# 	for pattern in sup.sites_patterns do
+		# 		if pattern isa MOCallSitePattern then
+		# 			var lp_rsc = pattern.gp.lookup_first_definition(mainmodule, pattern.rsc.intro.bound_mtype)
+		# 			pattern.add_lp(lp_rsc)
+		# 		end
+
+		# 		pattern.reinit_impl
+		# 		pattern.get_impl(self)
+
+		# 		for site in pattern.sites do
+		# 			site.concretes_receivers = null
+		# 			site.reinit_impl
+		# 			site.get_impl(self)
+		# 		end
 		# 	end
 		# end
 	end
@@ -851,7 +871,7 @@ redef abstract class MOSitePattern
 	var impl: nullable Implementation is writable, noinit
 
 	# Assign `null` to `impl`
-	# NOTE: This method must be use to set to null an Implementation before recompute it
+	# NOTE: This method must be used to set to null an Implementation before recompute it
 	# This method can be redefined to count recompilations in the vm
 	fun reinit_impl
 	do
@@ -1266,7 +1286,6 @@ redef abstract class MOSite
 	fun compute_impl: Implementation
 	do
 		# Force the recomputation
-		concretes_receivers = null
 		monomorphic_analysis
 		compute_concretes_site
 

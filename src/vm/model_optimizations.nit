@@ -1184,8 +1184,12 @@ class MOFunctionSite
 				end
 			end
 		else
+			# TODO: bug in the propogation with this line
 			# If not, use pattern's callees
-			callees = pattern.callees
+			if pattern.cuc == 0 then
+				# print "Use pattern.callees {pattern.callees}"
+				# callees = pattern.callees
+			end
 		end
 
 		# The concrete types of this callsite is the union of concrete types of all callees
@@ -1195,7 +1199,6 @@ class MOFunctionSite
 		for callee in callees do
 			var return_concretes = callee.compute_concretes(sys.vm)
 
-			if return_concretes != null then print "return_concretes of {callee} = {return_concretes.as(not null)} {return_concretes.immutable}"
 			# The return must have immutable concrete types to be considered
 			if return_concretes != null and return_concretes.immutable then
 				concrete_types.add_all(return_concretes)
@@ -1205,6 +1208,7 @@ class MOFunctionSite
 		end
 
 		if not concrete_types.is_empty then
+			print "Concretes of {self} = {concrete_types}"
 			return concrete_types
 		else
 			return null
