@@ -74,6 +74,8 @@ redef class MOStats
 
 		table_recompilations(new FileWriter.open("{dir}/table_recompilations-{lbl}.tex"))
 
+		table_recompilations_methods(new FileWriter.open("{dir}/table_recompilations_methods-{lbl}.tex"))
+
 		table_executions(new FileWriter.open("{dir}/table_executions-{lbl}.tex"))
 
 		table_executions_warm(new FileWriter.open("{dir}/table_executions_warm-{lbl}.tex"))
@@ -969,6 +971,25 @@ redef class MOStats
 		var table = "PICPattern & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
 		table += "GPPattern & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]}\\\\\n"
 		table += "Site & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output the number of methods's recompilations
+	private fun	table_recompilations_methods(file: FileWriter)
+	do
+		file.write("%Table recompilations methods: number of times a whole method is recompiled\n")
+		file.write("%Recompilations & methods\n")
+
+		var recompilations = 0
+		for method in vm.pstats.compiled_methods do
+			recompilations += method.nb_recompilations
+		end
+
+		var table = "recompilations non-primitive methods & {recompilations} \\\\\n"
+		table += "Number of methods & {vm.pstats.compiled_methods.length} \\\\\n"
 
 		file.write(table)
 		file.write("\n\n")

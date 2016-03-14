@@ -159,8 +159,6 @@ redef class VirtualMachine
 	# TODO: put some parts of this in pattern classes
 	redef fun load_class_indirect(mclass)
 	do
-		# if mclass.abstract_loaded then return
-
 		super(mclass)
 
 		# Update Patterns and sites
@@ -184,16 +182,6 @@ redef class VirtualMachine
 				if mosite.get_impl(self).is_mutable then
 					mosite.reinit_impl
 					mosite.get_impl(vm)
-				end
-			end
-
-			if pattern.rsc == mclass then
-				# Reinit sites which had `mclass` as their rsc
-				for mosite in pattern.sites do
-					if mosite.get_impl(self).is_mutable then
-						mosite.reinit_impl
-						mosite.get_impl(vm)
-					end
 				end
 			end
 		end
