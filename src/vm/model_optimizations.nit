@@ -1192,7 +1192,7 @@ class MOFunctionSite
 				end
 			end
 		else
-			# TODO: bug in the propogation with this line
+			# TODO: bug in the propagation with this line
 			# If not, use pattern's callees
 			if pattern.cuc == 0 then
 				# print "Use pattern.callees {pattern.callees}"

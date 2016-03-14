@@ -74,10 +74,8 @@ redef class VirtualMachine
 
 			# Reset the implementation
 			callsite.mocallsite.impl = null
-			var impl2 = callsite.mocallsite.get_impl(sys.vm)
 
 			if impl.exec_method(recv) != propdef then
-				print "\n\nERROR dispatch found {impl} {impl.exec_method(recv)} impl2 {impl2} required {propdef}"
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
 				print "preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
@@ -88,40 +86,6 @@ redef class VirtualMachine
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
 				abort
-			end
-
-			if impl isa StaticImplMethod then
-				if not impl2 isa StaticImplMethod then
-					print "impl {impl} impl2 {impl2} {callsite.mocallsite.can_be_static}"
-					# print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-					# if callsite.mocallsite.concretes_receivers != null then
-					# 	print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)}"
-					# 	print "Concrete callees {callsite.mocallsite.concrete_callees}"
-					# 	print "Concrete callees {callsite.mocallsite.concrete_callees.first.is_compiled}"
-					# 	print "pattern.cuc {callsite.mocallsite.pattern.cuc} {callsite.mocallsite.pattern.can_be_static}"
-					# end
-					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}\n\n"
-				end
-			else if impl isa SSTImpl then
-				if not impl2 isa SSTImpl then
-					print "\n\nimpl {impl} impl2 {impl2}"
-					print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees} cuc {callsite.mocallsite.pattern.cuc}"
-					if callsite.mocallsite.concretes_receivers != null then
-						print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} monomorph {callsite.mocallsite.is_monomorph}"
-						print "Concrete callees {callsite.mocallsite.concrete_callees} loaded ? {callsite.mocallsite.concretes_receivers.first.loaded}"
-						print "pattern.rsc.abstract_loaded = {callsite.mocallsite.pattern.rsc.abstract_loaded}"
-						print "can_be_static {callsite.mocallsite.can_be_static}"
-					end
-					print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses}"
-				end
-			else if impl isa PHImpl then
-				if not impl2 isa PHImpl then
-					print "impl {impl} impl2 {impl2}"
-					# print "monomorph site = {callsite.mocallsite.is_monomorph}, self site {callsite.mocallsite.to_s}"
-					# print "Pattern {callsite.mocallsite.pattern.rsc}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-					# print "Concrete receivers {callsite.mocallsite.concretes_receivers.as(not null)} preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
-					# print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
-				end
 			end
 
 			return self.call(impl.exec_method(recv), args)
@@ -1265,7 +1229,16 @@ redef abstract class MOSite
 		if impl != null then
 			res = impl.as(not null)
 		else
-			res = compute_impl
+			if sys.preexistence_protocol then
+				if not expr_recv.is_pre then
+					# Use the conservative implementation
+					res = conservative_implementation
+				else
+					res = compute_impl
+				end
+			else
+				res = compute_impl
+			end
 		end
 
 		return res
@@ -1429,13 +1402,17 @@ redef abstract class MOSite
 	# The conservative implementation is the Implementation that will never require recompiling the site
 	fun conservative_implementation: Implementation
 	do
-		# SST for a property introduced in Object
-		if get_pic(vm).is_instance_of_object(vm) then
-			return new SSTImpl(self, false, get_block_position(vm, pattern.rsc) + get_offset(vm))
+		if not get_pic(vm).abstract_loaded then
+			set_null_impl
+		else if get_pic(vm).is_instance_of_object(vm) then
+			# SST for a property introduced in Object
+			set_sst_impl(vm, false)
 		else
 			# By default, perfect hashing
-			return new PHImpl(self, false, get_offset(vm), get_pic(vm).vtable.id)
+			set_ph_impl(vm, false)
 		end
+
+		return impl.as(not null)
 	end
 end
 
@@ -1473,12 +1450,12 @@ redef class MOSubtypeSite
 	redef fun conservative_implementation: Implementation
 	do
 		# Static for casts when the target type is final
-		if target_mclass.is_final then
-			return new StaticImplSubtype(self, false, true)
-		else
+		# if target_mclass.is_final then
+		# 	return new StaticImplSubtype(self, false, true)
+		# else
 			# Else we use the default computation of conservative implementation
 			return super
-		end
+		# end
 	end
 end
 
