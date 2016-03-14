@@ -1604,10 +1604,19 @@ redef class MPropDef
 		end
 	end
 
+	# The number of times the propdef is recompiled
+	var nb_recompilations = 0
+
+	redef fun recompile_sites
+	do
+		super
+		nb_recompilations += 1
+	end
+
 	fun trace: String
 	do
 		var res = "LP {self}, GP {mproperty.intro_mclassdef.mclass}#{mproperty}"
-		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length}"
+		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length} nb_recompilations {nb_recompilations}"
 
 		if return_expr != null then
 			if not return_expr_is_object then return res

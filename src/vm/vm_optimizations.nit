@@ -159,7 +159,7 @@ redef class VirtualMachine
 	# TODO: put some parts of this in pattern classes
 	redef fun load_class_indirect(mclass)
 	do
-		if mclass.abstract_loaded then return
+		# if mclass.abstract_loaded then return
 
 		super(mclass)
 
@@ -181,15 +181,19 @@ redef class VirtualMachine
 			pattern.compute_impl
 
 			for mosite in pattern.sites do
-				mosite.reinit_impl
-				mosite.get_impl(vm)
+				if mosite.get_impl(self).is_mutable then
+					mosite.reinit_impl
+					mosite.get_impl(vm)
+				end
 			end
 
 			if pattern.rsc == mclass then
 				# Reinit sites which had `mclass` as their rsc
 				for mosite in pattern.sites do
-					mosite.reinit_impl
-					mosite.get_impl(vm)
+					if mosite.get_impl(self).is_mutable then
+						mosite.reinit_impl
+						mosite.get_impl(vm)
+					end
 				end
 			end
 		end
@@ -212,46 +216,6 @@ redef class VirtualMachine
 		if mclass.loaded then return
 
 		super(mclass)
-
-		# for site in all_moentities do
-		# 	if not site isa MOSite then continue
-		# 	site.reinit_impl
-		# 	site.get_impl(self)
-		# end
-
-		# # Recompute the implementation of sites with `mclass` as a concrete
-		# for site in mclass.concrete_sites do
-		# 	site.reinit_impl
-		# 	site.get_impl(self)
-		# end
-
-		# for pattern in mclass.sites_patterns do
-		# 	pattern.reinit_impl
-		# 	pattern.get_impl(self)
-
-		# 	for site in pattern.sites do
-		# 		site.reinit_impl
-		# 		site.get_impl(self)
-		# 	end
-		# end
-
-		# for sup in mclass.in_hierarchy(mainmodule).greaters do
-		# 	for pattern in sup.sites_patterns do
-		# 		if pattern isa MOCallSitePattern then
-		# 			var lp_rsc = pattern.gp.lookup_first_definition(mainmodule, pattern.rsc.intro.bound_mtype)
-		# 			pattern.add_lp(lp_rsc)
-		# 		end
-
-		# 		pattern.reinit_impl
-		# 		pattern.get_impl(self)
-
-		# 		for site in pattern.sites do
-		# 			site.concretes_receivers = null
-		# 			site.reinit_impl
-		# 			site.get_impl(self)
-		# 		end
-		# 	end
-		# end
 	end
 end
 
@@ -694,11 +658,35 @@ redef class AAsCastExpr
 end
 
 redef class MPropDef
+	# If true, then this propdef need to be recompiled lazily
+	var recompilation = false
+
 	redef fun compile_mo
 	do
 		super
 
 		for site in self.mosites do site.get_impl(vm)
+	end
+
+	# Recompile the whole method
+	fun recompile_sites
+	do
+		for site in mosites do
+			site.impl = null
+			site.compute_impl
+		end
+
+		for site in monomorph_sites do
+			site.impl = null
+			site.compute_impl
+		end
+
+		for site in primitive_sites do
+			site.impl = null
+			site.compute_impl
+		end
+
+		recompilation = false
 	end
 end
 
@@ -1254,7 +1242,12 @@ redef abstract class MOSite
 	# This method can be redefined to count recompilations in the vm
 	fun reinit_impl
 	do
-		impl = null
+		if preexistence_protocol then
+			lp.recompilation = true
+		else
+			# Code-patching approach
+			impl = null
+		end
 	end
 
 	# Change the Implementation to ph_impl if the site has no concrete types
@@ -1274,11 +1267,20 @@ redef abstract class MOSite
 	# Get the implementation of the site, according to preexist value
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
-		if impl != null then
-			return impl.as(not null)
-		else
-			return compute_impl
+		var res: Implementation
+
+		if lp.recompilation then
+			# We need to recompile the whole method
+			lp.recompile_sites
 		end
+
+		if impl != null then
+			res = impl.as(not null)
+		else
+			res = compute_impl
+		end
+
+		return res
 	end
 
 	# Compute an Implementation for self site and assign `impl`

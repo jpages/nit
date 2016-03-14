@@ -31,6 +31,7 @@ redef class ToolContext
 		option_context.add_option(improve_loading)
 		option_context.add_option(disable_preexistence_extensions)
 		option_context.add_option(disable_method_return)
+		option_context.add_option(preexistence_protocol)
 	end
 end
 
@@ -56,6 +57,10 @@ redef class Sys
 	# If true, improve the loading of classes
 	var improve_loading: Bool = false
 
+	# Use poreexistence values in the protocol, and recompile the whole method instead,
+	# of doing code-patching
+	var preexistence_protocol: Bool = false
+
 	# Singleton of MONull
 	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
@@ -75,6 +80,7 @@ redef class ModelBuilder
 
 		sys.disable_preexistence_extensions = toolcontext.disable_preexistence_extensions.value
 		sys.disable_method_return = toolcontext.disable_method_return.value
+		sys.preexistence_protocol = toolcontext.preexistence_protocol.value
 
 		if toolcontext.debug.value then
 			# Create the output file for debug traces
@@ -456,6 +462,8 @@ redef class MPropDef
 		for mclass in to_load do
 			sys.vm.load_class(mclass)
 		end
+
+		if not to_load.is_empty then to_load.clear
 
 		for site in mosites do
 			# Determine if the site is monomorphic
