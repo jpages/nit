@@ -57,6 +57,10 @@ class GlobalAnalysis
 					# Add it to the collection
 					final_classes.add(classdef.mclass)
 
+					if classdef.mclass.name == "NativeArray" or classdef.mclass.name == "NativeString" then
+						classdef.mclass.is_final = true
+					end
+
 					# To be more realistic, just annotate is_final classes which are introduced in the AST ou parser
 					if classdef.mclass.intro_mmodule.name == "parser" or classdef.mclass.intro_mmodule.name == "parser_nodes" then
 						classdef.mclass.is_final = true

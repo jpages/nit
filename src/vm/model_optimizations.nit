@@ -1120,7 +1120,12 @@ class MOCallSite
 		callsite = cs
 		callsite.mocallsite = self
 
-		if node isa ANewExpr then
+		# Special case for is_same_instance method
+		# TODO: to remove after the end of experiments
+		if cs.mproperty.name == "is_same_instance" then
+			sys.vm.primitive_entities.add(self)
+			is_primitive = true
+		else if node isa ANewExpr then
 			sys.vm.all_moentities.add(self)
 		else if node.as(ASendExpr).n_expr.mtype != null and node.as(ASendExpr).n_expr.mtype.is_primitive_type then
 			sys.vm.primitive_entities.add(self)
