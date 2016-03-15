@@ -1199,10 +1199,10 @@ class MOFunctionSite
 		else
 			# TODO: bug in the propagation with this line
 			# If not, use pattern's callees
-			if pattern.cuc == 0 then
+			# if pattern.cuc == 0 then
 				# print "Use pattern.callees {pattern.callees}"
-				# callees = pattern.callees
-			end
+				callees = pattern.callees
+			# end
 		end
 
 		# The concrete types of this callsite is the union of concrete types of all callees

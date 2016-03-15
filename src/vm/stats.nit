@@ -952,18 +952,13 @@ redef class MOSite
 		if self isa MOFunctionSite then
 			# The method returns a preexisting value which is not a primitive type
 			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
-				# If the pattern is preexisting, then the site is also preexisting
-				# if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
-				# 	vm.pstats.matrix[60][0] += 1
-				# else
-					# If the site is preexisting with concretes receivers for example, the site is preexisting
-					if compute_preexist.bit_pre then
-						vm.pstats.matrix[60][0] += 1
-					else
-						# For all other cases, the site is non-preexisting
-						vm.pstats.matrix[61][0] += 1
-					end
-				# end
+				# If the site is preexisting with concretes receivers for example, the site is preexisting
+				if compute_preexist.bit_pre then
+					vm.pstats.matrix[60][0] += 1
+				else
+					# For all other cases, the site is non-preexisting
+					vm.pstats.matrix[61][0] += 1
+				end
 			end
 		else
 			# A primitive or a real procedure

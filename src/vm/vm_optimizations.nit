@@ -162,13 +162,6 @@ redef class VirtualMachine
 			end
 		end
 	end
-
-	redef fun load_class(mclass)
-	do
-		if mclass.loaded then return
-
-		super(mclass)
-	end
 end
 
 redef class AAttrFormExpr
@@ -1031,8 +1024,10 @@ redef class MOCallSitePattern
 
 		for site in sites do
 			# TODO: recompute only sites with a mutable implementation
-			site.reinit_impl
-			site.get_impl(vm)
+			if site.get_impl(vm).is_mutable then
+				site.reinit_impl
+				site.get_impl(vm)
+			end
 		end
 	end
 end
@@ -1423,16 +1418,32 @@ redef class MOSubtypeSite
 
 	# Compute an Implementation for self site and assign `impl`
 	# Return the Implementation of the Site
-	redef fun compute_impl: Implementation
+	# redef fun compute_impl: Implementation
+	# do
+	# 	monomorphic_analysis
+	# 	compute_concretes_site
+
+	# 	impl = pattern.get_impl(vm)
+	# 	if impl isa StaticImplSubtype then
+	# 		set_static_impl(vm, true)
+	# 	else if impl isa SSTImplSubtype then
+	# 		set_sst_impl(vm, true)
+	# 	else if impl isa PHImpl then
+	# 		set_ph_impl(vm, true)
+	# 	else if impl isa NullImpl then
+	# 		set_null_impl
+	# 	end
+
+	# 	impl.mo_entity = self
+
+	# 	#TODO: compute_impl_concretes
+	# 	return impl.as(not null)
+	# end
+
+	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
-		monomorphic_analysis
-		compute_concretes_site
-
-		impl = pattern.get_impl(vm)
-		impl.mo_entity = self
-
-		#TODO: compute_impl_concretes
-		return impl.as(not null)
+		var offset = get_offset(vm)
+		impl = new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
 	end
 
 	redef fun set_static_impl(vm, mutable)
@@ -1440,17 +1451,15 @@ redef class MOSubtypeSite
 		if not get_pic(vm).abstract_loaded then
 			impl = new StaticImplSubtype(self, mutable, false)
 		else
-			var target_id = get_pic(vm).vtable.as(not null).id
-			var source_vt = pattern.rsc.vtable.as(not null)
-			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
+			var cast_value = vm.is_subclass(pattern.rsc, get_pic(vm))
 			impl = new StaticImplSubtype(self, mutable, cast_value)
 		end
 	end
 
 	redef fun conservative_implementation: Implementation
 	do
-		# Static for casts when the target type is final
-		# if target_mclass.is_final then
+		# Static for casts when the target type is a superclass of the rsc (useless casts)
+		# if sys.vm.is_subclass(pattern.rsc, pattern.target_mclass) then
 		# 	return new StaticImplSubtype(self, false, true)
 		# else
 			# Else we use the default computation of conservative implementation
@@ -1530,14 +1539,14 @@ redef class MOCallSite
 
 	redef fun conservative_implementation: Implementation
 	do
-		# Static, when the concrete types of the receiver are known
-		if concretes_receivers != null then
-			var callees = concrete_callees
+		# # Static, when the concrete types of the receiver are known
+		# if concretes_receivers != null then
+		# 	var callees = concrete_callees
 
-			if callees.length == 1 then
-				return new StaticImplMethod(self, false, concrete_callees.first)
-			end
-		end
+		# 	if callees.length == 1 then
+		# 		return new StaticImplMethod(self, false, concrete_callees.first)
+		# 	end
+		# end
 
 		return super
 	end
