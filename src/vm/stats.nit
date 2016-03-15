@@ -105,16 +105,6 @@ redef class ModelBuilder
 			if sys.vm.return_origin[i] > 0 then print("return_origin[{i}] = {sys.vm.return_origin[i]}")
 		end
 
-		# print("Stats on receiver_origin_recursive\n")
-		# for i in [0..sys.vm.receiver_origin_recursive.length[ do
-		# 	if sys.vm.receiver_origin_recursive[i] > 0 then print("receiver_origin_recursive[{i}] = {sys.vm.receiver_origin_recursive[i]}")
-		# end
-
-		# print("\nStats on return_origin_recursive\n")
-		# for i in [0..sys.vm.return_origin_recursive.length[ do
-		# 	if sys.vm.return_origin_recursive[i] > 0 then print("return_origin_recursive[{i}] = {sys.vm.return_origin_recursive[i]}")
-		# end
-
 		var trace_origin_string = """
 		# Trace the origin of preexistence of a site
 		# 1: positive cuc
@@ -222,6 +212,7 @@ end
 
 redef class AAttrPropdef
 	# When the node encode accessors who are redefined, tell if it's already count as "attr_redef"
+	# TODO: maybe remove that, seems useless
 	var attr_redef_taken_into = false
 end
 
@@ -646,14 +637,11 @@ class MOStats
 
 			# Debug the two model
 			# debug_model(propdef, trace_file, trace_model)
-			if propdef.msignature.return_mtype != null and propdef.return_expr != null then
+			if propdef.msignature.return_mtype != null and propdef.return_expr != null and not propdef.msignature.return_mtype.is_primitive_type then
 				nb_method_return += 1
 
-				var primitive_return = false
-				if propdef.msignature.return_mtype.is_primitive_type then primitive_return = true
-
 				# If the propdef has a preexisting return
-				if propdef.return_expr.is_pre and not primitive_return then
+				if propdef.return_expr.return_preexist.bit_pre then
 					nb_method_return_pre += 1
 					# Trace the origin of preexistence
 					var origin = propdef.return_expr.preexistence_origin
@@ -730,7 +718,7 @@ class MOStats
 						print "Pattern {pattern.rsc}#{pattern.gp} executed but without callees {pattern.gp.living_mpropdefs}, rsc loaded ? = {pattern.rsc.abstract_loaded}"
 					end
 				else
-					if pattern.gp.intro.msignature.return_mtype == null then
+					if pattern.gp.intro.msignature.return_mtype == null or pattern.gp.intro.msignature.return_mtype.is_primitive_type then
 						vm.pstats.matrix[56][0] += 1
 					else
 						# A preexisting pattern is a pattern with cuc = 0 and all callees with a preexisting return
@@ -960,13 +948,14 @@ redef class MOSite
 			vm.pstats.matrix[63][index_x] += 1
 		end
 
-		# If self isa MOCallsite and call a method with a return
-		if self isa MOCallSite then
+		# If self is a site which returns something
+		if self isa MOFunctionSite then
+			# The method returns a preexisting value which is not a primitive type
 			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
 				# If the pattern is preexisting, then the site is also preexisting
-				if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
-					vm.pstats.matrix[60][0] += 1
-				else
+				# if pattern.as(MOCallSitePattern).cuc == 0 and pattern.as(MOCallSitePattern).is_pre then
+				# 	vm.pstats.matrix[60][0] += 1
+				# else
 					# If the site is preexisting with concretes receivers for example, the site is preexisting
 					if compute_preexist.bit_pre then
 						vm.pstats.matrix[60][0] += 1
@@ -974,12 +963,11 @@ redef class MOSite
 						# For all other cases, the site is non-preexisting
 						vm.pstats.matrix[61][0] += 1
 					end
-				end
-			else
-				if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype == null then
-					vm.pstats.matrix[62][0] += 1
-				end
+				# end
 			end
+		else
+			# A primitive or a real procedure
+			vm.pstats.matrix[62][0] += 1
 		end
 	end
 

@@ -45,10 +45,10 @@ redef class MOStats
 		end
 
 		# Do not generate table3 in original preexistence
-		# if not sys.disable_preexistence_extensions then
-		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
-		# 	table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
-		# end
+		if not sys.disable_preexistence_extensions then
+			table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
+			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
+		end
 
 		table4(new FileWriter.open("{dir}/table4-{lbl}.tex"))
 
@@ -291,6 +291,7 @@ redef class MOStats
 	private fun table6(file: FileWriter)
 	do
 		file.write("%Table 6\n")
+		file.write("%Method & Pattern & Site\n")
 
 		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]}\\\\\n"
 		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]}\\\\\n"
@@ -1059,6 +1060,7 @@ redef class MOStats
 
 			if not site isa MOSite then continue
 			if site.is_monomorph then continue
+			if site.is_primitive then continue
 
 			if site isa MOCallSite then
 				index_x = 0

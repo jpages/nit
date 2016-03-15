@@ -57,12 +57,7 @@ redef class MPropDef
 	# The origin of the preexistence of self return variable (if any)
 	fun preexistence_origin: Int
 	do
-		# if recursive_origin then
-		# 	return 64
-		# else
-		# 	recursive_origin = true
-			return return_expr.preexistence_origin
-		# end
+		return return_expr.preexistence_origin
 	end
 end
 
@@ -703,7 +698,6 @@ redef class MOCallSitePattern
 				if not callee.return_expr.return_preexist.bit_pre then return false
 			end
 		end
-
 
 		return true
 	end
