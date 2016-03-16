@@ -1197,12 +1197,7 @@ class MOFunctionSite
 				end
 			end
 		else
-			# TODO: bug in the propagation with this line
-			# If not, use pattern's callees
-			# if pattern.cuc == 0 then
-				# print "Use pattern.callees {pattern.callees}"
-				callees = pattern.callees
-			# end
+			callees = pattern.callees
 		end
 
 		# The concrete types of this callsite is the union of concrete types of all callees
@@ -1221,7 +1216,6 @@ class MOFunctionSite
 		end
 
 		if not concrete_types.is_empty then
-			print "Concretes of {self} = {concrete_types}"
 			return concrete_types
 		else
 			return null
