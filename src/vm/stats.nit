@@ -1271,6 +1271,13 @@ redef class MOSubtypeSite
 	redef var index_x = 2
 
 	redef var site_type = "cast"
+
+	redef fun trace
+	do
+		var res = " target {pattern.target_mclass}"
+
+		return super + res
+	end
 end
 
 redef class MOAsNotNullSite
@@ -1605,15 +1612,17 @@ redef class MPropDef
 			if not return_expr_is_object then return res
 			if not self isa MMethodDef then return res
 
-			res += " return_preexist {return_expr.return_preexist}"
-
-			var return_concretes = compute_concretes(sys.vm)
-			if return_concretes != null then res += " return_concretes {return_concretes}"
-
 			if not msignature.return_mtype == null then
+				res += " return_preexist {return_expr.return_preexist}"
+
 				var mclass_return = msignature.return_mtype.as(not null).get_mclass(vm, self)
 
-				if mclass_return.is_final then res += ", final_return {mclass_return.as(not null)}"
+				res += " return_type {mclass_return.as(not null)}"
+				if mclass_return.is_final then res += ", final_return"
+				if msignature.return_mtype.as(not null).is_primitive_type then res += ", primitive_return"
+
+				var return_concretes = compute_concretes(sys.vm)
+				if return_concretes != null then res += ", return_concretes {return_concretes}"
 			end
 		end
 
