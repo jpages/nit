@@ -46,7 +46,7 @@ redef class MOStats
 
 		# Do not generate table3 in original preexistence
 		if not sys.disable_preexistence_extensions then
-			table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
+		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
 			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
 		end
 
@@ -187,7 +187,7 @@ redef class MOStats
 		var total_other_improvable = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][0] + vm.pstats.matrix[30][1] + vm.pstats.matrix[30][2]
 
 		var table3 = "Read & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_readsite_improved} & {if total_readsite_improvable != 0 then total_readsite_improved*100/total_readsite_improvable else 0}\\\\\n"
-		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {total_new_improved*100/total_new_improvable}\\\\\n"
+		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {if total_new_improvable != 0 then total_new_improved*100/total_new_improvable else 0}\\\\\n"
 		table3 += "Call & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
 		table3 += "Subtype & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
 		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
