@@ -141,9 +141,9 @@ redef class MOStats
 		file.write("%Table 2\n")
 
 		# Line "other",  sites which are not preexisting
-		var other_methods = vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]
-		var other_attributes = vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]
-		var other_casts = vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]
+		var other_methods = vm.pstats.matrix[30][0]
+		var other_attributes = vm.pstats.matrix[30][1]
+		var other_casts = vm.pstats.matrix[30][2]
 		var total_others = other_methods + other_attributes + other_casts
 
 		var total_from_new = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]

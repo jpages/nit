@@ -585,12 +585,12 @@ end
 redef class MONew
 	redef fun compute_preexist
 	do
-		if pattern.is_loaded then
-			# Preexisting and perennial
-			return 3
-		else if disable_preexistence_extensions then
+		if disable_preexistence_extensions then
 			# Perennial and not preexisting
 			return 24
+		else if pattern.is_loaded then
+			# Preexisting and perennial
+			return 3
 		else
 			# Non-preexisting and non perennial
 			return 8
