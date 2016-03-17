@@ -1077,7 +1077,6 @@ class MOAsSubtypeSite
 		end
 
 		if not concretes.is_empty then
-			print "Concretes of {self}{pattern.rsc}.as({target_mclass}) = {concretes}"
 			return concretes
 		else
 			return null

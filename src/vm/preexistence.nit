@@ -693,8 +693,7 @@ redef class MOCallSitePattern
 		if callees.length == 0 then return false
 
 		for callee in callees do
-			#TODO : le cuc doit être null ici, donc les méthodes avec un return_expr
-			if callee.return_expr != null then
+			if callee.return_expr != null and not callee.msignature.return_mtype.is_primitive_type then
 				if not callee.return_expr.return_preexist.bit_pre then return false
 			end
 		end

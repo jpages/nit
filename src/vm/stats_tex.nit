@@ -1010,13 +1010,13 @@ redef class MOStats
 
 		var total_primitive = vm.pstats.primitive_method_executions + vm.pstats.primitive_attribute_executions + vm.pstats.primitive_cast_executions
 
-		var table = "primitive & {vm.pstats.primitive_method_executions} & {vm.pstats.primitive_attribute_executions} & {vm.pstats.primitive_cast_executions} & {total_primitive}\\\\\n"
-		table += "monomorph & {vm.pstats.monomorph_method_executions} & {vm.pstats.monomorph_attribute_executions} & {vm.pstats.monomorph_cast_executions} & {vm.pstats.monomorph_method_executions + vm.pstats.monomorph_attribute_executions + vm.pstats.monomorph_cast_executions}\\\\\n"
-		table += "static & {vm.pstats.method_static} & {0} & {vm.pstats.cast_static} & {vm.pstats.method_static + vm.pstats.cast_static}\\\\\n"
-		table += "SST & {vm.pstats.method_sst} & {vm.pstats.attribute_sst} & {vm.pstats.cast_sst} & {vm.pstats.method_sst + vm.pstats.attribute_sst + vm.pstats.cast_sst} \\\\\n"
-		table += "PH & {vm.pstats.method_ph} & {vm.pstats.attribute_ph} & {vm.pstats.cast_ph} & {vm.pstats.method_ph + vm.pstats.attribute_ph + vm.pstats.cast_ph} \\\\\n"
+		var table = "primitive & {vm.pstats.primitive_method_executions/1000} & {vm.pstats.primitive_attribute_executions/1000} & {vm.pstats.primitive_cast_executions/1000} & {total_primitive/1000}\\\\\n"
+		table += "monomorph & {vm.pstats.monomorph_method_executions/1000} & {vm.pstats.monomorph_attribute_executions/1000} & {vm.pstats.monomorph_cast_executions/1000} & {vm.pstats.monomorph_method_executions/1000 + vm.pstats.monomorph_attribute_executions/1000 + vm.pstats.monomorph_cast_executions/1000}\\\\\n"
+		table += "static & {vm.pstats.method_static/1000} & {0/1000} & {vm.pstats.cast_static/1000} & {vm.pstats.method_static/1000 + vm.pstats.cast_static/1000}\\\\\n"
+		table += "SST & {vm.pstats.method_sst/1000} & {vm.pstats.attribute_sst/1000} & {vm.pstats.cast_sst/1000} & {vm.pstats.method_sst/1000 + vm.pstats.attribute_sst/1000 + vm.pstats.cast_sst/1000} \\\\\n"
+		table += "PH & {vm.pstats.method_ph/1000} & {vm.pstats.attribute_ph/1000} & {vm.pstats.cast_ph/1000} & {vm.pstats.method_ph/1000 + vm.pstats.attribute_ph/1000 + vm.pstats.cast_ph/1000} \\\\\n"
 		table += "\\hline\n"
-		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+		table += "total & {total_methods/1000} & {total_attributes/1000} & {total_casts/1000} & {grand_total/1000}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")
@@ -1115,13 +1115,13 @@ redef class MOStats
 			grand_total += site.executions
 		end
 
-		var table = "primitive & {total_primitive_methods} & {total_primitive_attribute} & {total_primitive_casts} & {total_primitive_methods + total_primitive_attribute + total_primitive_casts}\\\\\n"
-		table += "monomorph & {callsite_executions} & {attribute_executions} & {cast_executions} & {callsite_executions + attribute_executions + cast_executions}\\\\\n"
-		table += "static & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
-		table += "SST & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
-		table += "PH & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+		var table = "primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
+		table += "monomorph & {callsite_executions/1000} & {attribute_executions/1000} & {cast_executions/1000} & {callsite_executions/1000 + attribute_executions/1000 + cast_executions/1000}\\\\\n"
+		table += "static & {stats_array[1][0]/1000} & {stats_array[1][1]/1000} & {stats_array[1][2]/1000} & {stats_array[1][3]/1000} \\\\\n"
+		table += "SST & {stats_array[2][0]/1000} & {stats_array[2][1]/1000} & {stats_array[2][2]/1000} & {stats_array[2][3]/1000} \\\\\n"
+		table += "PH & {stats_array[3][0]/1000} & {stats_array[3][1]/1000} & {stats_array[3][2]/1000} & {stats_array[3][3]/1000} \\\\\n"
 		table += "\\hline\n"
-		table += "total & {total_methods} & {total_attributes} & {total_casts} & {grand_total}\\\\\n"
+		table += "total & {total_methods/1000} & {total_attributes/1000} & {total_casts/1000} & {grand_total/1000}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")
