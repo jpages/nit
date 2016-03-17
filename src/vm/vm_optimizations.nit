@@ -455,13 +455,6 @@ redef class AIsaExpr
 		if mo_entity != null then
 			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
 
-			if impl isa NullImpl then
-				print "ERROR AIsaExpr {impl} recv.mtype {recv.mtype} target_type {mtype}"
-				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "Exec recv {recv.mtype} target {mtype}"
-				print "pic loaded {mo_entity.as(MOSubtypeSite).pattern.target_mclass.abstract_loaded} {mo_entity.as(MOSubtypeSite).pattern.rsc.abstract_loaded}"
-			end
-
 			var res_mo = subtype_commons(recv.mtype, mtype)
 			if res_mo != null then
 				if res_mo != subtype_res then
@@ -556,13 +549,6 @@ redef class AAsCastExpr
 
 		if mo_entity != null then
 			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
-
-			if impl isa NullImpl then
-				print "ERROR AIsaExpr {impl} {self}"
-				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "Exec recv {recv.mtype} target {mtype}"
-				print "pic loaded {mo_entity.as(MOSubtypeSite).pattern.target_mclass.abstract_loaded} {mo_entity.as(MOSubtypeSite).pattern.rsc.abstract_loaded}"
-			end
 
 			var res_mo = subtype_commons(recv.mtype, mtype)
 			if res_mo != null then
@@ -1113,7 +1099,9 @@ redef class MOSubtypeSitePattern
 		# If the rsc is a subclass of the target, then the test will always be true
 		if vm.is_subclass(rsc, target_mclass) then return true
 
+		# If one of the two classes is loaded bu not both, then it is static (unrelated classes)
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then return true
+		if rsc.abstract_loaded and not target_mclass.abstract_loaded then return true
 
 		return false
 	end
@@ -1135,6 +1123,7 @@ redef class MOSubtypeSitePattern
 		if vm.is_subclass(rsc, target_mclass) then res = true
 
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then res = false
+		if rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
 
 		impl = new StaticImplSubtype(self, true, res)
 	end
@@ -1443,15 +1432,19 @@ redef class MOSubtypeSite
 		monomorphic_analysis
 		compute_concretes_site
 
-		var impl_pattern = pattern.get_impl(vm)
-		if impl_pattern isa StaticImplSubtype then
+		if can_be_static then
 			set_static_impl(vm, true)
-		else if impl_pattern isa SSTImplSubtype then
-			set_sst_impl(vm, true)
-		else if impl_pattern isa PHImpl then
-			set_ph_impl(vm, true)
-		else if impl_pattern isa NullImpl then
-			set_null_impl
+		else
+			var impl_pattern = pattern.get_impl(vm)
+			if impl_pattern isa StaticImplSubtype then
+				set_static_impl(vm, true)
+			else if impl_pattern isa SSTImplSubtype then
+				set_sst_impl(vm, true)
+			else if impl_pattern isa PHImpl then
+				set_ph_impl(vm, true)
+			else if impl_pattern isa NullImpl then
+				set_null_impl
+			end
 		end
 
 		impl.mo_entity = self
@@ -1481,8 +1474,6 @@ redef class MOSubtypeSite
 		# Static for casts when the target type is a superclass of the rsc (useless casts)
 		if sys.vm.is_subclass(pattern.rsc, pattern.target_mclass) then
 			return new StaticImplSubtype(self, false, true)
-		else if pattern.rsc.abstract_loaded and not get_pic(vm).abstract_loaded then
-			return new StaticImplSubtype(self, true, false)
 		else
 			# Else we use the default computation of conservative implementation
 			return super

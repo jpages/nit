@@ -951,6 +951,8 @@ redef class MOSite
 	# Statistics on the return of callsites (call-expressions not necessarily used as a receiver)
 	fun incr_stats_sites
 	do
+		if not self isa MOCallSite then return
+
 		if not is_executed then
 			vm.pstats.matrix[63][index_x] += 1
 		end
@@ -958,14 +960,12 @@ redef class MOSite
 		# If self is a site which returns something
 		if self isa MOFunctionSite then
 			# The method returns a preexisting value which is not a primitive type
-			if pattern.as(MOCallSitePattern).gp.intro.msignature.return_mtype != null then
-				# If the site is preexisting with concretes receivers for example, the site is preexisting
-				if compute_preexist.bit_pre then
-					vm.pstats.matrix[60][0] += 1
-				else
-					# For all other cases, the site is non-preexisting
-					vm.pstats.matrix[61][0] += 1
-				end
+			# If the site is preexisting with concretes receivers for example, the site is preexisting
+			if compute_preexist.bit_pre then
+				vm.pstats.matrix[60][0] += 1
+			else
+				# For all other cases, the site is non-preexisting
+				vm.pstats.matrix[61][0] += 1
 			end
 		else
 			# A primitive or a real procedure
@@ -1281,7 +1281,7 @@ redef class MOSubtypeSite
 
 	redef fun trace
 	do
-		var res = " target {pattern.target_mclass}"
+		var res = " source {pattern.rsc} target {pattern.target_mclass}"
 
 		return super + res
 	end

@@ -81,6 +81,8 @@ redef class MOStats
 		table_executions_warm(new FileWriter.open("{dir}/table_executions_warm-{lbl}.tex"))
 
 		table_site_implementations(new FileWriter.open("{dir}/table_implementations-{lbl}.tex"))
+
+		table_site_implementations_simplified(new FileWriter.open("{dir}/table_implementations_simplified-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -1170,6 +1172,42 @@ redef class MOStats
 
 		table += "\\hline\n"
 		table += "total & {vm.pstats.matrix[6][0] + vm.pstats.matrix[9][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[15][0]} & {vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1] + vm.pstats.matrix[15][1]} & {vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2] + vm.pstats.matrix[15][2]} & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1] + vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output simplified statistics about MOSites and their implementations
+	private fun table_site_implementations_simplified(file: FileWriter)
+	do
+		file.write("%Table simplified implementations of sites\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var primitive_methods = 0
+		var primitive_attributes = 0
+		var primitive_casts = 0
+
+		for mosite in sys.vm.primitive_entities do
+			if mosite isa MOSite then
+				if mosite isa MOCallSite then
+					primitive_methods += 1
+				else if mosite isa MOAttrSite then
+					primitive_attributes += 1
+				else if mosite isa MOSubtypeSite then
+					primitive_casts += 1
+				end
+			end
+		end
+
+		var table = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
+		table += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][2]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][2]}\\\\\n"
+		table += "SST & {vm.pstats.matrix[9][0]} & {vm.pstats.matrix[9][1]} & {vm.pstats.matrix[9][2]} & {vm.pstats.matrix[9][0] + vm.pstats.matrix[9][1] + vm.pstats.matrix[9][2]} \\\\\n"
+		table += "PH & {vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]} \\\\\n"
+
+		table += "\\hline\n"
+		table += "total & {vm.pstats.matrix[6][0] + vm.pstats.matrix[9][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1]} & {vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2]} & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1] + vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")
