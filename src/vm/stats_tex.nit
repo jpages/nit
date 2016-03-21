@@ -125,6 +125,7 @@ redef class MOStats
 
 		var table1 = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table1 += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
+		table1 += "\hline\\\\\n"
 		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
@@ -1200,6 +1201,10 @@ redef class MOStats
 			end
 		end
 
+		var polymorph_methods = vm.pstats.matrix[6][0] + vm.pstats.matrix[9][0] + vm.pstats.matrix[12][0]
+		var polymorph_attributes = vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1]
+		var polymorph_casts = vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2]
+
 		var table = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][2]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][2]}\\\\\n"
@@ -1207,7 +1212,7 @@ redef class MOStats
 		table += "PH & {vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]} \\\\\n"
 
 		table += "\\hline\n"
-		table += "total & {vm.pstats.matrix[6][0] + vm.pstats.matrix[9][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1]} & {vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2]} & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0] + vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1] + vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]}\\\\\n"
+		table += "total & {polymorph_methods} & {polymorph_attributes} & {polymorph_casts} & {polymorph_methods + polymorph_attributes + polymorph_casts}\\\\\n"
 
 		file.write(table)
 		file.write("\n\n")

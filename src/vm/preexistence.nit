@@ -306,8 +306,22 @@ redef class MOPhiVar
 end
 
 redef class MOSite
+	# Compute and return the preexistence of the receiver of the site
 	fun site_preexist: Int
 	do
+		# Check if this site depends of a callsite receiver
+		if expr_recv isa MOCallSite then
+			expr_recv.as(MOCallSite).as_receiver = true
+		else if expr_recv isa MOSSAVar then
+			if expr_recv.as(MOSSAVar).dependency isa MOCallSite then
+				expr_recv.as(MOSSAVar).dependency.as(MOCallSite).as_receiver = true
+			end
+		else if expr_recv isa MOPhiVar then
+			for dep in expr_recv.as(MOPhiVar).dependencies do
+				if dep isa MOCallSite then dep.as_receiver = true
+			end
+		end
+
 		return expr_recv.expr_preexist
 	end
 end
@@ -319,6 +333,9 @@ redef class MOCallSite
 	end
 
 	var nb_callees = 0
+
+	# Indicate if this callsite is used as a receiver of another site
+	var as_receiver = false
 
 	# Trace the origin of preexistence of a site
 	# 1: positive cuc
@@ -671,7 +688,7 @@ redef class MOCallSitePattern
 		for lp in callees do lp.propage_npreexist
 	end
 
-	# When add a new branch, if it is not compiled, unset preexistence to all expressions using it
+	# When add a new candidate, if it is not compiled then unset preexistence to all expressions using it
 	redef fun add_lp(lp)
 	do
 		super
@@ -685,7 +702,8 @@ redef class MOCallSitePattern
 		end
 	end
 
-	# Return true if all sites of this pattern are preexisting, else false
+	# Return true if all sites of this pattern have a preexisting return,
+	# the sites must be function site and not procedures
 	fun is_pre: Bool
 	do
 		if cuc != 0 then return false

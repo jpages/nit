@@ -1249,7 +1249,12 @@ redef class MOCallSite
 
 	redef fun trace
 	do
-		var res = " {pattern.rsc}#{pattern.gp} args {given_args}"
+		var res = " {pattern.rsc}#{pattern.gp}"
+
+		var preexistence_value = compute_preexist
+		if preexistence_value.bit_pre then
+			res += " return_preexist {preexistence_value}"
+		end
 
 		return super + res
 	end

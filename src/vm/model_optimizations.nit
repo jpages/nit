@@ -57,7 +57,7 @@ redef class Sys
 	# If true, improve the loading of classes
 	var improve_loading: Bool = false
 
-	# Use poreexistence values in the protocol, and recompile the whole method instead,
+	# Use preexistence values in the protocol, and recompile the whole method instead,
 	# of doing code-patching
 	var preexistence_protocol: Bool = false
 
