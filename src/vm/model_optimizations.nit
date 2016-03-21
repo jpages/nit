@@ -664,7 +664,6 @@ class MOPhiVar
 	# List of expressions that variable depends
 	var dependencies = new List[MOExpr] is writable
 
-	#TODO
 	redef fun compute_concretes(concretes)
 	do
 		super
@@ -1112,6 +1111,9 @@ class MOCallSite
 
 	# Values of each arguments
 	var given_args = new List[MOExpr]
+
+	# Indicate if this callsite is used as a receiver of another site
+	var as_receiver = false is writable
 
 	init(mpropdef: MPropDef, node: AExpr, cs: CallSite)
 	do

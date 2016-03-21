@@ -972,6 +972,23 @@ redef class MOStats
 			stats_array[2][3] += site.recompilations
 		end
 
+		for site in sys.vm.pstats.analysed_monomorph_sites do
+			var index_x: Int
+			# Do not count as.(not null)
+			if site isa MOAsNotNullSite then continue
+
+			if site isa MOCallSite then
+				index_x = 0
+			else if site isa MOAttrSite then
+				index_x = 1
+			else
+				index_x = 2
+			end
+
+			stats_array[2][index_x] += site.recompilations
+			stats_array[2][3] += site.recompilations
+		end
+
 		var table = "PICPattern & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]}\\\\\n"
 		table += "GPPattern & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]}\\\\\n"
 		table += "Site & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]}\\\\\n"
@@ -985,15 +1002,19 @@ redef class MOStats
 	private fun	table_recompilations_methods(file: FileWriter)
 	do
 		file.write("%Table recompilations methods: number of times a whole method is recompiled\n")
-		file.write("%Recompilations & methods\n")
+		file.write("%Compilations & Recompilations \n")
 
 		var recompilations = 0
+		var recompilations_cost = 0
 		for method in vm.pstats.compiled_methods do
 			recompilations += method.nb_recompilations
+			recompilations_cost += method.nb_recompilations * (method.mosites.length + method.monomorph_sites.length)
 		end
 
-		var table = "recompilations non-primitive methods & {recompilations} \\\\\n"
-		table += "Number of methods & {vm.pstats.compiled_methods.length} \\\\\n"
+		var compilation_cost = vm.pstats.compiled_methods.length * (sys.vm.pstats.analysed_sites.length + sys.vm.pstats.analysed_monomorph_sites.length)
+
+		var table = "number & {vm.pstats.compiled_methods.length} & {recompilations} \\\\\n"
+		table += "cost & {compilation_cost} & {recompilations_cost} \\\\\n"
 
 		file.write(table)
 		file.write("\n\n")

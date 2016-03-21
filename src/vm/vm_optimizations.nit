@@ -77,11 +77,14 @@ redef class VirtualMachine
 
 			if impl.exec_method(recv) != propdef then
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
-				print "preexistence {callsite.mocallsite.expr_preexist} preexistence_origin {callsite.mocallsite.preexistence_origin}"
+				print "preexistence {callsite.mocallsite.expr_preexist} if_pre {callsite.mocallsite.expr_preexist.bit_pre} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
-
+				print "Implementation {impl}"
 				print "impl.exec_method(recv) {impl.exec_method(recv)}, propdef {propdef}"
 				callsite.mocallsite.compute_concretes_site
+
+				if callsite.mocallsite.concretes_receivers != null then print "concretes_receivers {callsite.mocallsite.concretes_receivers.to_s}"
+
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
 				abort
@@ -143,8 +146,6 @@ redef class VirtualMachine
 			if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
 				pattern.reinit_impl
 				pattern.compute_impl
-			else
-				pattern.compute_impl
 			end
 
 			for mosite in pattern.sites do
@@ -158,17 +159,16 @@ redef class VirtualMachine
 		# If `mclass` was a target of a subtyping test, go in these patterns and
 		# recompute them because they were static
 		for pattern in mclass.subtype_target_patterns do
-			# if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
-			# end
-			pattern.reinit_impl
-			pattern.compute_impl
-			# else
-			# 	pattern.compute_impl
-			# end
+			if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
+				pattern.reinit_impl
+				pattern.compute_impl
+			end
 
 			for mosite in pattern.sites do
-				mosite.reinit_impl
-				mosite.get_impl(vm)
+				if mosite.impl != null and mosite.impl != null then
+					mosite.reinit_impl
+					mosite.get_impl(vm)
+				end
 			end
 		end
 	end
@@ -627,6 +627,9 @@ redef class MPropDef
 		for site in mosites do
 			site.impl = null
 			site.expr_recv.preexist_init
+			site.concretes_receivers = null
+			site.compute_concretes_site
+
 			if site.expr_recv.is_pre then
 				site.compute_impl
 			else
@@ -827,6 +830,7 @@ redef abstract class MOSitePattern
 	# Change the Implementation to a PHImpl
 	fun propagate_ph_impl
 	do
+		if impl != null and impl isa StaticImpl then return
 		if impl != null and impl isa PHImpl then return
 
 		reinit_impl
@@ -1018,16 +1022,20 @@ redef class MOCallSitePattern
 		super(lp)
 
 		if need_reset then
-			reinit_impl
+			if impl isa StaticImplMethod and callees.length > 1 then
+				reinit_impl
 
-			for site in sites do
-				if site.impl != null and site.impl.as(not null).is_mutable then
-					site.reinit_impl
-				end
+				for site in sites do
+					if site.impl != null and site.impl.as(not null).is_mutable then
+						site.reinit_impl
+					end
 
-				# If one of the site is a callsite used a reicever which is now non-preexisting
-				if site.as_receiver and site.compute_preexist.bit_npre then
-					site.reinit_impl
+					# If one of the site is a callsite used a reicever which is now non-preexisting
+					if site.as_receiver then
+						site.reinit_impl
+
+						site.lp.recompilation = true
+					end
 				end
 			end
 		end
@@ -1037,7 +1045,14 @@ redef class MOCallSitePattern
 	do
 		super
 
-		# Now, recompute the implementation of this pattern and its sites
+		# If the pattern is static, its sites are static, so nothing to do here
+		if callees.length == 1 then return
+
+		if impl != null and impl isa SSTImpl then return
+		if impl != null and impl isa PHImpl and cuc != 0 then return
+		if not impl isa PHImpl then return
+
+		# Now, recompute the implementation off this pattern and its sites
 		if not impl == null and impl.is_mutable then
 			reinit_impl
 			compute_impl
@@ -1278,16 +1293,18 @@ redef abstract class MOSite
 		compute_concretes_site
 
 		if concretes_receivers == null and not is_monomorph then
-			impl = pattern.get_impl(vm)
+			# impl = pattern.get_impl(vm)
 			# Recopy the implementation of the pattern
-			# var pattern_impl = pattern.get_impl(vm)
-			# if pattern_impl isa StaticImpl then
-			# 	set_static_impl(vm, true)
-			# else if pattern_impl isa SSTImpl then
-			# 	set_sst_impl(vm, true)
-			# else
-			# 	set_ph_impl(vm, true)
-			# end
+			var pattern_impl = pattern.get_impl(vm)
+			if pattern_impl isa StaticImpl then
+				set_static_impl(vm, true)
+			else if pattern_impl isa SSTImpl then
+				set_sst_impl(vm, true)
+			else if pattern.impl isa NullImpl then
+				set_null_impl
+			else
+				set_ph_impl(vm, true)
+			end
 		else
 			compute_impl_concretes(vm)
 		end
@@ -1311,7 +1328,7 @@ redef abstract class MOSite
 			if concretes_receivers.first.abstract_loaded then
 				# callsite and casts are implemented in static
 				if can_be_static then
-					set_static_impl(vm, false)
+					set_static_impl(vm, true)
 				else
 					# Attributes are implemented in SST
 					set_sst_impl(vm, false)

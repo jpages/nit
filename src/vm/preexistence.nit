@@ -334,9 +334,6 @@ redef class MOCallSite
 
 	var nb_callees = 0
 
-	# Indicate if this callsite is used as a receiver of another site
-	var as_receiver = false
-
 	# Trace the origin of preexistence of a site
 	# 1: positive cuc
 	# 2: at least one preexisting callee
