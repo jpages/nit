@@ -1623,6 +1623,7 @@ redef class MPropDef
 		var res = "LP {self}, GP {mproperty.intro_mclassdef.mclass}#{mproperty}"
 		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length} nb_recompilations {nb_recompilations}"
 		res += " nb_executions {nb_executions}"
+		res += ", recompilations_cost {nb_recompilations * (mosites.length + monomorph_sites.length +1)}"
 
 		if return_expr != null then
 			if not return_expr_is_object then return res

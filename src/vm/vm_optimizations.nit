@@ -630,7 +630,9 @@ redef class MPropDef
 			site.concretes_receivers = null
 			site.compute_concretes_site
 
-			if site.expr_recv.is_pre then
+			if not sys.preexistence_protocol then
+				site.compute_impl
+			else if site.expr_recv.is_pre then
 				site.compute_impl
 			else
 				site.impl = site.conservative_implementation

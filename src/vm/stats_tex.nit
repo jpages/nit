@@ -80,6 +80,8 @@ redef class MOStats
 
 		table_executions_warm(new FileWriter.open("{dir}/table_executions_warm-{lbl}.tex"))
 
+		table_executions_code_patching(new FileWriter.open("{dir}/table_executions_code_patching-{lbl}.tex"))
+
 		table_site_implementations(new FileWriter.open("{dir}/table_implementations-{lbl}.tex"))
 
 		table_site_implementations_simplified(new FileWriter.open("{dir}/table_implementations_simplified-{lbl}.tex"))
@@ -125,7 +127,7 @@ redef class MOStats
 
 		var table1 = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table1 += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
-		table1 += "\hline\\\\\n"
+		table1 += "\\hline\\\\\n"
 		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
@@ -287,21 +289,21 @@ redef class MOStats
 	end
 
 	# Statistics of preexsitence by method, pattern and site, for sites with a return (MOCallSite)
-	#      | Method | pattern | Site
-	# pre  |        |         |
-	# npre |        |         |
+	#      | Method | pattern | Site |  as receiver
+	# pre  |        |         |      |
+	# npre |        |         |      |
 	# `file` An already opened output file
 	private fun table6(file: FileWriter)
 	do
 		file.write("%Table 6\n")
-		file.write("%Method & Pattern & Site\n")
+		file.write("%Method & Pattern & Site & receiver\n")
 
-		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]}\\\\\n"
-		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]}\\\\\n"
-		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]}\\\\\n"
+		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][5]}\\\\\n"
+		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5]}\\\\\n"
+		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5]}\\\\\n"
 		table6 += "\\hline\n"
 
-		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])}\\\\\n"
+		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {vm.pstats.matrix[27][5]*100/vm.pstats.matrix[26][5]}\\\\\n"
 
 		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]}\\\\\n"
 
@@ -1008,10 +1010,10 @@ redef class MOStats
 		var recompilations_cost = 0
 		for method in vm.pstats.compiled_methods do
 			recompilations += method.nb_recompilations
-			recompilations_cost += method.nb_recompilations * (method.mosites.length + method.monomorph_sites.length)
+			recompilations_cost += method.nb_recompilations * (method.mosites.length + method.monomorph_sites.length +1)
 		end
 
-		var compilation_cost = vm.pstats.compiled_methods.length * (sys.vm.pstats.analysed_sites.length + sys.vm.pstats.analysed_monomorph_sites.length)
+		var compilation_cost = vm.pstats.compiled_methods.length + (sys.vm.pstats.analysed_sites.length + sys.vm.pstats.analysed_monomorph_sites.length)
 
 		var table = "number & {vm.pstats.compiled_methods.length} & {recompilations} \\\\\n"
 		table += "cost & {compilation_cost} & {recompilations_cost} \\\\\n"
@@ -1103,6 +1105,111 @@ redef class MOStats
 			var impl = site.get_impl(vm)
 			if index_x != -1 then
 				if impl isa StaticImpl then
+					stats_array[1][index_x] += site.executions
+					stats_array[1][3] += site.executions
+				else if impl isa SSTImpl then
+					stats_array[2][index_x] += site.executions
+					stats_array[2][3] += site.executions
+				else if impl isa PHImpl then
+					stats_array[3][index_x] += site.executions
+					stats_array[3][3] += site.executions
+				end
+			end
+		end
+
+		var callsite_executions = 0
+		var attribute_executions = 0
+		var cast_executions = 0
+
+		# Monomorphic sites
+		for site in sys.vm.all_moentities do
+			if not site isa MOSite then continue
+			if not site.is_monomorph then continue
+
+			if site isa MOCallSite then
+				total_methods += site.executions
+				callsite_executions += site.executions
+			else if site isa MOAttrSite then
+				total_attributes += site.executions
+				attribute_executions += site.executions
+			else if site isa MOSubtypeSite then
+				# Casts
+				total_casts += site.executions
+				cast_executions += site.executions
+			end
+
+			grand_total += site.executions
+		end
+
+		var table = "primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
+		table += "monomorph & {callsite_executions/1000} & {attribute_executions/1000} & {cast_executions/1000} & {callsite_executions/1000 + attribute_executions/1000 + cast_executions/1000}\\\\\n"
+		table += "static & {stats_array[1][0]/1000} & {stats_array[1][1]/1000} & {stats_array[1][2]/1000} & {stats_array[1][3]/1000} \\\\\n"
+		table += "SST & {stats_array[2][0]/1000} & {stats_array[2][1]/1000} & {stats_array[2][2]/1000} & {stats_array[2][3]/1000} \\\\\n"
+		table += "PH & {stats_array[3][0]/1000} & {stats_array[3][1]/1000} & {stats_array[3][2]/1000} & {stats_array[3][3]/1000} \\\\\n"
+		table += "\\hline\n"
+		table += "total & {total_methods/1000} & {total_attributes/1000} & {total_casts/1000} & {grand_total/1000}\\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Output statistic in .tex files for dynamic executions of sites with a counter in each site,
+	# with code-patching for callsites which can be static, otherwise the preexistence is considered
+	private fun table_executions_code_patching(file: FileWriter)
+	do
+		file.write("%Table number of execution with code-patching for callsites and preexistence\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var total_methods = 0
+		var total_attributes = 0
+		var total_casts = 0
+		var grand_total = 0
+
+		var stats_array_size = 3
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		var total_primitive_methods = 0
+		var total_primitive_attribute = 0
+		var total_primitive_casts = 0
+
+		for site in sys.vm.primitive_entities do
+			if site isa MOCallSite then
+				total_primitive_methods += site.executions
+			else if site isa MOAttrSite then
+				total_primitive_attribute += site.executions
+			else if site isa MOSubtypeSite then
+				total_primitive_casts += site.executions
+			end
+		end
+
+		for site in sys.vm.all_moentities do
+			var index_x: Int = -1
+
+			if not site isa MOSite then continue
+			if site.is_monomorph then continue
+			if site.is_primitive then continue
+
+			if site isa MOCallSite then
+				index_x = 0
+				total_methods += site.executions
+			else if site isa MOAttrSite then
+				index_x = 1
+				total_attributes += site.executions
+			else if site isa MOSubtypeSite then
+				# Casts
+				index_x = 2
+				total_casts += site.executions
+			end
+
+			grand_total += site.executions
+
+			var impl = site.get_impl(vm)
+			if index_x != -1 then
+				if (site isa MOCallSite and site.can_be_static) or impl isa StaticImpl then
 					stats_array[1][index_x] += site.executions
 					stats_array[1][3] += site.executions
 				else if impl isa SSTImpl then
