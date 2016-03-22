@@ -1272,11 +1272,16 @@ redef abstract class MOSite
 			res = impl.as(not null)
 		else
 			if sys.preexistence_protocol then
-				if not expr_recv.is_pre then
-					# Use the conservative implementation
-					res = conservative_implementation
-				else
+				if mixed_protocol and self isa MOCallSite then
+					# We use the most optimized implementation for callsites (no conservative implementations)
 					res = compute_impl
+				else
+					if not expr_recv.is_pre then
+						# Use the conservative implementation
+						res = conservative_implementation
+					else
+						res = compute_impl
+					end
 				end
 			else
 				res = compute_impl
@@ -1639,6 +1644,22 @@ redef class MOCallSite
 			end
 		else
 			set_null_impl
+		end
+	end
+
+	# A special case for the mixed protocol
+	redef fun reinit_impl
+	do
+		if not preexistence_protocol then super
+		if not mixed_protocol then super
+
+		# We make code-pathing for methods which were not implemented in static
+		if impl != null and not impl.as(not null) isa StaticImplMethod then
+			impl = null
+		else
+			# We need to recompile the whole method
+			impl = null
+			lp.recompilation = true
 		end
 	end
 end

@@ -23,6 +23,9 @@ redef class ToolContext
 	# If true, consider the preexistence of sites in the protocol
 	var preexistence_protocol = new OptionBool("Consider sites' preexistence in the protocol", "--preexistence-protocol")
 
+	# A mix between code-patching and preexistence
+	var mixed_protocol = new OptionBool("Consider preexistence for all site except callsites", "--mixed-protocol")
+
 	redef init
 	do
 		super
@@ -32,6 +35,7 @@ redef class ToolContext
 		option_context.add_option(disable_preexistence_extensions)
 		option_context.add_option(disable_method_return)
 		option_context.add_option(preexistence_protocol)
+		option_context.add_option(mixed_protocol)
 	end
 end
 
@@ -61,6 +65,9 @@ redef class Sys
 	# of doing code-patching
 	var preexistence_protocol: Bool = false
 
+	# See --mixed-protocol option
+	var mixed_protocol: Bool = false
+
 	# Singleton of MONull
 	var monull = new MONull(sys.vm.current_propdef.mpropdef.as(not null)) is lazy
 
@@ -81,6 +88,7 @@ redef class ModelBuilder
 		sys.disable_preexistence_extensions = toolcontext.disable_preexistence_extensions.value
 		sys.disable_method_return = toolcontext.disable_method_return.value
 		sys.preexistence_protocol = toolcontext.preexistence_protocol.value
+		sys.mixed_protocol = toolcontext.mixed_protocol.value
 
 		if toolcontext.debug.value then
 			# Create the output file for debug traces

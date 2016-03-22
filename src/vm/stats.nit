@@ -1183,6 +1183,7 @@ redef class MOSite
 		res += " executions {executions}"
 		res += " recompilations {recompilations}"
 		res += " enclosing {lp}"
+		res += " pattern_impl {pattern.get_impl(vm)}"
 
 		return res
 	end
