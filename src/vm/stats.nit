@@ -1181,6 +1181,8 @@ redef class MOSite
 
 		res += " impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		res += " executions {executions}"
+		res += " recompilations {recompilations}"
+		res += " enclosing {lp}"
 
 		return res
 	end

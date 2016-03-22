@@ -868,7 +868,6 @@ abstract class MOSite
 			var concrete = new ConcreteTypes
 			concrete.immutable = true
 			concrete.add(pattern.rsc)
-
 			concretes_receivers = concrete
 		end
 
@@ -898,7 +897,6 @@ abstract class MOSite
 		if expr_recv isa MOSSAVar and expr_recv.as(MOSSAVar).dependency isa MONew then
 			var new_class = expr_recv.as(MOSSAVar).dependency.as(MONew).pattern.cls
 			# The corresponding class must be loaded
-			# if not new_class.loaded then return
 			if new_class.is_abstract then return
 
 			is_monomorph = true
@@ -1152,6 +1150,12 @@ class MOCallSite
 	fun concrete_callees: List[MMethodDef]
 	do
 		var callees = new List[MMethodDef]
+
+		if is_monomorph then
+			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, concretes_receivers.first.intro.bound_mtype)
+			callees.add(propdef)
+			return callees
+		end
 
 		for rcv in concretes_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue

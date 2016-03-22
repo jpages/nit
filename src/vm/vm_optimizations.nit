@@ -1035,8 +1035,8 @@ redef class MOCallSitePattern
 					# If one of the site is a callsite used a reicever which is now non-preexisting
 					if site.as_receiver then
 						site.reinit_impl
-
 						site.lp.recompilation = true
+						site.as_receiver = false
 					end
 				end
 			end
@@ -1295,7 +1295,6 @@ redef abstract class MOSite
 		compute_concretes_site
 
 		if concretes_receivers == null and not is_monomorph then
-			# impl = pattern.get_impl(vm)
 			# Recopy the implementation of the pattern
 			var pattern_impl = pattern.get_impl(vm)
 			if pattern_impl isa StaticImpl then
@@ -1319,12 +1318,6 @@ redef abstract class MOSite
 	# TODO: finish to comment the code
 	fun compute_impl_concretes(vm: VirtualMachine)
 	do
-		# Static
-		if can_be_static then
-			set_static_impl(vm, true)
-			return
-		end
-
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
 			if concretes_receivers.first.abstract_loaded then
@@ -1337,6 +1330,12 @@ redef abstract class MOSite
 				end
 				return
 			end
+		end
+
+		# Static
+		if can_be_static then
+			set_static_impl(vm, true)
+			return
 		end
 
 		# If the property is introduced in Object class, SST can be used
@@ -1463,18 +1462,18 @@ redef class MOSubtypeSite
 
 	redef fun compute_impl_concretes(vm: VirtualMachine)
 	do
-		# Static
-		if can_be_static then
-			set_static_impl(vm, true)
-			return
-		end
-
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
 			if concretes_receivers.first.abstract_loaded then
 				set_static_impl(vm, false)
 				return
 			end
+		end
+
+		# Static
+		if can_be_static then
+			set_static_impl(vm, true)
+			return
 		end
 
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
@@ -1563,6 +1562,16 @@ redef abstract class MOAttrSite
 		var pos_cls = get_block_position(vm, pattern.rsc)
 		impl = new SSTImpl(self, mutable, pos_cls + offset)
 	end
+
+	redef fun compute_impl_concretes(vm: VirtualMachine)
+	do
+		if is_monomorph then
+			# Attributes are implemented in SST
+			set_sst_impl(vm, false)
+		else
+			super
+		end
+	end
 end
 
 redef class MOCallSite
@@ -1592,6 +1601,44 @@ redef class MOCallSite
 			else
 				return false
 			end
+		end
+	end
+
+	# Compute the implementation with rst/pic, and concretes if any
+	# TODO: finish to comment the code
+	redef fun compute_impl_concretes(vm: VirtualMachine)
+	do
+		if is_monomorph then
+			set_static_impl(vm, false)
+			return
+		end
+
+		# Static
+		if can_be_static then
+			set_static_impl(vm, true)
+			return
+		end
+
+		# If the property is introduced in Object class, SST can be used
+		if get_pic(vm).is_instance_of_object(vm) then
+			set_sst_impl(vm, false)
+			return
+		end
+
+		var unique_pos_indicator = unique_pos_for_each_recv(vm)
+
+		if unique_pos_indicator == 1 then
+			# SST immutable because statically, it can't be more than these concrete receivers
+			set_sst_impl(vm, false)
+		else if get_pic(vm).abstract_loaded then
+			if unique_pos_indicator == -1 then
+				# Some receiver classes are not loaded yet, so we use a mutable implementation
+				set_ph_impl(vm, true)
+			else
+				set_ph_impl(vm, false)
+			end
+		else
+			set_null_impl
 		end
 	end
 end
