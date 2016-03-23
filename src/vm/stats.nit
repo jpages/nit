@@ -1261,6 +1261,14 @@ redef class MOCallSite
 
 		return super + res
 	end
+
+	redef fun reinit_impl
+	do
+		super
+
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 end
 
 redef class MOFunctionSite
@@ -1316,10 +1324,28 @@ redef class MOSitePattern
 		# Each time a pattern has a change in its implementation, count it
 		recompilations += 1
 	end
+
+	fun trace: String
+	do
+		return "nb_recompilations {recompilations} executed {is_executed} Pattern {rsc}"
+	end
+end
+
+redef class MOPropSitePattern
+
+	redef fun trace
+	do
+		return super + "#{gp} rsc_loaded = {rsc.abstract_loaded} nb_sites {sites.length} "
+	end
 end
 
 redef class MOCallSitePattern
 	redef var index_x = 0
+
+	redef fun trace
+	do
+		return super + " cuc = {cuc} + nb_callees {callees.length}"
+	end
 end
 
 redef class MOAttrPattern
@@ -1328,6 +1354,11 @@ end
 
 redef class MOSubtypeSitePattern
 	redef var index_x = 2
+
+	redef fun trace
+	do
+		return super + " nb_site {sites.length} target = {target}"
+	end
 end
 
 redef class MOAsNotNullPattern

@@ -73,7 +73,7 @@ redef class VirtualMachine
 			var impl = callsite.mocallsite.get_impl(sys.vm)
 
 			# Reset the implementation
-			callsite.mocallsite.impl = null
+			# callsite.mocallsite.impl = null
 
 			if impl.exec_method(recv) != propdef then
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
@@ -634,6 +634,8 @@ redef class MPropDef
 				site.compute_impl
 			else if site.expr_recv.is_pre then
 				site.compute_impl
+			else if mixed_protocol and site isa MOCallSite then
+				site.compute_impl
 			else
 				site.impl = site.conservative_implementation
 			end
@@ -1035,7 +1037,7 @@ redef class MOCallSitePattern
 					# If one of the site is a callsite used a reicever which is now non-preexisting
 					if site.as_receiver then
 						site.reinit_impl
-						site.lp.recompilation = true
+						# site.lp.recompilation = true
 						site.as_receiver = false
 					end
 				end
@@ -1054,7 +1056,7 @@ redef class MOCallSitePattern
 		if impl != null and impl isa PHImpl and cuc != 0 then return
 		if not impl isa PHImpl then return
 
-		# Now, recompute the implementation off this pattern and its sites
+		# Now, recompute the implementation of this pattern and its sites
 		if not impl == null and impl.is_mutable then
 			reinit_impl
 			compute_impl
@@ -1657,9 +1659,17 @@ redef class MOCallSite
 		if impl != null and not impl.as(not null) isa StaticImplMethod then
 			impl = null
 		else
-			# We need to recompile the whole method
+			# We need to recompile the whole method only if the preexistence of the receiver has changed
+			# to preexisting to non-preexisting
+			var preexistence_before = expr_recv.preexist_value
+			expr_recv.preexist_init
+			var preexistence_after = site_preexist
+
+			if preexistence_before.bit_pre and preexistence_after.bit_npre then
+				lp.recompilation = true
+			end
+
 			impl = null
-			lp.recompilation = true
 		end
 	end
 end

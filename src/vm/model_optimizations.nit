@@ -226,11 +226,6 @@ abstract class MOSitePattern
 		site.pattern = self
 	end
 
-	fun trace: String
-	do
-		return "Pattern {rsc}"
-	end
-
 	# Get the pic
 	fun get_pic(vm: VirtualMachine): MClass is abstract
 
@@ -265,11 +260,6 @@ abstract class MOPropSitePattern
 	fun compatible_site(site: MOPropSite): Bool is abstract
 
 	redef fun get_pic(vm) do return gp.intro_mclassdef.mclass
-
-	redef fun trace
-	do
-		return super + "#{gp} rsc_loaded = {rsc.abstract_loaded} nb_sites {sites.length} "
-	end
 end
 
 # Pattern of expression sites (method call / read attribute)
@@ -289,11 +279,6 @@ class MOSubtypeSitePattern
 	var target: MType
 
 	var target_mclass: MClass
-
-	redef fun trace
-	do
-		return super + " nb_site {sites.length} target = {target}"
-	end
 
 	redef fun get_pic(vm) do return target.as(MClassType).mclass
 
@@ -374,11 +359,6 @@ class MOCallSitePattern
 			# If the mpropdef is abstract do not count it in uncompiled methods
 			if not mpropdef.is_abstract and not mpropdef.is_compiled then cuc += 1
 		end
-	end
-
-	redef fun trace
-	do
-		return super + " cuc = {cuc} + nb_callees {callees.length}"
 	end
 
 	redef fun pic_pattern_factory(rsc, pic)

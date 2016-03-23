@@ -125,7 +125,7 @@ redef class MOStats
 			end
 		end
 
-		var table1 = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
+		var table1 = "%primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table1 += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table1 += "\\hline\\\\\n"
 		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
@@ -1036,7 +1036,7 @@ redef class MOStats
 
 		var total_primitive = vm.pstats.primitive_method_executions + vm.pstats.primitive_attribute_executions + vm.pstats.primitive_cast_executions
 
-		var table = "primitive & {vm.pstats.primitive_method_executions/1000} & {vm.pstats.primitive_attribute_executions/1000} & {vm.pstats.primitive_cast_executions/1000} & {total_primitive/1000}\\\\\n"
+		var table = "%primitive & {vm.pstats.primitive_method_executions/1000} & {vm.pstats.primitive_attribute_executions/1000} & {vm.pstats.primitive_cast_executions/1000} & {total_primitive/1000}\\\\\n"
 		table += "monomorph & {vm.pstats.monomorph_method_executions/1000} & {vm.pstats.monomorph_attribute_executions/1000} & {vm.pstats.monomorph_cast_executions/1000} & {vm.pstats.monomorph_method_executions/1000 + vm.pstats.monomorph_attribute_executions/1000 + vm.pstats.monomorph_cast_executions/1000}\\\\\n"
 		table += "static & {vm.pstats.method_static/1000} & {0/1000} & {vm.pstats.cast_static/1000} & {vm.pstats.method_static/1000 + vm.pstats.cast_static/1000}\\\\\n"
 		table += "SST & {vm.pstats.method_sst/1000} & {vm.pstats.attribute_sst/1000} & {vm.pstats.cast_sst/1000} & {vm.pstats.method_sst/1000 + vm.pstats.attribute_sst/1000 + vm.pstats.cast_sst/1000} \\\\\n"
@@ -1141,7 +1141,7 @@ redef class MOStats
 			grand_total += site.executions
 		end
 
-		var table = "primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
+		var table = "%primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
 		table += "monomorph & {callsite_executions/1000} & {attribute_executions/1000} & {cast_executions/1000} & {callsite_executions/1000 + attribute_executions/1000 + cast_executions/1000}\\\\\n"
 		table += "static & {stats_array[1][0]/1000} & {stats_array[1][1]/1000} & {stats_array[1][2]/1000} & {stats_array[1][3]/1000} \\\\\n"
 		table += "SST & {stats_array[2][0]/1000} & {stats_array[2][1]/1000} & {stats_array[2][2]/1000} & {stats_array[2][3]/1000} \\\\\n"
@@ -1246,7 +1246,7 @@ redef class MOStats
 			grand_total += site.executions
 		end
 
-		var table = "primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
+		var table = "%primitive & {total_primitive_methods/1000} & {total_primitive_attribute/1000} & {total_primitive_casts/1000} & {total_primitive_methods/1000 + total_primitive_attribute/1000 + total_primitive_casts/1000}\\\\\n"
 		table += "monomorph & {callsite_executions/1000} & {attribute_executions/1000} & {cast_executions/1000} & {callsite_executions/1000 + attribute_executions/1000 + cast_executions/1000}\\\\\n"
 		table += "static & {stats_array[1][0]/1000} & {stats_array[1][1]/1000} & {stats_array[1][2]/1000} & {stats_array[1][3]/1000} \\\\\n"
 		table += "SST & {stats_array[2][0]/1000} & {stats_array[2][1]/1000} & {stats_array[2][2]/1000} & {stats_array[2][3]/1000} \\\\\n"
@@ -1281,7 +1281,7 @@ redef class MOStats
 			end
 		end
 
-		var table = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
+		var table = "%primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][2]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][2]}\\\\\n"
 		table += "static preexisting & {vm.pstats.matrix[7][0]} & {vm.pstats.matrix[7][1]} & {vm.pstats.matrix[7][2]} & {vm.pstats.matrix[7][0] + vm.pstats.matrix[7][1] + vm.pstats.matrix[7][2]}\\\\\n"
@@ -1333,7 +1333,7 @@ redef class MOStats
 		var polymorph_attributes = vm.pstats.matrix[6][1] + vm.pstats.matrix[9][1] + vm.pstats.matrix[12][1]
 		var polymorph_casts = vm.pstats.matrix[6][2] + vm.pstats.matrix[9][2] + vm.pstats.matrix[12][2]
 
-		var table = "primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
+		var table = "%primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
 		table += "static & {vm.pstats.matrix[6][0]} & {vm.pstats.matrix[6][1]} & {vm.pstats.matrix[6][2]} & {vm.pstats.matrix[6][0] + vm.pstats.matrix[6][1] + vm.pstats.matrix[6][2]}\\\\\n"
 		table += "SST & {vm.pstats.matrix[9][0]} & {vm.pstats.matrix[9][1]} & {vm.pstats.matrix[9][2]} & {vm.pstats.matrix[9][0] + vm.pstats.matrix[9][1] + vm.pstats.matrix[9][2]} \\\\\n"
