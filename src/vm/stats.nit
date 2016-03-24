@@ -1188,16 +1188,13 @@ redef class MOSite
 		return res
 	end
 
-	# The number of recompilations of this entity
-	var recompilations: Int = 0
+	# redef fun reinit_impl
+	# do
+	# 	super
 
-	redef fun reinit_impl
-	do
-		super
-
-		# Each time a pattern has a change in its implementation, count it
-		recompilations += 1
-	end
+	# 	# Each time a pattern has a change in its implementation, count it
+	# 	recompilations += 1
+	# end
 
 	# The number of executions of this site
 	var executions = 0
@@ -1262,13 +1259,13 @@ redef class MOCallSite
 		return super + res
 	end
 
-	redef fun reinit_impl
-	do
-		super
+	# redef fun reinit_impl
+	# do
+	# 	super
 
-		# Each time a pattern has a change in its implementation, count it
-		recompilations += 1
-	end
+	# 	# Each time a pattern has a change in its implementation, count it
+	# 	recompilations += 1
+	# end
 end
 
 redef class MOFunctionSite

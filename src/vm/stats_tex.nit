@@ -127,7 +127,7 @@ redef class MOStats
 
 		var table1 = "%primitive & {primitive_methods} & {primitive_attributes} & {primitive_casts} & {primitive_methods + primitive_attributes + primitive_casts}\\\\\n"
 		table1 += "monomorph & {vm.pstats.monomorph_methods} & {vm.pstats.monomorph_attributes} & {vm.pstats.monomorph_casts} & {vm.pstats.monomorph_methods + vm.pstats.monomorph_attributes + vm.pstats.monomorph_casts}\\\\\n"
-		table1 += "\\hline\\\\\n"
+		table1 += "\\hline\n"
 		table1 += "preexisting & {vm.pstats.matrix[1][0]} & {vm.pstats.matrix[1][1]} & {vm.pstats.matrix[1][2]} & {total_pre}\\\\\n"
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
@@ -152,7 +152,7 @@ redef class MOStats
 		var total_others = other_methods + other_attributes + other_casts
 
 		var total_from_new = vm.pstats.matrix[23][0] + vm.pstats.matrix[23][1] + vm.pstats.matrix[23][2]
-		var total_from_callsite = vm.pstats.matrix[28][0] + vm.pstats.matrix[28][1] + vm.pstats.matrix[28][2]
+		var total_from_callsite = vm.pstats.matrix[26][0] + vm.pstats.matrix[26][1] + vm.pstats.matrix[26][2]
 		var total_from_readsite = vm.pstats.matrix[32][0] + vm.pstats.matrix[32][1] + vm.pstats.matrix[32][2]
 		var total_from_cast = vm.pstats.matrix[79][0] + vm.pstats.matrix[79][1] + vm.pstats.matrix[79][2]
 
@@ -160,8 +160,8 @@ redef class MOStats
 
 		var table2 = "Read & {vm.pstats.matrix[32][0]} & {vm.pstats.matrix[32][1]} & {vm.pstats.matrix[32][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
 		table2 += "New & {vm.pstats.matrix[23][0]} & {vm.pstats.matrix[23][1]} & {vm.pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
-		table2 += "Call & {vm.pstats.matrix[28][0]} & {vm.pstats.matrix[28][1]} & {vm.pstats.matrix[28][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
-		table2 += "Subtype & {vm.pstats.matrix[79][0]} & {vm.pstats.matrix[79][1]} & {vm.pstats.matrix[79][2]} & {total_from_cast} & {total_from_cast*100/general_total}\\\\\n"
+		table2 += "Call & {vm.pstats.matrix[26][0]} & {vm.pstats.matrix[26][1]} & {vm.pstats.matrix[26][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
+		table2 += "Cast & {vm.pstats.matrix[79][0]} & {vm.pstats.matrix[79][1]} & {vm.pstats.matrix[79][2]} & {total_from_cast} & {total_from_cast*100/general_total}\\\\\n"
 		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {total_others*100/general_total}\\\\\n"
 		table2 += "\\hline\n"
 
@@ -194,7 +194,7 @@ redef class MOStats
 		var table3 = "Read & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_readsite_improved} & {if total_readsite_improvable != 0 then total_readsite_improved*100/total_readsite_improvable else 0}\\\\\n"
 		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {if total_new_improvable != 0 then total_new_improved*100/total_new_improvable else 0}\\\\\n"
 		table3 += "Call & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
-		table3 += "Subtype & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
+		table3 += "Cast & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
 		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
 
 		table3 += "\\hline\n"
@@ -238,7 +238,7 @@ redef class MOStats
 		var table3 = "Call & {if vm.pstats.matrix[26][0] != 0 then vm.pstats.matrix[27][0]*100/vm.pstats.matrix[26][0] else 0} & {if vm.pstats.matrix[26][1] != 0 then vm.pstats.matrix[27][1]*100/vm.pstats.matrix[26][1] else 0} & {if vm.pstats.matrix[26][2] != 0 then vm.pstats.matrix[27][2]*100/vm.pstats.matrix[26][2] else 0}  & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
 		table3 += "Read & {if vm.pstats.matrix[31][0] != 0 then vm.pstats.matrix[31][0]*100/(vm.pstats.matrix[31][0] + vm.pstats.matrix[32][0]) else 0} & {if vm.pstats.matrix[31][1] != 0 then vm.pstats.matrix[31][1]*100/(vm.pstats.matrix[31][1] + vm.pstats.matrix[32][1]) else 0} & {if vm.pstats.matrix[31][2] != 0 then vm.pstats.matrix[31][2]*100/(vm.pstats.matrix[31][2] + vm.pstats.matrix[32][2]) else 0} & {if total_readsite_improvable != 0 then total_readsite_improved*100/total_readsite_improvable else 0}\\\\\n"
 		table3 += "New & {if vm.pstats.matrix[23][0] != 0 then vm.pstats.matrix[24][0]*100/vm.pstats.matrix[23][0] else 0} & {if vm.pstats.matrix[23][1] != 0 then vm.pstats.matrix[24][1]*100/vm.pstats.matrix[23][1] else 0} & {if vm.pstats.matrix[23][2] != 0 then vm.pstats.matrix[24][2]*100/vm.pstats.matrix[23][2] else 0} & {total_new_improved*100/total_new_improvable}\\\\\n"
-		table3 += "Subtype & {if vm.pstats.matrix[77][0] != 0 then vm.pstats.matrix[78][0]*100/vm.pstats.matrix[77][0] else 0} & {if vm.pstats.matrix[77][1] != 0 then vm.pstats.matrix[78][1]*100/vm.pstats.matrix[77][1] else 0} & {if vm.pstats.matrix[77][2] != 0 then vm.pstats.matrix[78][2]*100/vm.pstats.matrix[77][2] else 0} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
+		table3 += "Cast & {if vm.pstats.matrix[77][0] != 0 then vm.pstats.matrix[78][0]*100/vm.pstats.matrix[77][0] else 0} & {if vm.pstats.matrix[77][1] != 0 then vm.pstats.matrix[78][1]*100/vm.pstats.matrix[77][1] else 0} & {if vm.pstats.matrix[77][2] != 0 then vm.pstats.matrix[78][2]*100/vm.pstats.matrix[77][2] else 0} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
 		table3 += "other & {if vm.pstats.matrix[29][0] != 0 then vm.pstats.matrix[29][0]*100/(vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0]) else 0} & {if vm.pstats.matrix[29][1] != 0 then vm.pstats.matrix[29][1]*100/(vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1]) else 0} & {if vm.pstats.matrix[29][2] != 0 then vm.pstats.matrix[29][2]*100/(vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2]) else 0} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
 
 		table3 += "\\hline\n"
@@ -288,7 +288,7 @@ redef class MOStats
 		file.close
 	end
 
-	# Statistics of preexsitence by method, pattern and site, for sites with a return (MOCallSite)
+	# Statistics of preexistence by method, pattern and site, for sites with a return (MOCallSite)
 	#      | Method | pattern | Site |  as receiver
 	# pre  |        |         |      |
 	# npre |        |         |      |
@@ -298,12 +298,12 @@ redef class MOStats
 		file.write("%Table 6\n")
 		file.write("%Method & Pattern & Site & receiver\n")
 
-		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][5]}\\\\\n"
-		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5]}\\\\\n"
-		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5]}\\\\\n"
+		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][5] - vm.pstats.matrix[27][3]}\\\\\n"
+		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5] -vm.pstats.matrix[28][3]}\\\\\n"
+		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
 		table6 += "\\hline\n"
 
-		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {vm.pstats.matrix[27][5]*100/vm.pstats.matrix[26][5]}\\\\\n"
+		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][5] -vm.pstats.matrix[27][3])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
 
 		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]}\\\\\n"
 

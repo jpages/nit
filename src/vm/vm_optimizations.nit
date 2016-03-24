@@ -72,9 +72,6 @@ redef class VirtualMachine
 		if callsite.mocallsite != null then
 			var impl = callsite.mocallsite.get_impl(sys.vm)
 
-			# Reset the implementation
-			# callsite.mocallsite.impl = null
-
 			if impl.exec_method(recv) != propdef then
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
 				print "preexistence {callsite.mocallsite.expr_preexist} if_pre {callsite.mocallsite.expr_preexist.bit_pre} preexistence_origin {callsite.mocallsite.preexistence_origin}"
@@ -982,7 +979,7 @@ redef class MOCallSitePattern
 			if pic_pos_unique then
 				set_sst_impl(vm, true)
 			else
-				set_ph_impl(vm, true, get_pic(vm).vtable.id)
+				set_ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		else
 			if get_pic(vm).is_instance_of_object(vm) then
@@ -994,7 +991,7 @@ redef class MOCallSitePattern
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
 				# By default, use perfect hashing
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				set_ph_impl(vm, true, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
 				impl = new NullImpl(self, true, 0, get_pic(vm))
@@ -1037,7 +1034,6 @@ redef class MOCallSitePattern
 					# If one of the site is a callsite used a reicever which is now non-preexisting
 					if site.as_receiver then
 						site.reinit_impl
-						# site.lp.recompilation = true
 						site.as_receiver = false
 					end
 				end
@@ -1233,11 +1229,15 @@ redef abstract class MOSite
 	# get_impl must be used to read this value
 	var impl: nullable Implementation is writable
 
+	# The number of recompilations of this entity
+	var recompilations: Int = 0
+
 	# Assign `null` to `impl`
 	# NOTE: This method must be use to set to null an Implementation before recompute it
 	# This method can be redefined to count recompilations in the vm
 	fun reinit_impl
 	do
+		recompilations += 1
 		if preexistence_protocol then
 			lp.recompilation = true
 		else
@@ -1330,7 +1330,7 @@ redef abstract class MOSite
 			if concretes_receivers.first.abstract_loaded then
 				# callsite and casts are implemented in static
 				if can_be_static then
-					set_static_impl(vm, true)
+					set_static_impl(vm, false)
 				else
 					# Attributes are implemented in SST
 					set_sst_impl(vm, false)
@@ -1655,7 +1655,9 @@ redef class MOCallSite
 		if not preexistence_protocol then super
 		if not mixed_protocol then super
 
-		# We make code-pathing for methods which were not implemented in static
+		recompilations += 1
+
+		# We make code-patching for methods which were not implemented in static
 		if impl != null and not impl.as(not null) isa StaticImplMethod then
 			impl = null
 		else

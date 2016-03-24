@@ -373,7 +373,11 @@ end
 redef class MOProcedureSite
 	redef fun compute_preexist
 	do
+		# return 8
+		# # if disable_preexistence_extensions or disable_method_return then
+		# else
 		return expr_recv.expr_preexist
+		# end
 	end
 end
 
