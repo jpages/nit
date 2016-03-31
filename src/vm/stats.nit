@@ -199,8 +199,8 @@ redef class VirtualMachine
 
 		if sys.debug_mode then
 			# Create the files for dumping ast_sites and model_sites
-			sys.dump_ast = new FileWriter.open("{vm.pstats.dir}/dump_ast_sites.txt")
-			sys.dump_object_sites = new FileWriter.open("{vm.pstats.dir}/dump_object_sites.txt")
+			sys.dump_ast = new FileWriter.open("{vm.pstats.dir}/dump_ast_sites-{vm.pstats.lbl}.txt")
+			sys.dump_object_sites = new FileWriter.open("{vm.pstats.dir}/dump_object_sites-{vm.pstats.lbl}.txt")
 		end
 	end
 end
@@ -307,6 +307,14 @@ class MOStats
 		# Create a directory with the current date to store the results
 		var date = new DateTime.now
 		dir = "{date.year}{date.month}{date.day}"
+
+		if sys.preexistence_protocol then
+			dir += "_preexistence"
+		else if sys.mixed_protocol then
+			dir += "_mixed"
+		else
+			dir += "_patching"
+		end
 
 		if not "{date.year}{date.month}{date.day}".file_exists then
 			dir.mkdir
@@ -542,7 +550,7 @@ class MOStats
 
 	fun trace_sites
 	do
-		var file = new FileWriter.open("{dir}/trace_sites.txt")
+		var file = new FileWriter.open("{dir}/trace_sites-{lbl}.txt")
 
 		print "sys.vm.all_moentities {sys.vm.all_moentities.length + sys.vm.primitive_entities.length}"
 		for mosite in sys.vm.all_moentities do
@@ -558,7 +566,7 @@ class MOStats
 			end
 		end
 
-		var primitives_file = new FileWriter.open("{dir}/trace_primitive_sites.txt")
+		var primitives_file = new FileWriter.open("{dir}/trace_primitive_sites-{lbl}.txt")
 
 		# Trace primitive sites
 		for mosite in sys.vm.primitive_entities do
@@ -585,7 +593,7 @@ class MOStats
 
 	fun trace_local_methods
 	do
-		var file = new FileWriter.open("{dir}/trace_local_methods.txt")
+		var file = new FileWriter.open("{dir}/trace_local_methods-{lbl}.txt")
 
 		for mpropdef in sys.vm.compiled_mproperties do
 			file.write("{mpropdef.trace}\n")
@@ -596,7 +604,7 @@ class MOStats
 
 	fun trace_global_methods
 	do
-		var file = new FileWriter.open("{dir}/trace_global_methods.txt")
+		var file = new FileWriter.open("{dir}/trace_global_methods-{lbl}.txt")
 
 		for mmethod in sys.vm.compiled_global_methods do
 			file.write("{mmethod.trace}\n")
@@ -623,8 +631,8 @@ class MOStats
 		var cuc_pos = 0
 		var cuc_null = 0
 
-		var trace_file = new FileWriter.open("{dir}/trace_file.txt")
-		var trace_model = new FileWriter.open("{dir}/trace_model.txt")
+		var trace_file = new FileWriter.open("{dir}/trace_file-{lbl}.txt")
+		var trace_model = new FileWriter.open("{dir}/trace_model-{lbl}.txt")
 
 		# Statistics on method returns
 		var nb_method_return = 0 # A method with a return
@@ -896,6 +904,9 @@ redef class MOSite
 
 	# Origin of the dependence encoded with the method `preexistence_origin`
 	var origin: Int is noinit
+
+	# The number of recompilations of this entity
+	var recompilations: Int = 0
 
 	# Count the implementation of the site
 	fun stats(vm: VirtualMachine)
@@ -1179,7 +1190,8 @@ redef class MOSite
 			res += "concretes = null"
 		end
 
-		res += " impl {get_impl(sys.vm)} preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
+		res += " used impl {get_impl(sys.vm)} conservative_impl {conservative_impl.as(not null)}"
+		res += " preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		res += " executions {executions}"
 		res += " recompilations {recompilations}"
 		res += " enclosing {lp}"
@@ -1188,13 +1200,13 @@ redef class MOSite
 		return res
 	end
 
-	# redef fun reinit_impl
-	# do
-	# 	super
+	redef fun reinit_impl
+	do
+		super
 
-	# 	# Each time a pattern has a change in its implementation, count it
-	# 	recompilations += 1
-	# end
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 
 	# The number of executions of this site
 	var executions = 0
@@ -1259,13 +1271,13 @@ redef class MOCallSite
 		return super + res
 	end
 
-	# redef fun reinit_impl
-	# do
-	# 	super
+	redef fun reinit_impl
+	do
+		super
 
-	# 	# Each time a pattern has a change in its implementation, count it
-	# 	recompilations += 1
-	# end
+		# Each time a pattern has a change in its implementation, count it
+		recompilations += 1
+	end
 end
 
 redef class MOFunctionSite
@@ -1673,6 +1685,8 @@ redef class MPropDef
 				if return_concretes != null then res += ", return_concretes {return_concretes}"
 			end
 		end
+
+		res += " all_immutables {all_immutables} all_conservative_impls {all_conservative_impls}"
 
 		return res
 	end

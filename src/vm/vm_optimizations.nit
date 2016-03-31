@@ -650,6 +650,30 @@ redef class MPropDef
 
 		recompilation = false
 	end
+
+	# Return true if all polymorphic sites have a conservative implementation
+	fun all_conservative_impls: Bool
+	do
+		var all_conservative = true
+		for site in mosites do
+			if site.get_impl(sys.vm) != site.conservative_impl then
+				all_conservative = false
+			end
+		end
+
+		return all_conservative
+	end
+
+	# Return true if all polymorphic sites have an immutable implementation
+	fun all_immutables: Bool
+	do
+		var all_immutable = true
+		for site in mosites do
+			if site.get_impl(sys.vm).is_mutable then all_immutable = false
+		end
+
+		return all_immutable
+	end
 end
 
 redef class MClass
@@ -1229,15 +1253,14 @@ redef abstract class MOSite
 	# get_impl must be used to read this value
 	var impl: nullable Implementation is writable
 
-	# The number of recompilations of this entity
-	var recompilations: Int = 0
+	# The conservative implementation of the site
+	var conservative_impl: nullable Implementation
 
 	# Assign `null` to `impl`
 	# NOTE: This method must be use to set to null an Implementation before recompute it
 	# This method can be redefined to count recompilations in the vm
 	fun reinit_impl
 	do
-		recompilations += 1
 		if preexistence_protocol then
 			lp.recompilation = true
 		else
@@ -1265,6 +1288,8 @@ redef abstract class MOSite
 	do
 		var res: Implementation
 
+		conservative_impl = conservative_implementation
+
 		if lp.recompilation then
 			# We need to recompile the whole method
 			lp.recompile_sites
@@ -1280,7 +1305,7 @@ redef abstract class MOSite
 				else
 					if not expr_recv.is_pre then
 						# Use the conservative implementation
-						res = conservative_implementation
+						res = conservative_impl.as(not null)
 					else
 						res = compute_impl
 					end
@@ -1449,16 +1474,17 @@ redef abstract class MOSite
 	fun conservative_implementation: Implementation
 	do
 		if not get_pic(vm).abstract_loaded then
-			set_null_impl
+			return new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
 		else if get_pic(vm).is_instance_of_object(vm) then
 			# SST for a property introduced in Object
-			set_sst_impl(vm, false)
+			var offset = get_offset(vm)
+			var pos_cls = get_block_position(vm, pattern.rsc)
+
+			return new SSTImpl(self, false, pos_cls + offset)
 		else
 			# By default, perfect hashing
-			set_ph_impl(vm, false)
+			return new PHImpl(self, false, get_offset(vm), get_pic(vm).vtable.id)
 		end
-
-		return impl.as(not null)
 	end
 end
 
@@ -1654,8 +1680,6 @@ redef class MOCallSite
 	do
 		if not preexistence_protocol then super
 		if not mixed_protocol then super
-
-		recompilations += 1
 
 		# We make code-patching for methods which were not implemented in static
 		if impl != null and not impl.as(not null) isa StaticImplMethod then
