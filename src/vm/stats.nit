@@ -1191,6 +1191,9 @@ redef class MOSite
 		end
 
 		res += " used impl {get_impl(sys.vm)} conservative_impl {conservative_impl.as(not null)}"
+
+		if get_impl(sys.vm) == conservative_impl then res += " is_conservative"
+
 		res += " preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		res += " executions {executions}"
 		res += " recompilations {recompilations}"
@@ -1655,6 +1658,9 @@ redef class MPropDef
 	# Number of times this method is executed
 	var nb_executions = 0
 
+	# Number of times the recompilation flag is set
+	var nb_recompilation_flag = 0
+
 	redef fun recompile_sites
 	do
 		super
@@ -1664,7 +1670,7 @@ redef class MPropDef
 	fun trace: String
 	do
 		var res = "LP {self}, GP {mproperty.intro_mclassdef.mclass}#{mproperty}"
-		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length} nb_recompilations {nb_recompilations}"
+		res += ", nb_sites {mosites.length}, nb_news {monews.length}, nb_callers {callers.length} nb_recompilations {nb_recompilations} recompilation_flag {recompilation} nb_recompilation_flag {nb_recompilation_flag}"
 		res += " nb_executions {nb_executions}"
 		res += ", recompilations_cost {nb_recompilations * (mosites.length + monomorph_sites.length +1)}"
 
@@ -1689,6 +1695,13 @@ redef class MPropDef
 		res += " all_immutables {all_immutables} all_conservative_impls {all_conservative_impls}"
 
 		return res
+	end
+
+	redef fun recompilation=(o: Bool)
+	do
+		super(o)
+
+		nb_recompilation_flag += 1
 	end
 end
 

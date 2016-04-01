@@ -607,7 +607,7 @@ end
 
 redef class MPropDef
 	# If true, then this propdef need to be recompiled lazily
-	var recompilation = false
+	var recompilation: Bool = false is writable
 
 	redef fun compile_mo
 	do
