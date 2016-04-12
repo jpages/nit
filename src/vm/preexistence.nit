@@ -362,7 +362,7 @@ redef class MOCallSite
 
 		if is_pre then res = res.bin_or(16)
 
-		if concretes_receivers != null then res = res.bin_or(32)
+		if concrete_receivers != null then res = res.bin_or(32)
 
 		if ast.get_receiver.mtype isa MFormalType then res = res.bin_or(64)
 
@@ -404,7 +404,7 @@ redef class MOFunctionSite
 		# Compute the concrete receivers of this site
 		if not is_monomorph then compute_concretes_site
 
-		if concretes_receivers != null then
+		if concrete_receivers != null then
 			callees = concrete_callees
 
 			for callee in callees do
@@ -473,7 +473,7 @@ redef class MOFunctionSite
 			return 32
 		else
 			# If we do not have any receivers
-			if concretes_receivers == null and pval.bit_pre_immut then
+			if concrete_receivers == null and pval.bit_pre_immut then
 				return pval.setbit(2, 0)
 			end
 

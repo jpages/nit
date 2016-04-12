@@ -80,7 +80,7 @@ redef class VirtualMachine
 				print "impl.exec_method(recv) {impl.exec_method(recv)}, propdef {propdef}"
 				callsite.mocallsite.compute_concretes_site
 
-				if callsite.mocallsite.concretes_receivers != null then print "concretes_receivers {callsite.mocallsite.concretes_receivers.to_s}"
+				if callsite.mocallsite.concrete_receivers != null then print "concrete_receivers {callsite.mocallsite.concrete_receivers.to_s}"
 
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
@@ -142,7 +142,7 @@ redef class VirtualMachine
 
 			if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
 				pattern.reinit_impl
-				pattern.compute_impl
+				pattern.impl = pattern.compute_impl
 			end
 
 			for mosite in pattern.sites do
@@ -158,7 +158,7 @@ redef class VirtualMachine
 		for pattern in mclass.subtype_target_patterns do
 			if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
 				pattern.reinit_impl
-				pattern.compute_impl
+				pattern.impl = pattern.compute_impl
 			end
 
 			for mosite in pattern.sites do
@@ -287,13 +287,6 @@ redef class AAttrAssignExpr
 		var mproperty = self.mproperty.as(not null)
 
 		assert recv isa MutableInstance
-
-		# if status == 1 then
-		# 	v.write_attribute_sst(recv.internal_attributes, offset, i)
-		# else
-		# 	v.write_attribute_ph(recv.internal_attributes, recv.vtable.as(not null).internal_vtable,
-		# 			recv.vtable.as(not null).mask, id, offset, i)
-		# end
 
 		# Test with new mechanisms
 		if mo_entity != null then
@@ -624,15 +617,15 @@ redef class MPropDef
 		for site in mosites do
 			site.impl = null
 			site.expr_recv.preexist_init
-			site.concretes_receivers = null
+			site.concrete_receivers = null
 			site.compute_concretes_site
 
 			if not sys.preexistence_protocol then
-				site.compute_impl
+				site.impl = site.compute_impl
 			else if site.expr_recv.is_pre then
-				site.compute_impl
+				site.impl = site.compute_impl
 			else if mixed_protocol and site isa MOCallSite then
-				site.compute_impl
+				site.impl = site.compute_impl
 			else
 				site.impl = site.conservative_implementation
 			end
@@ -640,12 +633,12 @@ redef class MPropDef
 
 		for site in monomorph_sites do
 			site.impl = null
-			site.compute_impl
+			site.impl = site.compute_impl
 		end
 
 		for site in primitive_sites do
 			site.impl = null
-			site.compute_impl
+			site.impl = site.compute_impl
 		end
 
 		recompilation = false
@@ -719,17 +712,16 @@ redef class PICPattern
 	# Compute an appropriate Implementation based on the positions of recv_class and pic_class
 	fun get_impl: Implementation
 	do
-		if impl == null then compute_impl
+		if impl == null then impl = compute_impl
 		return impl.as(not null)
 	end
 
 	# Compute an Implementation for self and set attribute `impl`
-	private fun compute_impl
+	private fun compute_impl: Implementation
 	do
 		# If the pic is the root of the hierarchy
 		if pic_class.is_instance_of_object(vm) then
-			set_sst_impl(false)
-			return
+			return sst_impl(false)
 		end
 
 		# If the recv_class and pic_class are loaded we can compute an implementation
@@ -738,47 +730,47 @@ redef class PICPattern
 			if pic_pos_unique then
 				# In all loaded subclasses of recv_class, the pic block is at the same position,
 				# use sst mutable implementation
-				set_sst_impl(true)
+				return sst_impl(true)
 			else
 				# The pic has several position in subclasses of recv_class,
 				# we must use a perfect hashing non-mutable implementation
-				set_ph_impl(false, pic_class.vtable.id)
+				return ph_impl(false, pic_class.vtable.id)
 			end
 		else
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if pic_class.abstract_loaded then
 				# By default, use perfect hashing
-				set_ph_impl(false, pic_class.vtable.id)
+				return ph_impl(false, pic_class.vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				set_null_impl
+				return null_impl
 			end
 		end
 	end
 
 	# Set a single-subtyping implementation
 	# *`mutable` Indicate if the implementation can change in the future
-	fun set_sst_impl(mutable: Bool)
+	fun sst_impl(mutable: Bool): Implementation
 	do
 		var pos_cls = get_block_position
 
-		impl = new SSTImpl(self, mutable, pos_cls)
+		return new SSTImpl(self, mutable, pos_cls)
 	end
 
 	# Set a perfect hashing implementation
 	# *`mutable` Indicate if the implementation can change in the future
 	# *`id` The target identifier
-	fun set_ph_impl(mutable: Bool, id: Int)
+	fun ph_impl(mutable: Bool, id: Int): Implementation
 	do
-		impl = new PHImpl(self, mutable, get_block_position, id)
+		return new PHImpl(self, mutable, get_block_position, id)
 	end
 
 	# Set a null Implementation, i.e. the pic is not loaded
-	fun set_null_impl
+	fun null_impl: Implementation
 	do
 		# This implementation is temporary and will be replaced if the corresponding class is loaded
-		impl = new NullImpl(self, true, 0, pic_class)
+		return new NullImpl(self, true, 0, pic_class)
 	end
 
 	# The PICPattern implementation became a perfect hashing implementation with a class loading
@@ -860,7 +852,7 @@ redef abstract class MOSitePattern
 
 		reinit_impl
 
-		set_ph_impl(vm, false, get_pic(vm).vtable.id)
+		ph_impl(vm, false, get_pic(vm).vtable.id)
 
 		for site in sites do
 			site.propagate_ph_impl
@@ -870,12 +862,12 @@ redef abstract class MOSitePattern
 	# Get implementation, compute it if not exists
 	fun get_impl(vm: VirtualMachine): Implementation
 	do
-		if impl == null then compute_impl
+		if impl == null then impl = compute_impl
 		return impl.as(not null)
 	end
 
 	# Compute the implementation of this pattern and set attribute `impl`
-	private fun compute_impl is abstract
+	private fun compute_impl: Implementation is abstract
 
 	# Get the relative offset of the "property" (gp for MOPropPattern, method block offset for MOSubtypeSitePattern)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
@@ -887,27 +879,27 @@ redef abstract class MOSitePattern
 		return false
 	end
 
-	# Set a static implementation
+	# Compute and return an appropriate static Implementation
 	# `mutable` If true, the implementation can change in the future
-	fun set_static_impl(mutable: Bool) is abstract
+	fun static_impl(mutable: Bool): Implementation is abstract
 
 	# Set a sst impl
-	fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	fun sst_impl(vm: VirtualMachine, mutable: Bool): Implementation
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position
 
-		impl = new SSTImpl(self, mutable, pos_cls + offset)
+		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
 
 	# Set a perfect hashing implementation
 	# *`mutable` Indicate if the implementation can change in the future
 	# *`id` The target identifier
-	fun set_ph_impl(vm: VirtualMachine, mutable: Bool, id: Int)
+	fun ph_impl(vm: VirtualMachine, mutable: Bool, id: Int): Implementation
 	do
 		var offset = get_offset(vm)
 
-		impl = new PHImpl(self, mutable, offset, id)
+		return new PHImpl(self, mutable, offset, id)
 	end
 
 	# Return true if the pic is at a unique position on the whole class hierarchy
@@ -924,28 +916,27 @@ redef abstract class MOSitePattern
 end
 
 redef class MOAttrPattern
-	redef fun compute_impl
+	redef fun compute_impl: Implementation
 	do
 		if rsc.abstract_loaded then
 			if pic_pos_unique then
-				set_sst_impl(vm, true)
+				return sst_impl(vm, true)
 			else
-				set_ph_impl(vm, true, get_pic(vm).vtable.id)
+				return ph_impl(vm, true, get_pic(vm).vtable.id)
 			end
 		else
 			if get_pic(vm).is_instance_of_object(vm) then
-				set_sst_impl(vm, false)
-				return
+				return sst_impl(vm, false)
 			end
 
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
 				# By default, use perfect hashing
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				impl = new NullImpl(self, true, 0, get_pic(vm))
+				return new NullImpl(self, true, 0, get_pic(vm))
 			end
 		end
 	end
@@ -960,23 +951,23 @@ redef class MOAttrPattern
  		return rsc.get_position_attributes(get_pic(vm))
  	end
 
-	redef fun set_static_impl(mutable) do abort
+	redef fun static_impl(mutable) do abort
 
-	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position
-		impl = new SSTImpl(self, mutable, pos_cls + offset)
+		return  new SSTImpl(self, mutable, pos_cls + offset)
 	end
 end
 
 redef class MOCallSitePattern
-	redef fun set_static_impl(mutable)
+	redef fun static_impl(mutable)
 	do
 		if rsc.is_final then
-			impl = new StaticImplMethod(self, mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
+			return new StaticImplMethod(self, mutable, gp.lookup_first_definition(sys.vm.mainmodule, rsc.intro.bound_mtype))
 		else
-			impl = new StaticImplMethod(self, mutable, callees.first)
+			return new StaticImplMethod(self, mutable, callees.first)
 		end
 	end
 
@@ -992,33 +983,31 @@ redef class MOCallSitePattern
 	do
 		if can_be_static then
 			if rsc.is_final and rsc.loaded then
-				set_static_impl(false)
+				return static_impl(false)
 			else
-				set_static_impl(true)
+				return static_impl(true)
 			end
-			return
 		end
 
 		if rsc.abstract_loaded then
 			if pic_pos_unique then
-				set_sst_impl(vm, true)
+				return sst_impl(vm, true)
 			else
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		else
 			if get_pic(vm).is_instance_of_object(vm) then
-				set_sst_impl(vm, false)
-				return
+				return sst_impl(vm, false)
 			end
 
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
 				# By default, use perfect hashing
-				set_ph_impl(vm, true, get_pic(vm).vtable.id)
+				return ph_impl(vm, true, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				impl = new NullImpl(self, true, 0, get_pic(vm))
+				return new NullImpl(self, true, 0, get_pic(vm))
 			end
 		end
 	end
@@ -1079,9 +1068,9 @@ redef class MOCallSitePattern
 		# Now, recompute the implementation of this pattern and its sites
 		if not impl == null and impl.is_mutable then
 			reinit_impl
-			compute_impl
+			impl = compute_impl
 		else
-			compute_impl
+			impl = compute_impl
 		end
 
 		for site in sites do
@@ -1100,19 +1089,19 @@ redef class MOSubtypeSitePattern
 	do
 		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
 			if can_be_static then
-				set_static_impl(true)
+				return static_impl(true)
 			else if can_be_sst then
-				set_sst_impl(vm, true)
+				return sst_impl(vm, true)
 			else
 				# By default, use perfect hashing
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		else
 			if can_be_static then
-				set_static_impl(true)
+				return static_impl(true)
 			else
 				# By default, use perfect hashing
-				set_ph_impl(vm, false, get_pic(vm).vtable.id)
+				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		end
 	end
@@ -1170,7 +1159,7 @@ redef class MOSubtypeSitePattern
 		return rsc.get_position_methods(get_pic(vm))
 	end
 
-	redef fun set_static_impl(mutable)
+	redef fun static_impl(mutable)
 	do
 		# The result of the subtyping test
 		var res: Bool = false
@@ -1185,14 +1174,14 @@ redef class MOSubtypeSitePattern
 		if rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
 		if not rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
 
-		impl = new StaticImplSubtype(self, true, res)
+		return new StaticImplSubtype(self, true, res)
 	end
 
-	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position
-		impl = new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
+		return  new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
 	end
 end
 
@@ -1204,9 +1193,9 @@ redef class MOAsNotNullPattern
 		# TODO
 		if rsc.abstract_loaded then
 			if can_be_static then
-				set_static_impl(true)
+				return static_impl(true)
 			else
-				set_sst_impl(vm, true)
+				return sst_impl(vm, true)
 			end
 		else
 			# The rst is not loaded but the pic is,
@@ -1214,16 +1203,16 @@ redef class MOAsNotNullPattern
 			if get_pic(vm).abstract_loaded then
 				var pos_cls = get_block_position
 				if get_pic(vm).is_instance_of_object(vm) then
-					set_sst_impl(vm, false)
+					return sst_impl(vm, false)
 				else if can_be_static then
-					set_static_impl(true)
+					return static_impl(true)
 				else
 					# By default, use perfect hashing
-					set_ph_impl(vm, false, get_pic(vm).vtable.id)
+					return ph_impl(vm, false, get_pic(vm).vtable.id)
 				end
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				impl = new NullImpl(self, true, 0, get_pic(vm))
+				return new NullImpl(self, true, 0, get_pic(vm))
 			end
 		end
 	end
@@ -1233,9 +1222,9 @@ redef class MOAsNotNullPattern
 		return rsc.get_position_methods(get_pic(vm))
 	end
 
-	redef fun set_static_impl(mutable)
+	redef fun static_impl(mutable)
 	do
-		impl = new StaticImplSubtype(self, false, true)
+		return new StaticImplSubtype(self, false, true)
 	end
 
 	redef fun can_be_static
@@ -1249,8 +1238,7 @@ redef abstract class MOPropSitePattern
 end
 
 redef abstract class MOSite
-	# Implementation of the site (null if can't determine concretes receivers)
-	# get_impl must be used to read this value
+	# Optimistic implementation of the site
 	var impl: nullable Implementation is writable
 
 	# The conservative implementation of the site
@@ -1276,10 +1264,10 @@ redef abstract class MOSite
 
 		if impl != null then reinit_impl
 
-		if concretes_receivers == null then
-			set_ph_impl(vm, false)
+		if concrete_receivers == null then
+			impl = ph_impl(vm, false)
 		else
-			compute_impl_concretes(vm)
+			impl = compute_impl_concretes(vm)
 		end
 	end
 
@@ -1326,70 +1314,61 @@ redef abstract class MOSite
 		monomorphic_analysis
 		compute_concretes_site
 
-		if concretes_receivers == null and not is_monomorph then
+		if concrete_receivers == null and not is_monomorph then
 			# Recopy the implementation of the pattern
 			var pattern_impl = pattern.get_impl(vm)
 			if pattern_impl isa StaticImpl then
-				set_static_impl(vm, true)
+				impl = static_impl(vm, true)
 			else if pattern_impl isa SSTImpl then
-				set_sst_impl(vm, true)
+				impl = sst_impl(vm, true)
 			else if pattern.impl isa NullImpl then
-				set_null_impl
+				impl = null_impl
 			else
-				set_ph_impl(vm, true)
+				impl = ph_impl(vm, true)
 			end
 		else
-			compute_impl_concretes(vm)
+			impl = compute_impl_concretes(vm)
 		end
 
 		impl.mo_entity = self
 		return impl.as(not null)
 	end
 
-	# Compute the implementation with rst/pic, and concretes if any
-	# TODO: finish to comment the code
-	fun compute_impl_concretes(vm: VirtualMachine)
+	# Compute the implementation based on concrete types and return it
+	fun compute_impl_concretes(vm: VirtualMachine): Implementation
 	do
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
-			if concretes_receivers.first.abstract_loaded then
+			if concrete_receivers.first.abstract_loaded then
 				# callsite and casts are implemented in static
 				if can_be_static then
-					set_static_impl(vm, false)
+					return static_impl(vm, false)
 				else
 					# Attributes are implemented in SST
-					set_sst_impl(vm, false)
+					return sst_impl(vm, false)
 				end
-				return
 			end
 		end
 
 		# Static
 		if can_be_static then
-			set_static_impl(vm, true)
-			return
-		end
-
-		# If the property is introduced in Object class, SST can be used
-		if get_pic(vm).is_instance_of_object(vm) then
-			set_sst_impl(vm, false)
-			return
+			return static_impl(vm, true)
 		end
 
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
 			# SST immutable because statically, it can't be more than these concrete receivers
-			set_sst_impl(vm, false)
+			return sst_impl(vm, false)
 		else if get_pic(vm).abstract_loaded then
 			if unique_pos_indicator == -1 then
 				# Some receiver classes are not loaded yet, so we use a mutable implementation
-				set_ph_impl(vm, true)
+				return ph_impl(vm, true)
 			else
-				set_ph_impl(vm, false)
+				return ph_impl(vm, false)
 			end
 		else
-			set_null_impl
+			return null_impl
 		end
 	end
 
@@ -1404,10 +1383,10 @@ redef abstract class MOSite
 		# If the rsc does not have a unique position for its methods in all its loaded subclasses
 		if pattern.rsc.position_methods < 0 then return 0
 
-		if concretes_receivers != null then
+		if concrete_receivers != null then
 
-			var current_pos = get_block_position(vm, concretes_receivers.first)
-			for recv in concretes_receivers.as(not null) do
+			var current_pos = get_block_position(vm, concrete_receivers.first)
+			for recv in concrete_receivers.as(not null) do
 				if not recv.loaded then return -1
 
 				if get_block_position(vm, recv) < 0 then
@@ -1444,46 +1423,80 @@ redef abstract class MOSite
 	end
 
 	# Set a static implementation
-	fun set_static_impl(vm: VirtualMachine, mutable: Bool) is abstract
+	fun static_impl(vm: VirtualMachine, mutable: Bool): Implementation is abstract
 
 	# Set a sst implementation
-	fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	fun sst_impl(vm: VirtualMachine, mutable: Bool): Implementation
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position(vm, pattern.rsc)
 
-		impl = new SSTImpl(self, mutable, pos_cls + offset)
+		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
 
 	# Set a ph implementation
-	fun set_ph_impl(vm: VirtualMachine, mutable: Bool)
+	fun ph_impl(vm: VirtualMachine, mutable: Bool): Implementation
 	do
 		var offset = get_offset(vm)
 
-		impl = new PHImpl(self, mutable, offset, get_pic(vm).vtable.id)
+		return new PHImpl(self, mutable, offset, get_pic(vm).vtable.id)
 	end
 
 	# Set a null implementation (eg. PIC null)
-	fun set_null_impl
+	fun null_impl: Implementation
 	do
-		impl = new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
+		return new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
 	end
 
 	# Compute and return the conservative implementation of this site
 	# The conservative implementation is the Implementation that will never require recompiling the site
 	fun conservative_implementation: Implementation
 	do
-		if not get_pic(vm).abstract_loaded then
-			return new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
-		else if get_pic(vm).is_instance_of_object(vm) then
-			# SST for a property introduced in Object
-			var offset = get_offset(vm)
-			var pos_cls = get_block_position(vm, pattern.rsc)
+		# If we have concrete receivers, use them to compute the conservative implementation
+		if concrete_receivers != null then
+			if is_monomorph then
+				# Ensure that the concrete type of the site is loaded
+				# if concrete_receivers.first.abstract_loaded then
+					# callsite and casts are implemented in static
+					if can_be_static then
+						return static_impl(vm, false)
+					else
+						# Attributes are implemented in SST
+						return sst_impl(vm, false)
+					end
+				# end
+			else if self isa MOCallSite and concrete_callees.length == 1 then
+				return static_impl(vm, false)
+			else
+				var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
-			return new SSTImpl(self, false, pos_cls + offset)
+				if unique_pos_indicator == 1 then
+					# SST immutable because statically, it can't be more than these concrete receivers
+					return sst_impl(vm, false)
+				else if get_pic(vm).abstract_loaded then
+					if unique_pos_indicator == -1 then
+						# Some receiver classes are not loaded yet, so we use a mutable implementation
+						return ph_impl(vm, true)
+					else
+						return ph_impl(vm, false)
+					end
+				else
+					return null_impl
+				end
+			end
 		else
-			# By default, perfect hashing
-			return new PHImpl(self, false, get_offset(vm), get_pic(vm).vtable.id)
+			if not get_pic(vm).abstract_loaded then
+				return new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
+			else if get_pic(vm).is_instance_of_object(vm) then
+				# SST for a property introduced in Object
+				var offset = get_offset(vm)
+				var pos_cls = get_block_position(vm, pattern.rsc)
+
+				return new SSTImpl(self, false, pos_cls + offset)
+			else
+				# By default, perfect hashing
+				return new PHImpl(self, false, get_offset(vm), get_pic(vm).vtable.id)
+			end
 		end
 	end
 end
@@ -1497,48 +1510,46 @@ redef class MOSubtypeSite
 	do
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
-			if concretes_receivers.first.abstract_loaded then
-				set_static_impl(vm, false)
-				return
+			if concrete_receivers.first.abstract_loaded then
+				return static_impl(vm, false)
 			end
 		end
 
 		# Static
 		if can_be_static then
-			set_static_impl(vm, true)
-			return
+			return static_impl(vm, true)
 		end
 
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
 			# SST immutable because statically, it can't be more than these concrete receivers
-			set_sst_impl(vm, false)
+			return sst_impl(vm, false)
 		else if get_pic(vm).abstract_loaded then
 			if unique_pos_indicator == -1 then
 				# Some receiver classes are not loaded yet, so we use a mutable implementation
-				set_ph_impl(vm, true)
+				return ph_impl(vm, true)
 			else
-				set_ph_impl(vm, false)
+				return ph_impl(vm, false)
 			end
 		else
-			set_static_impl(vm, true)
+			return static_impl(vm, true)
 		end
 	end
 
-	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		impl = new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
+		return new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
 	end
 
-	redef fun set_static_impl(vm, mutable)
+	redef fun static_impl(vm, mutable)
 	do
 		if not get_pic(vm).abstract_loaded then
-			impl = new StaticImplSubtype(self, mutable, false)
+			return new StaticImplSubtype(self, mutable, false)
 		else
 			var cast_value = vm.is_subclass(pattern.rsc, get_pic(vm))
-			impl = new StaticImplSubtype(self, mutable, cast_value)
+			return new StaticImplSubtype(self, mutable, cast_value)
 		end
 	end
 
@@ -1563,15 +1574,15 @@ redef class MOAsNotNullSite
 
 	redef fun get_pic(vm) do return pattern.rsc
 
-	redef fun set_static_impl(vm, mutable)
+	redef fun static_impl(vm, mutable)
 	do
 		if not get_pic(vm).loaded then
-			impl = new StaticImplSubtype(self, mutable, false)
+			return new StaticImplSubtype(self, mutable, false)
 		else
 			var target_id = get_pic(vm).vtable.as(not null).id
 			var source_vt = pattern.rsc.vtable.as(not null)
 			var cast_value = vm.inter_is_subtype_ph(target_id, source_vt.mask, source_vt.internal_vtable)
-			impl = new StaticImplSubtype(self, mutable, cast_value)
+			return new StaticImplSubtype(self, mutable, cast_value)
 		end
 	end
 end
@@ -1585,35 +1596,35 @@ end
 redef abstract class MOAttrSite
 	redef fun can_be_static do return false
 
-	redef fun set_static_impl(vm, mutable) do abort
+	redef fun static_impl(vm, mutable) do abort
 
 	redef fun get_block_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
 
-	redef fun set_sst_impl(vm: VirtualMachine, mutable: Bool)
+	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
 		var pos_cls = get_block_position(vm, pattern.rsc)
-		impl = new SSTImpl(self, mutable, pos_cls + offset)
+		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
 
 	redef fun compute_impl_concretes(vm: VirtualMachine)
 	do
 		if is_monomorph then
 			# Attributes are implemented in SST
-			set_sst_impl(vm, false)
+			return sst_impl(vm, false)
 		else
-			super
+			return super
 		end
 	end
 end
 
 redef class MOCallSite
-	redef fun set_static_impl(vm, mutable)
+	redef fun static_impl(vm, mutable)
 	do
 		if pattern.callees.length == 1 then
-			impl = new StaticImplMethod(self, mutable, pattern.callees.first)
+			return new StaticImplMethod(self, mutable, pattern.callees.first)
 		else
-			impl = new StaticImplMethod(self, mutable, concrete_callees.first)
+			return new StaticImplMethod(self, mutable, concrete_callees.first)
 		end
 	end
 
@@ -1626,7 +1637,7 @@ redef class MOCallSite
 
 		if is_monomorph then return true
 
-		if concretes_receivers == null then
+		if concrete_receivers == null then
 			return false
 		else
 			if concrete_callees.length == 1 then
@@ -1642,36 +1653,33 @@ redef class MOCallSite
 	redef fun compute_impl_concretes(vm: VirtualMachine)
 	do
 		if is_monomorph then
-			set_static_impl(vm, false)
-			return
+			return static_impl(vm, false)
 		end
 
 		# Static
 		if can_be_static then
-			set_static_impl(vm, true)
-			return
+			return static_impl(vm, true)
 		end
 
 		# If the property is introduced in Object class, SST can be used
 		if get_pic(vm).is_instance_of_object(vm) then
-			set_sst_impl(vm, false)
-			return
+			return sst_impl(vm, false)
 		end
 
 		var unique_pos_indicator = unique_pos_for_each_recv(vm)
 
 		if unique_pos_indicator == 1 then
 			# SST immutable because statically, it can't be more than these concrete receivers
-			set_sst_impl(vm, false)
+			return sst_impl(vm, false)
 		else if get_pic(vm).abstract_loaded then
 			if unique_pos_indicator == -1 then
 				# Some receiver classes are not loaded yet, so we use a mutable implementation
-				set_ph_impl(vm, true)
+				return ph_impl(vm, true)
 			else
-				set_ph_impl(vm, false)
+				return ph_impl(vm, false)
 			end
 		else
-			set_null_impl
+			return null_impl
 		end
 	end
 

@@ -421,7 +421,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			site.concretes_receivers = null
+			site.concrete_receivers = null
 			var concretes = site.get_concretes
 
 			# We only count MOSite with a concrete receiver
@@ -498,7 +498,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			if site.concretes_receivers == null then continue
+			if site.concrete_receivers == null then continue
 			if not (origin == 256 or origin == 384) then continue
 			# We only count MOSite with concrete_receivers and a readsite receiver
 
@@ -570,7 +570,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			site.concretes_receivers = null
+			site.concrete_receivers = null
 			var concretes = site.get_concretes
 
 			if concretes == null then continue
@@ -646,7 +646,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			site.concretes_receivers = null
+			site.concrete_receivers = null
 			var concretes = site.get_concretes
 
 			if concretes == null then continue
@@ -721,7 +721,7 @@ redef class MOStats
 			# Do not count as.(not null)
 			if site isa MOAsNotNullSite then continue
 
-			site.concretes_receivers = null
+			site.concrete_receivers = null
 			var concretes = site.get_concretes
 
 			if concretes == null then continue

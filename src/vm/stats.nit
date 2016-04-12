@@ -801,7 +801,7 @@ class MOStats
 
 				if site isa MOCallSite then
 					if site.trace_origin == 32 and site.expr_recv.preexistence_origin == 3 then
-						print "concretes_receivers"
+						print "concrete_receivers"
 					end
 				end
 
@@ -913,7 +913,7 @@ redef class MOSite
 	do
 		# Compute the concrete types of this site
 		if not is_monomorph then
-			concretes_receivers = null
+			concrete_receivers = null
 			compute_concretes_site
 		end
 
@@ -1073,7 +1073,7 @@ redef class MOSite
 	# Increment counters for callsites with concrete receivers
 	fun incr_concrete_site
 	do
-		if concretes_receivers != null then
+		if concrete_receivers != null then
 			# Total of concretes for each category
 			vm.pstats.matrix[3][index_x] += 1
 
@@ -1184,8 +1184,8 @@ redef class MOSite
 
 		if pattern.rsc.is_final then res += "final_rcv = {pattern.rsc} "
 
-		if concretes_receivers != null then
-			res += "concretes = {concretes_receivers.as(not null)}"
+		if concrete_receivers != null then
+			res += "concretes = {concrete_receivers.as(not null)}"
 		else
 			res += "concretes = null"
 		end

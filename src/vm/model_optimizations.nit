@@ -827,8 +827,8 @@ abstract class MOSite
 	# The pattern using by this expression site
 	var pattern: P is writable, noinit
 
-	# List of concretes receivers if ALL receivers can be statically and with intra-procedural analysis determined
-	var concretes_receivers: nullable ConcreteTypes is noinit, writable
+	# List of concrete receivers if all receivers can be statically determined
+	var concrete_receivers: nullable ConcreteTypes is noinit, writable
 
 	# Indicate if this site can be trivially optimized, and thus is in a special category in the protocol,
 	# A monomorphic site is coming from a unique new of a loaded class or typed by a final class (loaded or not)
@@ -856,7 +856,7 @@ abstract class MOSite
 			var concrete = new ConcreteTypes
 			concrete.immutable = true
 			concrete.add(pattern.rsc)
-			concretes_receivers = concrete
+			concrete_receivers = concrete
 		end
 
 		# If the static type is final, then it is monomorph
@@ -866,7 +866,7 @@ abstract class MOSite
 			concrete.immutable = true
 			concrete.add(pattern.rsc)
 
-			concretes_receivers = concrete
+			concrete_receivers = concrete
 		end
 
 		# If the site is coming from a new of a loaded class
@@ -878,7 +878,7 @@ abstract class MOSite
 			concrete.immutable = true
 
 			concrete.add(expr_recv.as(MONew).pattern.cls)
-			concretes_receivers = concrete
+			concrete_receivers = concrete
 		end
 
 		# The receiver of the site is coming from a variable with a unique loaded new in dependency
@@ -892,7 +892,7 @@ abstract class MOSite
 			concrete.immutable = true
 			concrete.add(new_class)
 
-			concretes_receivers = concrete
+			concrete_receivers = concrete
 		end
 
 		# If the site was monomorph, stores it apart from polymorph sites
@@ -912,11 +912,11 @@ abstract class MOSite
 		# Do not compute concrete_type in original preexistence
 		if sys.disable_preexistence_extensions then	return
 
-		if concretes_receivers != null then return
+		if concrete_receivers != null then return
 
 		var res = expr_recv.compute_concretes(null)
 		if res != null then
-			concretes_receivers = res
+			concrete_receivers = res
 
 			# The classes of the concrete need to know they are used as concrete types
 			notify_classes
@@ -928,13 +928,13 @@ abstract class MOSite
 	do
 		if not is_monomorph then compute_concretes_site
 
-		return concretes_receivers
+		return concrete_receivers
 	end
 
 	# Indicate to the class inside the concrete types that `self` used them as concretes
 	fun notify_classes
 	do
-		for mclass in concretes_receivers do
+		for mclass in concrete_receivers do
 			if not mclass.concrete_sites.has(self) then mclass.concrete_sites.add(self)
 		end
 	end
@@ -1046,9 +1046,9 @@ class MOAsSubtypeSite
 		if concretes == null then concretes = new ConcreteTypes
 
 		# If we have concrete receivers use them compute concretes types
-		if concretes_receivers != null then
+		if concrete_receivers != null then
 			# See which concretes receivers are subtypes of the target of the cast
-			for rcv in concretes_receivers.as(not null) do
+			for rcv in concrete_receivers.as(not null) do
 				if vm.is_subclass(rcv, target_mclass) then concretes.add(rcv)
 			end
 		else
@@ -1140,12 +1140,12 @@ class MOCallSite
 		var callees = new List[MMethodDef]
 
 		if is_monomorph then
-			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, concretes_receivers.first.intro.bound_mtype)
+			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, concrete_receivers.first.intro.bound_mtype)
 			callees.add(propdef)
 			return callees
 		end
 
-		for rcv in concretes_receivers.as(not null) do
+		for rcv in concrete_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue
 
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
@@ -1180,8 +1180,8 @@ class MOFunctionSite
 		var callees = new List[MMethodDef]
 
 		# If we have concrete receivers use them to get the concrete callees
-		if concretes_receivers != null then
-			for rcv in concretes_receivers.as(not null) do
+		if concrete_receivers != null then
+			for rcv in concrete_receivers.as(not null) do
 				if not rcv.abstract_loaded then continue
 
 				var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
@@ -1303,7 +1303,7 @@ redef class MClass
 	# The only asnotnull pattern
 	var asnotnull_pattern: nullable MOAsNotNullPattern
 
-	# Contrary relation of concretes_receivers, the sites in which self appears as a concrete
+	# Contrary relation of concrete_receivers, the sites in which self appears as a concrete
 	var concrete_sites = new List[MOSite]
 
 	# The list of all self_expressions on which self
