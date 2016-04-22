@@ -310,9 +310,13 @@ class MOStats
 
 		if sys.preexistence_protocol then
 			dir += "_preexistence"
-		else if sys.mixed_protocol then
+		end
+
+		if sys.mixed_protocol then
 			dir += "_mixed"
-		else
+		end
+
+		if not sys.preexistence_protocol and not sys.mixed_protocol then
 			dir += "_patching"
 		end
 

@@ -1529,13 +1529,4 @@ redef class AForExpr
 			end
 		end
 	end
-
-	#TODO: debug
-	# redef fun visit_expression(ssa, block)
-	# do
-	# 	dump_tree
-	# 	print "\n\n"
-	# 	parent.dump_tree
-	# 	abort
-	# end
 end

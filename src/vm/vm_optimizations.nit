@@ -1455,16 +1455,13 @@ redef abstract class MOSite
 		# If we have concrete receivers, use them to compute the conservative implementation
 		if concrete_receivers != null then
 			if is_monomorph then
-				# Ensure that the concrete type of the site is loaded
-				# if concrete_receivers.first.abstract_loaded then
-					# callsite and casts are implemented in static
-					if can_be_static then
-						return static_impl(vm, false)
-					else
-						# Attributes are implemented in SST
-						return sst_impl(vm, false)
-					end
-				# end
+				# callsite and casts are implemented in static
+				if can_be_static then
+					return static_impl(vm, false)
+				else
+					# Attributes are implemented in SST
+					return sst_impl(vm, false)
+				end
 			else if self isa MOCallSite and concrete_callees.length == 1 then
 				return static_impl(vm, false)
 			else
@@ -1474,12 +1471,7 @@ redef abstract class MOSite
 					# SST immutable because statically, it can't be more than these concrete receivers
 					return sst_impl(vm, false)
 				else if get_pic(vm).abstract_loaded then
-					if unique_pos_indicator == -1 then
-						# Some receiver classes are not loaded yet, so we use a mutable implementation
-						return ph_impl(vm, true)
-					else
-						return ph_impl(vm, false)
-					end
+					return ph_impl(vm, false)
 				else
 					return null_impl
 				end
@@ -1735,6 +1727,22 @@ abstract class Implementation
 	# *`recv` The receiver
 	# Return the result of the test
 	fun exec_subtype(recv: Instance): Bool is abstract
+
+	# Return true if `o` is the same type of implementation as self
+	fun same_implementation(o: Implementation): Bool
+	do
+		if o isa StaticImpl then
+			return self isa StaticImpl
+		else if o isa SSTImpl then
+			return self isa SSTImpl
+		else if o isa NullImpl then
+			return self isa NullImpl
+		else if o isa PHImpl then
+			return self isa PHImpl
+		end
+
+		return false
+	end
 end
 
 # A null implementation
