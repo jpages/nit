@@ -132,7 +132,7 @@ end
 class FinalAttributeVisitor
 	super Visitor
 
-	var propdef: nullable APropdef
+	var propdef: nullable APropdef is noinit
 
 	var concrete_types: GlobalAnalysis
 

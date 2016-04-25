@@ -75,7 +75,7 @@ redef class Int
 	fun check_preexist: Bool
 	do
 		# invariant d'une préexistence complètement calculée
-		var low = bin_and(63)
+		var low = self & 63
 		var preexist_values = once [0,1,0,3,0,5,0,7,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 		if low != preexist_values[low] then
 			print("Preexistence of {self} = {low}")
@@ -94,44 +94,44 @@ redef class Int
 
 	fun bit_param(n: Int): Bool
 	do
-		return bin_and(64.lshift(n)) > 0
+		return (self & (64 << n)) > 0
 	end
 
 	fun bit_rec: Bool
 	do
-		return bin_and(32) == 32
+		return self & 32 == 32
 	end
 
 	fun bit_pre: Bool
 	do
-		return bin_and(1) == 1
+		return self & 1 == 1
 	end
 
 	fun bit_pre_immut : Bool
 	do
-		return bin_and(2) == 2
+		return self & 2 == 2
 	end
 
 	fun bit_pre_val: Bool
 	do
-		return bin_and(4) == 4
+		return self & 4 == 4
 	end
 
 	fun bit_npre: Bool
 	do
-		return bin_and(8) == 8
+		return self & 8 == 8
 	end
 
 	fun bit_npre_immut: Bool do
-		return bin_and(16) == 16
+		return self & 16 == 16
 	end
 
 	fun bit_mut: Bool do
-		return bin_and(18) == 0
+		return self & 18 == 0
 	end
 
 	fun bit_immut: Bool do
-		return bin_and(18) > 0
+		return self & 18 > 0
 	end
 
 	fun bit_unknown: Bool do
@@ -143,19 +143,19 @@ redef class Int
 		check_preexist
 		n.check_preexist
 
-		var low = bin_and(n)
-		var high = bin_or(n)
+		var low = self &  n
+		var high = self | n
 
-		if high.bit_npre then return high.bin_and(24)
+		if high.bit_npre then return high & 24
 		if high.bit_rec then return 32
 
 		high.check_preexist
 		if low.bit_pre_immut != high.bit_pre_immut then
-			high = high.bin_and(-3)
+			high = high & -3
 		end
 
 		if low.bit_pre_val != high.bit_pre_val then
-			high = high.bin_and(-5)
+			high = high & -5
 		end
 
 		return high
@@ -230,7 +230,7 @@ end
 redef class MOParam
 	redef fun compute_preexist
 	do
-		preexist_value = 64.lshift(offset)+7
+		preexist_value = (64 << offset)+7
 		preexist_value.check_preexist
 
 		return preexist_value
@@ -238,7 +238,7 @@ redef class MOParam
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(1)
+		return super | 1
 	end
 end
 
@@ -269,7 +269,7 @@ redef class MOSSAVar
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(dependency.preexistence_origin)
+		return super | dependency.preexistence_origin
 	end
 end
 
@@ -298,10 +298,10 @@ redef class MOPhiVar
 	do
 		var res = 0
 		for dep in dependencies do
-			res = res.bin_or(dep.preexistence_origin)
+			res = res | dep.preexistence_origin
 		end
 
-		return super.bin_or(res)
+		return super | res
 	end
 end
 
@@ -329,7 +329,7 @@ end
 redef class MOCallSite
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(4)
+		return super | 4
 	end
 
 	var nb_callees = 0
@@ -345,26 +345,26 @@ redef class MOCallSite
 	fun trace_origin: Int
 	do
 		var res = 0
-		if pattern.cuc > 0 then res = res.bin_or(1)
+		if pattern.cuc > 0 then res = res | 1
 
 		# Search for a preexisting (or not) return of a callee
 		for callee in pattern.callees do
 			if callee.return_expr == null then
-				res = res.bin_or(8)
+				res = res | 8
 			else
 				if callee.return_expr.is_pre then
-					res = res.bin_or(2)
+					res = res | 2
 				else
-					res = res.bin_or(4)
+					res = res | 4
 				end
 			end
 		end
 
-		if is_pre then res = res.bin_or(16)
+		if is_pre then res = res | 16
 
-		if concrete_receivers != null then res = res.bin_or(32)
+		if concrete_receivers != null then res = res | 32
 
-		if ast.get_receiver.mtype isa MFormalType then res = res.bin_or(64)
+		if ast.get_receiver.mtype isa MFormalType then res = res | 64
 
 		return res
 	end
@@ -373,11 +373,7 @@ end
 redef class MOProcedureSite
 	redef fun compute_preexist
 	do
-		# return 8
-		# # if disable_preexistence_extensions or disable_method_return then
-		# else
 		return expr_recv.expr_preexist
-		# end
 	end
 end
 
@@ -454,11 +450,11 @@ redef class MOFunctionSite
 			pval = -63
 			rec = true
 		else
-			pval = preval.bin_and(63)
+			pval = preval & 63
 		end
 
 		# If preexisting, we filter by arguments and erase the dependances in the callee
-		pval = preval.bin_and(63)
+		pval = preval & 63
 
 		# And we combine with the one of the caller
 		if preval.bit_param(0) then pval = pval.merge(expr_recv.expr_preexist)
@@ -538,7 +534,7 @@ redef class MOSuper
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(4)
+		return super | 4
 	end
 end
 
@@ -550,14 +546,14 @@ redef class MOLit
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(8)
+		return super | 8
 	end
 end
 
 redef class MOSubtypeSite
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(512)
+		return super | 512
 	end
 end
 
@@ -617,7 +613,7 @@ redef class MONew
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(2)
+		return super | 2
 	end
 end
 
@@ -633,7 +629,7 @@ redef class MOPrimitive
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(16)
+		return super | 16
 	end
 end
 
@@ -666,7 +662,7 @@ redef class MOReadSite
 
 	redef fun preexistence_origin: Int
 	do
-		return super.bin_or(256)
+		return super | 256
 	end
 end
 

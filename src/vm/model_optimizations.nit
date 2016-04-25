@@ -560,13 +560,19 @@ end
 abstract class MOEntity
 
 	# The local property containing this expression
-	var lp: MPropDef
+	var lp: MPropDef is noautoinit
 
 	# The corresponding ast node, if any
-	var ast: nullable AExpr
+	var ast: nullable AExpr is noautoinit
 
 	fun pretty_print(file: FileWriter)
 	do
+	end
+
+	init(mpropdef: MPropDef, node: nullable AExpr)
+	do
+		lp = mpropdef
+		ast = node
 	end
 end
 
@@ -574,9 +580,9 @@ end
 abstract class MOExpr
 	super MOEntity
 
-	init(lp: MPropDef, node: nullable AExpr)
+	init(mpropdef: MPropDef, node: nullable AExpr)
 	do
-		super(lp, node)
+		super(mpropdef, node)
 		sys.vm.all_moexprs.add(self)
 		ast = node
 	end
@@ -610,13 +616,6 @@ abstract class MOVar
 
 	# The offset of the variable in its environment, or the position of parameter
 	var offset: Int
-
-	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
-	do
-		super(lp, node)
-		variable = v
-		offset = pos
-	end
 
 	redef fun pretty_print(file: FileWriter)
 	do
@@ -704,11 +703,11 @@ class MOSelf
 	# The class of self
 	var self_mclass: MClass is noinit
 
-	init(lp: MPropDef, node: nullable AExpr, v: Variable, pos: Int)
+	init(lp: MPropDef, node: AExpr, v: Variable, pos: Int)
 	do
-		super(lp, node, v, pos)
+		super(lp, node)
 
-		ast = node.as(not null)
+		ast = node
 		# Set self_mclass, the static type of self
 		self_mclass = lp.mclassdef.mclass
 		lp.mclassdef.mclass.self_sites.add(self)
@@ -797,8 +796,7 @@ class MOSuper
 
 	init(lp: MPropDef, node: nullable AExpr)
 	do
-		self.lp = lp
-		self.ast = node.as(not null)
+		super(lp, node)
 		sys.vm.all_moentities.add(self)
 		sys.vm.mo_supers.add(self)
 	end
@@ -982,9 +980,8 @@ abstract class MOPropSite
 	redef type P: MOPropSitePattern
 end
 
-# MO of object expression
+# Object expression
 abstract class MOExprSite
-	# super MOPropSite
 	super MOSite
 	super MOExpr
 
@@ -992,8 +989,7 @@ abstract class MOExprSite
 
 	init(mpropdef: MPropDef, node: AExpr)
 	do
-		lp = mpropdef
-		ast = node
+		# super(mpropdef, node)
 	end
 end
 
@@ -1009,9 +1005,11 @@ abstract class MOSubtypeSite
 	# Static MClass of the class
 	var target_mclass: MClass
 
-	init(mpropdef: MPropDef, node: nullable AExpr, target: MType)
+	init(mpropdef: MPropDef, node: AExpr, target: MType)
 	do
-		super(mpropdef, node.as(not null))
+		super(mpropdef, node)
+		lp = mpropdef
+		ast = node
 		var mclass = target.get_mclass(sys.vm, mpropdef)
 		self.target = mclass.mclass_type
 		self.target_mclass = mclass.as(not null)
@@ -1613,12 +1611,12 @@ redef class Variable
 
 		# The corresponding movar
 		if dep_exprs.length == 0 and parameter then
-			var moparam = new MOParam(mpropdef, self, position)
+			var moparam = new MOParam(mpropdef, null)
 
 			movar = moparam
 			return moparam
 		else if dep_exprs.length == 1 or dep_exprs.length == 0 then
-			var mossa = new MOSSAVar(mpropdef, self, position)
+			var mossa = new MOSSAVar(mpropdef, null)
 			movar = mossa
 
 			if dep_exprs.length == 0 then
@@ -1629,7 +1627,7 @@ redef class Variable
 
 			return mossa
 		else
-			var mophi = new MOPhiVar(mpropdef, self, position)
+			var mophi = new MOPhiVar(mpropdef, null)
 			movar = mophi
 
 			for dep in dep_exprs do
@@ -1697,7 +1695,7 @@ redef class ASelfExpr
 
 		var	movar
 		if self isa AImplicitSelfExpr and self.is_sys then
-			movar = new MOParam(mpropdef, variable.as(not null), 0)
+			movar = new MOParam(mpropdef, null)
 		else
 			movar = new MOSelf(mpropdef, self, variable.as(not null), 0)
 		end
@@ -1890,7 +1888,7 @@ redef class ACharExpr
 	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 
-redef class AIntExpr
+redef class AIntegerExpr
 	redef fun ast2mo(mpropdef) do return sys.moprimitive
 end
 

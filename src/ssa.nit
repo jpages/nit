@@ -653,6 +653,8 @@ class PhiFunction
 
 	init(n: String, b: BasicBlock, original: Variable)
 	do
+		super(n)
+
 		name = n
 		block = b
 		original_variable = original
@@ -1494,39 +1496,60 @@ redef class AWhileExpr
 end
 
 redef class ALoopExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.last = self
-
-		# The beginning of the block is the first instruction
-		var block = new BasicBlock
-		block.first = self.n_block.as(not null)
-		block.last = self.n_block.as(not null)
-
-		old_block.link(block)
-		self.n_block.generate_basic_blocks(ssa, block)
-
-		return block
+		self.n_block.generate_basic_blocks(ssa, old_block, new_block)
 	end
 end
 
 redef class AForExpr
-	redef fun generate_basic_blocks(ssa, old_block)
+	# redef fun generate_basic_blocks(ssa, old_block)
+	# do
+	# 	old_block.last = self
+	# 	# The beginning of the block is the first instruction
+	# 	var block = new BasicBlock
+	# 	block.first = self.n_groups.first.n_expr
+	# 	block.last = self.n_block.as(not null)
+
+	# 	for g in n_groups do
+	# 		# Visit the test of the if
+	# 		g.n_expr.generate_basic_blocks(ssa, block)
+
+	# 		# Collect the variables declared in the for
+	# 		for v in g.variables do
+	# 			ssa.propdef.variables.add(v)
+	# 		end
+	# 	end
+	# end
+
+	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
-		old_block.last = self
-		# The beginning of the block is the first instruction
-		var block = new BasicBlock
-		block.first = self.n_groups.first.n_expr
-		block.last = self.n_block.as(not null)
+		if not old_block.instructions.has(self) then old_block.instructions.add(self)
 
+		var index = old_block.instructions.index_of(self)
+		var to_remove = new List[AExpr]
+		old_block.instructions.remove(self)
+
+		# Move the instructions after the if to the new block
+		for i in [index..old_block.instructions.length[ do
+			to_remove.add(old_block.instructions[i])
+			new_block.instructions.add(old_block.instructions[i])
+		end
+
+		for instruction in to_remove do
+			old_block.instructions.remove(instruction)
+		end
+
+		# Collect the variables declared in the for
 		for g in n_groups do
-			# Visit the test of the if
-			g.n_expr.generate_basic_blocks(ssa, block)
-
-			# Collect the variables declared in the for
 			for v in g.variables do
 				ssa.propdef.variables.add(v)
 			end
+		end
+
+		# Generate a for structure (similar to a while loop)
+		for g in n_groups do
+			ssa.generate_while(old_block, g.n_expr, n_block, new_block)
 		end
 	end
 end
