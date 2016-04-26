@@ -37,7 +37,7 @@ redef class MOStats
 		var dir = "{self.dir}/output_latex"
 		dir.mkdir
 
-		table1(new FileWriter.open("{dir}/table1-{lbl}.tex"))
+		# table1(new FileWriter.open("{dir}/table1-{lbl}.tex"))
 
 		# Do not generate table2 with extended preexistence
 		if sys.disable_preexistence_extensions then
@@ -46,7 +46,6 @@ redef class MOStats
 
 		# Do not generate table3 in original preexistence
 		if not sys.disable_preexistence_extensions then
-		# 	table3_percentages(new FileWriter.open("{dir}/table3-percentage-{lbl}.tex"))
 			table3(new FileWriter.open("{dir}/table3-{lbl}.tex"))
 		end
 

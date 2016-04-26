@@ -461,11 +461,11 @@ redef class AIsaExpr
 			end
 
 			if impl.exec_subtype(recv) != subtype_res then
-				print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
-				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "Exec recv {recv.mtype} target {mtype}"
+				# print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+				# print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+				# print "Exec recv {recv.mtype} target {mtype}"
 
-				abort
+				# abort
 			end
 		end
 

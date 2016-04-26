@@ -940,9 +940,12 @@ abstract class MOSite
 	init(mpropdef: MPropDef, node: AExpr)
 	do
 		super(mpropdef, node)
-		ast = node
-		lp = mpropdef
 
+		add_entities
+	end
+
+	fun add_entities
+	do
 		# The receiver type
 		var rcv_ast: nullable AExpr = null
 
@@ -959,7 +962,7 @@ abstract class MOSite
 		else if ast isa ASuperExpr then
 			rcv_ast = ast
 		else
-			print node
+			print ast.as(not null)
 		end
 
 		if rcv_ast.mtype != null and rcv_ast.mtype.is_primitive_type then
@@ -989,7 +992,8 @@ abstract class MOExprSite
 
 	init(mpropdef: MPropDef, node: AExpr)
 	do
-		# super(mpropdef, node)
+		lp = mpropdef
+		ast = node
 	end
 end
 
@@ -1007,9 +1011,10 @@ abstract class MOSubtypeSite
 
 	init(mpropdef: MPropDef, node: AExpr, target: MType)
 	do
-		super(mpropdef, node)
 		lp = mpropdef
 		ast = node
+		add_entities
+
 		var mclass = target.get_mclass(sys.vm, mpropdef)
 		self.target = mclass.mclass_type
 		self.target_mclass = mclass.as(not null)
@@ -1102,8 +1107,12 @@ class MOCallSite
 	init(mpropdef: MPropDef, node: AExpr, cs: CallSite)
 	do
 		lp = mpropdef
+		ast = node
+
 		callsite = cs
 		callsite.mocallsite = self
+
+		add_entities
 
 		# Special case for is_same_instance method
 		# TODO: to remove after the end of experiments
@@ -1869,6 +1878,16 @@ redef class ASuperExpr
 
 		mo_entity = mosuper
 		return mosuper
+	end
+end
+
+redef class AIfexprExpr
+	redef fun ast2mo(mpropdef)
+	do
+		print self
+		dump_tree
+
+		return n_expr.ast2mo(mpropdef)
 	end
 end
 

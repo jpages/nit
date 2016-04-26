@@ -132,7 +132,6 @@ class BasicBlock
 							phi.declared_type = value.original_variable.declared_type
 							phi.assignment_blocks.add(self)
 							ssa.phi_functions.add(phi)
-							# ssa.propdef.variables.add(phi)
 						else
 							print "We retrieve a PhiFunction for this variable"
 						end
@@ -142,9 +141,7 @@ class BasicBlock
 
 						versions[value.original_variable] = phi
 
-						# environment[phi.original_variable].remove_all
 						environment[phi.original_variable].add_all(other.environment[phi.original_variable])
-						# environment[phi.original_variable].add_all(environment[phi.original_variable])
 						phi.dep_exprs = environment[phi.original_variable].clone
 					end
 				else
@@ -221,10 +218,6 @@ class BasicBlock
 				end
 				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
-
-			# print "After fill_environment for {self} {instructions}"
-			# for key, value in environment do print "\tenv {key}-> {value}"
-			# for key,value in versions do print "\tversions {key} -> {value}"
 		end
 	end
 
@@ -896,6 +889,7 @@ redef class AExpr
 	# *`new_block` The BasicBlock with all the following instructions inside
 	fun generate_basic_blocks(ssa: SSA, old_block: BasicBlock, new_block: BasicBlock)
 	do
+		# print "NYI {self}"
 	end
 
 	# Visit an expression in a sequence to get variables acces and object-oriented sites
@@ -1408,9 +1402,8 @@ redef class ABlockExpr
 		end
 
 		# Recursively continue in the body of the block
-		for i in [0..self.n_expr.length[ do
-			# old_block.instructions.add(n_expr[i])
-			self.n_expr[i].generate_basic_blocks(ssa, old_block, new_block)
+		for expr in self.n_expr do
+			expr.generate_basic_blocks(ssa, old_block, new_block)
 		end
 	end
 end
@@ -1438,6 +1431,17 @@ redef class AIfExpr
 		# Generate a if structure for the blocks
 		ssa.generate_if(old_block, n_expr, n_then, n_else, new_block)
 	end
+
+	# redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	# do
+	# 	print "{self}"
+	# 	print "{parent.as(not null)}"
+	# 	for i in block.instructions do
+	# 		print "\t {i}"
+	# 	end
+
+	# 	# abort
+	# end
 end
 
 redef class AIfexprExpr
@@ -1493,6 +1497,16 @@ redef class AWhileExpr
 		# Generate a while structure
 		ssa.generate_while(old_block, n_expr, n_block, new_block)
 	end
+
+	# redef fun visit_expression(ssa: SSA, block: BasicBlock)
+	# do
+	# 	print "{self}"
+	# 	for i in block.instructions do
+	# 		print "\t {i}"
+	# 	end
+
+	# 	# abort
+	# end
 end
 
 redef class ALoopExpr
@@ -1503,25 +1517,6 @@ redef class ALoopExpr
 end
 
 redef class AForExpr
-	# redef fun generate_basic_blocks(ssa, old_block)
-	# do
-	# 	old_block.last = self
-	# 	# The beginning of the block is the first instruction
-	# 	var block = new BasicBlock
-	# 	block.first = self.n_groups.first.n_expr
-	# 	block.last = self.n_block.as(not null)
-
-	# 	for g in n_groups do
-	# 		# Visit the test of the if
-	# 		g.n_expr.generate_basic_blocks(ssa, block)
-
-	# 		# Collect the variables declared in the for
-	# 		for v in g.variables do
-	# 			ssa.propdef.variables.add(v)
-	# 		end
-	# 	end
-	# end
-
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
 		if not old_block.instructions.has(self) then old_block.instructions.add(self)

@@ -19,6 +19,7 @@ module nitvm
 
 import vm
 import frontend
+import dynamic_loading_ffi
 
 # Create a tool context to handle options and paths
 var toolcontext = new ToolContext
