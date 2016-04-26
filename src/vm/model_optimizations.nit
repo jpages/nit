@@ -1884,9 +1884,28 @@ end
 redef class AIfexprExpr
 	redef fun ast2mo(mpropdef)
 	do
-		print self
-		dump_tree
+		return n_expr.ast2mo(mpropdef)
+	end
+end
 
+redef class AVarargExpr
+	redef fun ast2mo(mpropdef)
+	do
+		return n_expr.ast2mo(mpropdef)
+	end
+end
+
+redef class ANamedargExpr
+	redef fun ast2mo(mpropdef)
+	do
+		return n_expr.ast2mo(mpropdef)
+	end
+end
+
+redef class ARangeExpr
+	# TODO: not perfect, find a better way to do this
+	redef fun ast2mo(mpropdef)
+	do
 		return n_expr.ast2mo(mpropdef)
 	end
 end

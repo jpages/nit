@@ -16,6 +16,7 @@
 module stats
 
 import vm_optimizations
+import dynamic_loading_ffi
 import date
 
 redef class ToolContext
