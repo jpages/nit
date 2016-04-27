@@ -74,6 +74,7 @@ redef class VirtualMachine
 
 			if impl.exec_method(recv) != propdef then
 				print "Pattern {callsite.mocallsite.pattern.rst}#{callsite.mocallsite.pattern.gp} {callsite.mocallsite.pattern.callees}"
+				print "Pattern.impl {callsite.mocallsite.pattern.get_impl(vm)}"
 				print "preexistence {callsite.mocallsite.expr_preexist} if_pre {callsite.mocallsite.expr_preexist.bit_pre} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
 				print "Implementation {impl}"
@@ -976,6 +977,7 @@ redef class MOCallSitePattern
 		# If the rsc is a final class
 		if rsc.is_final and rsc.loaded then return true
 
+		# return false
 		return callees.length == 1
 	end
 
@@ -1031,16 +1033,28 @@ redef class MOCallSitePattern
 
 	redef fun add_lp(lp)
 	do
+		# if rsc.to_s == "FlatText" and gp.to_s == "first_byte" then
+		# 	print "add_lp {rsc}#{gp} lp {lp} impl {get_impl(vm)}"
+		# 	print "pattern.Callees {callees}"
+		# 	print "Sites du pattern {sites}"
+		# 	for site in sites do
+		# 		print "\t {site.impl.as(not null)}"
+		# 	end
+		# end
+		# For the computation of the pattern before
+		get_impl(vm)
 		# If this lp is unknown
 		var need_reset = not callees.has(lp)
 		super(lp)
 
+
 		if need_reset then
-			if impl isa StaticImplMethod and callees.length > 1 then
+			if get_impl(vm) isa StaticImplMethod and callees.length > 1 then
 				reinit_impl
 
 				for site in sites do
-					if site.impl != null and site.impl.as(not null).is_mutable then
+					if site.impl isa StaticImplMethod and site.concrete_receivers == null then
+						# print "Réinit of {site} {site.impl.as(not null)}"
 						site.reinit_impl
 					end
 

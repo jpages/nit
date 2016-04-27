@@ -197,6 +197,8 @@ class FinalAttributeVisitor
 
 		# The attribute can be set with a call to its setter
 		if n isa ASendExpr then
+			if n.callsite == null then return
+
 			var called_node_ast = concrete_types.modelbuilder.mpropdef2node(n.callsite.mpropdef)
 			var is_attribute = called_node_ast isa AAttrPropdef
 

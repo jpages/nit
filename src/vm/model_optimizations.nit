@@ -1322,7 +1322,7 @@ redef class MClass
 	var pic_patterns = new List[PICPattern]
 
 	# `self` is an instance of object
-	fun is_instance_of_object(vm:VirtualMachine): Bool
+	fun is_instance_of_object(vm: VirtualMachine): Bool
 	do
 		return self.in_hierarchy(vm.mainmodule).greaters.length == 1
 	end
@@ -1432,6 +1432,9 @@ redef class VirtualMachine
 end
 
 redef class MType
+	# The artificial class of the null type
+	var null_class: nullable MClass
+
 	# True if self is a primitive type
 	fun is_primitive_type: Bool
 	do
@@ -1448,7 +1451,10 @@ redef class MType
 	fun get_mclass(vm: VirtualMachine, mpropdef: MPropDef): nullable MClass
 	do
 		if self isa MNullType then
-			return null
+			if null_class == null then
+				null_class = new MClass(vm.mainmodule, "Null", null, concrete_kind, public_visibility)
+			end
+			return null_class.as(not null)
 		else if self isa MNotNullType then
 			return self.mtype.get_mclass(vm, mpropdef)
 		else if self isa MClassType then
@@ -1458,7 +1464,7 @@ redef class MType
 		else if self isa MFormalType then
 
 			var anchor: MType = mpropdef.mclassdef.bound_mtype
-			var res = anchor_to(sys.vm.mainmodule, anchor.as(MClassType)).get_mclass(vm, mpropdef)
+			var res = anchor_to(vm.mainmodule, anchor.as(MClassType)).get_mclass(vm, mpropdef)
 
 			return res
 		else
@@ -1773,29 +1779,42 @@ redef class ASendExpr
 		var cs = callsite.as(not null)
 		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
 
-		# Test if the return type of the introduction property is a primitive
-		var primitive_return = false
-		if cs.mpropdef.msignature.return_mtype != null then
-			primitive_return = cs.mpropdef.mproperty.intro.msignature.return_mtype.is_primitive_type
-		end
+		# If the receiver is the null type, do a special treatment
+		if cs.recv.to_s == "null" then
+			var mocallsite = new MOProcedureSite(mpropdef, self, cs)
 
-		var mocallsite: MOCallSite
-		if cs.mpropdef.msignature.return_mtype != null and not primitive_return then
-			# The mproperty is a function
-			mocallsite = new MOFunctionSite(mpropdef, self, cs)
+			# Do not create a pattern for these callsites
+			recv_class.set_site_pattern(mocallsite, cs.mproperty)
+			return mocallsite
 		else
-			# The mproperty is a procedure
-			mocallsite = new MOProcedureSite(mpropdef, self, cs)
+			# Test if the return type of the introduction property is a primitive
+			var primitive_return = false
+			if cs.mpropdef.msignature.return_mtype != null then
+				primitive_return = cs.mpropdef.mproperty.intro.msignature.return_mtype.is_primitive_type
+			end
+
+			var mocallsite: MOCallSite
+			if cs.mpropdef.msignature.return_mtype != null and not primitive_return then
+				# The mproperty is a function
+				mocallsite = new MOFunctionSite(mpropdef, self, cs)
+			else
+				# The mproperty is a procedure
+				mocallsite = new MOProcedureSite(mpropdef, self, cs)
+			end
+
+			recv_class.set_site_pattern(mocallsite, cs.mproperty)
+
+			return mocallsite
 		end
-
-		recv_class.set_site_pattern(mocallsite, cs.mproperty)
-
-		return mocallsite
 	end
 
 	redef fun ast2mo(mpropdef)
 	do
 		if mo_entity != null then return mo_entity.as(not null)
+
+		if callsite == null then
+			return sys.monull
+		end
 
 		var cs = callsite.as(not null)
 
