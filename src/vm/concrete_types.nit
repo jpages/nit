@@ -102,6 +102,10 @@ class GlobalAnalysis
 				if annotation.name == "writable" then
 					# If the setter of the attribute is public for all modules,
 					# we can not use its concrete types
+					if node.mpropdef == null then return
+
+					# print "note.mpropdef {node.mpropdef.as(not null)}"
+					# print "node.mpropdef.mproperty {node.mpropdef.mproperty}"
 					node.mpropdef.mproperty.has_concrete_types = false
 					return
 				end

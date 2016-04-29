@@ -77,7 +77,7 @@ redef class VirtualMachine
 				print "Pattern.impl {callsite.mocallsite.pattern.get_impl(vm)}"
 				print "preexistence {callsite.mocallsite.expr_preexist} if_pre {callsite.mocallsite.expr_preexist.bit_pre} preexistence_origin {callsite.mocallsite.preexistence_origin}"
 				print "Pattern.loaded_subclasses {callsite.mocallsite.pattern.rsc.loaded_subclasses} {callsite.mocallsite.pattern.rsc.get_position_methods(callsite.mocallsite.pattern.gp.intro_mclassdef.mclass)}"
-				print "Implementation {impl}"
+				print "Implementation {impl} is_monomorph {callsite.mocallsite.is_monomorph}"
 				print "impl.exec_method(recv) {impl.exec_method(recv)}, propdef {propdef}"
 				callsite.mocallsite.compute_concretes_site
 

@@ -1771,6 +1771,11 @@ redef class ASendExpr
 		end
 
 		var recv_class = n_expr.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
+		if called_node_ast.mpropdef == null then
+			called_node_ast.dump_tree
+			return moattr
+		end
+
 		recv_class.set_site_pattern(moattr, called_node_ast.mpropdef.as(not null).mproperty)
 
 		return moattr

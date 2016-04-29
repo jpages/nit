@@ -152,6 +152,9 @@ class VirtualMachine super NaiveInterpreter
 	do
 		if sub == sup then return true
 
+		# A special case for the Null class, null is subtype of everything
+		if sub.to_s == "Null" then return true
+
 		var hierarchy = sub.in_hierarchy(sys.vm.mainmodule)
 
 		return hierarchy.greaters.has(sup)
