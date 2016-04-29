@@ -545,6 +545,7 @@ redef class AAsCastExpr
 		end
 
 		if mo_entity != null then
+			mo_entity.as(MOSubtypeSite).reinit_impl
 			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
 
 			var res_mo = subtype_commons(recv.mtype, mtype)
@@ -561,7 +562,11 @@ redef class AAsCastExpr
 				print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} recv.mtype {recv.mtype} target_type {mtype}"
 				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
 				print "Exec recv {recv.mtype} target {mtype}"
+				print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
 
+				print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
+				print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
+				print vm.stack_trace
 				abort
 			end
 		end
@@ -977,7 +982,6 @@ redef class MOCallSitePattern
 		# If the rsc is a final class
 		if rsc.is_final and rsc.loaded then return true
 
-		# return false
 		return callees.length == 1
 	end
 
@@ -1517,7 +1521,8 @@ redef class MOSubtypeSite
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
 			if concrete_receivers.first.abstract_loaded then
-				return static_impl(vm, false)
+				var subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
+				return new StaticImplSubtype(self, false, subtype_res)
 			end
 		end
 

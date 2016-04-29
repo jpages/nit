@@ -1155,6 +1155,8 @@ class MOCallSite
 		for rcv in concrete_receivers.as(not null) do
 			if not rcv.abstract_loaded then continue
 
+			if not rcv.intro.bound_mtype.has_mproperty(vm.mainmodule, pattern.gp) then continue
+
 			var propdef = pattern.gp.lookup_first_definition(sys.vm.mainmodule, rcv.intro.bound_mtype)
 			if not callees.has(propdef) then
 				callees.add(propdef)
