@@ -1009,6 +1009,8 @@ abstract class MOSubtypeSite
 	# Static MClass of the class
 	var target_mclass: MClass
 
+	var rst: MType is noinit
+
 	init(mpropdef: MPropDef, node: AExpr, target: MType)
 	do
 		lp = mpropdef
@@ -1556,6 +1558,7 @@ class ASubtypeExpr
 		mo_entity = cast_site
 
 		cast_site.expr_recv = recv.ast2mo(mpropdef).as(MOExpr)
+		cast_site.rst = recv.mtype.as(not null)
 
 		var recv_class = recv.mtype.as(not null).get_mclass(vm, mpropdef).as(not null)
 		recv_class.set_subtype_pattern(cast_site, mpropdef)

@@ -559,13 +559,14 @@ redef class AAsCastExpr
 			end
 
 			if impl.exec_subtype(recv) != res then
-				print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} recv.mtype {recv.mtype} target_type {mtype}"
+				print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} site.rst {mo_entity.as(MOSubtypeSite).rst} site.target {mtype}"
 				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "Exec recv {recv.mtype} target {mtype}"
+				print "recv {recv.mtype} target {mtype}"
 				print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
 
 				print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
 				print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
+				mo_entity.as(MOSubtypeSite).ast.dump_tree
 				print vm.stack_trace
 				abort
 			end
@@ -1037,20 +1038,11 @@ redef class MOCallSitePattern
 
 	redef fun add_lp(lp)
 	do
-		# if rsc.to_s == "FlatText" and gp.to_s == "first_byte" then
-		# 	print "add_lp {rsc}#{gp} lp {lp} impl {get_impl(vm)}"
-		# 	print "pattern.Callees {callees}"
-		# 	print "Sites du pattern {sites}"
-		# 	for site in sites do
-		# 		print "\t {site.impl.as(not null)}"
-		# 	end
-		# end
 		# For the computation of the pattern before
 		get_impl(vm)
 		# If this lp is unknown
 		var need_reset = not callees.has(lp)
 		super(lp)
-
 
 		if need_reset then
 			if get_impl(vm) isa StaticImplMethod and callees.length > 1 then
@@ -1163,7 +1155,8 @@ redef class MOSubtypeSitePattern
 		if not target_mclass.abstract_loaded then return true
 
 		# If the rsc is a subclass of the target, then the test will always be true
-		if vm.is_subclass(rsc, target_mclass) then return true
+		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then return true
+		# if vm.is_subtype(rst, target) then return true
 
 		# If one of the two classes is loaded but not both, then it is static (unrelated classes)
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then return true
@@ -1186,7 +1179,9 @@ redef class MOSubtypeSitePattern
 		if not target_mclass.abstract_loaded then res = false
 
 		# If the rsc is a subclass of the target, then the test will always be true
-		if vm.is_subclass(rsc, target_mclass) then res = true
+		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then res = true
+
+		# if vm.is_subtype(rst, target) then res = true
 
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then res = false
 		if rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
@@ -1521,7 +1516,14 @@ redef class MOSubtypeSite
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
 			if concrete_receivers.first.abstract_loaded then
-				var subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
+				var subtype_res: Bool
+
+				if rst isa MClassType then
+					subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
+				else
+					subtype_res = vm.is_subtype(rst, pattern.target)
+				end
+
 				return new StaticImplSubtype(self, false, subtype_res)
 			end
 		end
@@ -1571,6 +1573,7 @@ redef class MOSubtypeSite
 		else if pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return new StaticImplSubtype(self, false, false)
 		else if sys.vm.is_subclass(pattern.rsc, pattern.target_mclass) then
+		# else if vm.is_subtype(pattern.rst, pattern.target) then
 			# Static for casts when the target type is a superclass of the rsc (useless casts)
 			return new StaticImplSubtype(self, false, true)
 		else
