@@ -498,8 +498,8 @@ case $engine in
 		;;
 	nitvm)
 		isinterpret=true
-		enginebinname=nit
-		OPT="--vm $OPT"
+		enginebinname=nitvm
+		OPT="$OPT"
 		savdirs="sav/niti/"
 		;;
 	nitj)
