@@ -398,8 +398,12 @@ redef class ASubtypeExpr
 			end
 		end
 
+		if sub isa MBottomType then
+			return true
+		end
+
 		# `sup` accepts only null
-		if sup isa MNullType then return false
+		if sup isa MNullType or sup isa MNullType or sup isa MBottomType then return false
 
 		# All cases have been checked, now the test is class against class
 		return null
@@ -461,12 +465,32 @@ redef class AIsaExpr
 				return v.bool_instance(subtype_res)
 			end
 
-			if impl.exec_subtype(recv) != subtype_res then
-				# print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
-				# print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				# print "Exec recv {recv.mtype} target {mtype}"
+			var exec_res = impl.exec_subtype(recv)
 
-				# abort
+			if recv.mtype isa MGenericType then
+				if exec_res == false then
+					return v.bool_instance(false)
+				else
+					# We need to dig into the generic arguments, use the slow path for this
+					return v.bool_instance(v.is_subtype(recv.mtype, mtype))
+				end
+			else
+				if exec_res != subtype_res then
+					print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+					print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+					print "Exec recv {recv.mtype} target {mtype}"
+
+					if mo_entity.as(MOSubtypeSite).concrete_receivers != null then print "Concretes {mo_entity.as(MOSubtypeSite).concrete_receivers.as(not null)}"
+
+					print "{v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)}"
+
+					print "mo_entity.as(MOSubtypeSite).pattern.can_be_sst {mo_entity.as(MOSubtypeSite).pattern.can_be_sst}"
+					print "can_be_static {mo_entity.as(MOSubtypeSite).pattern.can_be_static}"
+					print vm.stack_trace
+					abort
+				end
+
+				return v.bool_instance(exec_res)
 			end
 		end
 
@@ -545,30 +569,39 @@ redef class AAsCastExpr
 		end
 
 		if mo_entity != null then
-			mo_entity.as(MOSubtypeSite).reinit_impl
 			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
 
 			var res_mo = subtype_commons(recv.mtype, mtype)
 			if res_mo != null then
 				if res_mo != res then
-					print "ERROR"
 					abort
 				end
 
 				return recv
 			end
 
-			if impl.exec_subtype(recv) != res then
-				print "ERROR AAsCastExpr {impl} {impl.exec_subtype(recv)} {res} site.rst {mo_entity.as(MOSubtypeSite).rst} site.target {mtype}"
-				print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-				print "recv {recv.mtype} target {mtype}"
-				print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
+			var exec_res = impl.exec_subtype(recv)
 
-				print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
-				print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
-				mo_entity.as(MOSubtypeSite).ast.dump_tree
-				print vm.stack_trace
-				abort
+			if recv.mtype isa MGenericType then
+				if exec_res == false then
+					res = exec_res
+				else
+					# We need to dig into the generic arguments, use the slow path for this
+					res = v.is_subtype(recv.mtype, mtype)
+				end
+			else
+				if exec_res != res then
+					print "ERROR AAsCastExpr {impl} {exec_res} {res} site.rst {mo_entity.as(MOSubtypeSite).rst} site.target {mtype}"
+					print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+					print "recv {recv.mtype} target {mtype}"
+					print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
+
+					print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
+					print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
+					mo_entity.as(MOSubtypeSite).ast.dump_tree
+					print vm.stack_trace
+					abort
+				end
 			end
 		end
 
@@ -1040,16 +1073,17 @@ redef class MOCallSitePattern
 	do
 		# For the computation of the pattern before
 		get_impl(vm)
+
 		# If this lp is unknown
 		var need_reset = not callees.has(lp)
 		super(lp)
 
 		if need_reset then
-			if get_impl(vm) isa StaticImplMethod and callees.length > 1 then
+			if impl isa StaticImplMethod and callees.length > 1 then
 				reinit_impl
 
 				for site in sites do
-					if site.impl isa StaticImplMethod and site.concrete_receivers == null then
+					if site.impl isa StaticImplMethod and site.concrete_receivers == null and site.impl.is_mutable then
 						# print "Réinit of {site} {site.impl.as(not null)}"
 						site.reinit_impl
 					end
@@ -1140,7 +1174,7 @@ redef class MOSubtypeSitePattern
 			var pos = mclass.get_position_methods(target_mclass)
 
 			# If one position differs then the cast must be implemented with perfect hashing
-			if pos != first_position then return false
+			if pos != first_position or pos < 0 then return false
 		end
 
 		return true
@@ -1154,9 +1188,10 @@ redef class MOSubtypeSitePattern
 		# If the target is not loaded, the cast will always fail
 		if not target_mclass.abstract_loaded then return true
 
+		if rst isa MGenericType then return false
+
 		# If the rsc is a subclass of the target, then the test will always be true
 		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then return true
-		# if vm.is_subtype(rst, target) then return true
 
 		# If one of the two classes is loaded but not both, then it is static (unrelated classes)
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then return true
@@ -1178,10 +1213,12 @@ redef class MOSubtypeSitePattern
 		# If the target is not loaded, the test will always fail
 		if not target_mclass.abstract_loaded then res = false
 
+		# if rst isa MGenericType then
+
+		# end
+
 		# If the rsc is a subclass of the target, then the test will always be true
 		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then res = true
-
-		# if vm.is_subtype(rst, target) then res = true
 
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then res = false
 		if rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
@@ -1192,9 +1229,17 @@ redef class MOSubtypeSitePattern
 
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
-		var offset = get_offset(vm)
-		var pos_cls = get_block_position
-		return  new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
+		var classes = new List[MClass]
+		for mclass in rsc.loaded_subclasses do
+			if vm.is_subclass(mclass, target_mclass) then
+				classes.add(mclass)
+			end
+		end
+
+		# We just take the first position because all potential receivers have the same position
+		var first_position = classes.first.get_position_methods(target_mclass)
+
+		return new SSTImplSubtype(self, mutable, first_position-2, get_pic(vm).vtable.id)
 	end
 end
 
@@ -1552,8 +1597,21 @@ redef class MOSubtypeSite
 
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
-		var offset = get_offset(vm)
-		return new SSTImplSubtype(self, mutable, offset, get_pic(vm).vtable.id)
+		var offset = pattern.rsc.get_position_methods(target_mclass)
+
+		if offset < 1 then
+			var classes = new List[MClass]
+			for mclass in pattern.rsc.loaded_subclasses do
+				if vm.is_subclass(mclass, target_mclass) then
+					classes.add(mclass)
+				end
+			end
+
+			# We just take the first position because all potential receivers have the same position
+			if not classes.is_empty then offset = classes.first.get_position_methods(target_mclass)
+		end
+
+		return new SSTImplSubtype(self, mutable, offset-2, get_pic(vm).vtable.id)
 	end
 
 	redef fun static_impl(vm, mutable)
@@ -1573,7 +1631,6 @@ redef class MOSubtypeSite
 		else if pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return new StaticImplSubtype(self, false, false)
 		else if sys.vm.is_subclass(pattern.rsc, pattern.target_mclass) then
-		# else if vm.is_subtype(pattern.rst, pattern.target) then
 			# Static for casts when the target type is a superclass of the rsc (useless casts)
 			return new StaticImplSubtype(self, false, true)
 		else
