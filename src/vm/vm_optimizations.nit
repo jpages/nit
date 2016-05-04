@@ -469,6 +469,21 @@ redef class AIsaExpr
 
 			if recv.mtype isa MGenericType then
 				if exec_res == false then
+					if not exec_res == subtype_res then
+						print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+						print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+						print "Exec recv {recv.mtype} target {mtype}"
+
+						if mo_entity.as(MOSubtypeSite).concrete_receivers != null then print "Concretes {mo_entity.as(MOSubtypeSite).concrete_receivers.as(not null)}"
+
+						print "{v.inter_is_subtype_sst(id, position, recv.mtype.as(MClassType).mclass.vtable.as(not null).internal_vtable)}"
+
+						print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
+						print "mo_entity.as(MOSubtypeSite).pattern.can_be_sst {mo_entity.as(MOSubtypeSite).pattern.can_be_sst}"
+						print "can_be_static {mo_entity.as(MOSubtypeSite).pattern.can_be_static}"
+						print vm.stack_trace
+						abort
+					end
 					return v.bool_instance(false)
 				else
 					# We need to dig into the generic arguments, use the slow path for this
@@ -1563,11 +1578,12 @@ redef class MOSubtypeSite
 			if concrete_receivers.first.abstract_loaded then
 				var subtype_res: Bool
 
-				if rst isa MClassType then
+				# if rst isa MClassType then
+					# print "rst {rst} pattern.rsc {pattern.rsc} patternb.target_mclass {pattern.target_mclass}"
 					subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
-				else
-					subtype_res = vm.is_subtype(rst, pattern.target)
-				end
+				# else
+				# 	subtype_res = vm.is_subtype(rst, pattern.target)
+				# end
 
 				return new StaticImplSubtype(self, false, subtype_res)
 			end
