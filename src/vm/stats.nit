@@ -135,6 +135,15 @@ redef class ModelBuilder
 		for i in [0..sys.vm.trace_origin.length[ do
 			if sys.vm.trace_origin[i] > 0 then print("trace_origin[{i}] = {sys.vm.trace_origin[i]}")
 		end
+
+		# trace the used classes
+		var trace_classes = new FileWriter.open("{vm.pstats.dir}/trace_classes.txt")
+
+		for mclass in vm.pstats.loaded_classes do
+			trace_classes.write("{mclass} number of methods {mclass.mmethods.length} number of attributes {mclass.mattributes.length} \n")
+		end
+
+		trace_classes.close
 	end
 end
 
@@ -157,6 +166,8 @@ redef class VirtualMachine
 		end
 
 		pstats.loaded_classes_explicits += 1
+
+		pstats.loaded_classes.add(mclass)
 	end
 
 	redef fun load_class_indirect(mclass)
@@ -273,11 +284,14 @@ class MOStats
 	# The number of loaded abstract classes
 	var loaded_classes_abstracts: Int = 0
 
-	# Each time a class is explicitely loaded, count the size of its ancestors
+	# Each time a class is explicitly loaded, count the size of its ancestors
 	var loaded_superclasses: Int = 0
 
 	# Each time a class is loaded, count the number of its superclasses which introduced attributes
 	var loaded_superclasses_attributes: Int = 0
+
+	# All loaded classes in the program
+	var loaded_classes = new List[MClass]
 
 	# The number of MOSite with a primitive receiver
 	var nb_primitive_sites: Int = 0
@@ -853,6 +867,8 @@ class MOStats
 		loaded_classes_explicits = counters.loaded_classes_explicits
 		loaded_classes_implicits = counters.loaded_classes_implicits
 		loaded_classes_abstracts = counters.loaded_classes_abstracts
+
+		loaded_classes = counters.loaded_classes
 		loaded_superclasses = counters.loaded_superclasses
 		loaded_superclasses_attributes = counters.loaded_superclasses_attributes
 
