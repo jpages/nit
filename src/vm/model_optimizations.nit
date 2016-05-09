@@ -1072,11 +1072,21 @@ class MOAsSubtypeSite
 			return null
 		end
 	end
+
+	redef init(mpropdef: MPropDef, node: AExpr, t: MType)
+	do
+		super(mpropdef, node, t)
+	end
 end
 
 # MO of isa expr
 class MOIsaSubtypeSite
 	super MOSubtypeSite
+
+	redef init(mpropdef: MPropDef, node: AExpr, t: MType)
+	do
+		super(mpropdef, node, t)
+	end
 end
 
 # MO of attribute access
@@ -1084,6 +1094,13 @@ abstract class MOAttrSite
 	super MOPropSite
 
 	redef type P: MOAttrPattern
+
+	redef init(mpropdef: MPropDef, node: AExpr)
+	do
+		super(mpropdef, node)
+
+		add_entities
+	end
 end
 
 redef class CallSite
@@ -1252,6 +1269,11 @@ class MOReadSite
 
 	redef type P: MOReadSitePattern
 
+	redef init(mpropdef: MPropDef, node: AExpr)
+	do
+		super(mpropdef, node)
+	end
+
 	redef fun pattern_factory(rst, gp, rsc)
 	do
 		return (new MOReadSitePattern(rst, rsc, gp.as(MAttribute))).init_abstract
@@ -1286,6 +1308,11 @@ class MOWriteSite
 	super MOAttrSite
 
 	redef type P: MOWriteSitePattern
+
+	redef init(mpropdef: MPropDef, node: AExpr)
+	do
+		super(mpropdef, node)
+	end
 
 	redef fun pattern_factory(rst, gp, rsc)
 	do

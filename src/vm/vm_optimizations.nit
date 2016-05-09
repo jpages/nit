@@ -1099,7 +1099,6 @@ redef class MOCallSitePattern
 
 				for site in sites do
 					if site.impl isa StaticImplMethod and site.concrete_receivers == null and site.impl.is_mutable then
-						# print "Réinit of {site} {site.impl.as(not null)}"
 						site.reinit_impl
 					end
 
