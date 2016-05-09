@@ -1267,6 +1267,12 @@ class MOReadSite
 	super MOExprSite
 	super MOAttrSite
 
+	redef init(mpropdef: MPropDef, node: AExpr)
+	do
+		super
+		add_entities
+	end
+
 	redef type P: MOReadSitePattern
 
 	redef init(mpropdef: MPropDef, node: AExpr)
