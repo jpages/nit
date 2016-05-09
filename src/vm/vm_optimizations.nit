@@ -674,6 +674,7 @@ redef class MPropDef
 			site.expr_recv.preexist_init
 			site.concrete_receivers = null
 			site.compute_concretes_site
+			site.site_preexist
 
 			if not sys.preexistence_protocol then
 				site.impl = site.compute_impl
@@ -1098,15 +1099,17 @@ redef class MOCallSitePattern
 				reinit_impl
 
 				for site in sites do
+					# Adding a candidate to a site which was static leads to recompilation
 					if site.impl isa StaticImplMethod and site.concrete_receivers == null and site.impl.is_mutable then
 						site.reinit_impl
 					end
+				end
+			end
 
-					# If one of the site is a callsite used a reicever which is now non-preexisting
-					if site.as_receiver then
-						site.reinit_impl
-						site.as_receiver = false
-					end
+			for site in sites do
+				if site.as_receiver then
+					site.reinit_impl
+					site.as_receiver = false
 				end
 			end
 		end
@@ -1772,8 +1775,15 @@ redef class MOCallSite
 	# A special case for the mixed protocol
 	redef fun reinit_impl
 	do
-		if not preexistence_protocol then super
-		if not mixed_protocol then super
+		if not preexistence_protocol then
+			super
+			return
+		end
+
+		if not mixed_protocol then
+			super
+			return
+		end
 
 		# We make code-patching for methods which were not implemented in static
 		if impl != null and not impl.as(not null) isa StaticImplMethod then
@@ -1781,7 +1791,7 @@ redef class MOCallSite
 		else
 			# We need to recompile the whole method only if the preexistence of the receiver has changed
 			# to preexisting to non-preexisting
-			var preexistence_before = expr_recv.preexist_value
+			var preexistence_before = site_preexist
 			expr_recv.preexist_init
 			var preexistence_after = site_preexist
 

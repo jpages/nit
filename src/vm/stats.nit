@@ -1250,7 +1250,6 @@ redef class MOSite
 	do
 		super
 
-		# Each time a pattern has a change in its implementation, count it
 		recompilations += 1
 	end
 
