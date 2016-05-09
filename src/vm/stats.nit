@@ -140,7 +140,8 @@ redef class ModelBuilder
 		var trace_classes = new FileWriter.open("{vm.pstats.dir}/trace_classes.txt")
 
 		for mclass in vm.pstats.loaded_classes do
-			trace_classes.write("{mclass} number of methods {mclass.mmethods.length} number of attributes {mclass.mattributes.length} \n")
+			trace_classes.write("{mclass} number of methods {mclass.mmethods.length} number of attributes {mclass.mattributes.length} ")
+			trace_classes.write("nb_instances {mclass.nb_instances} \n")
 		end
 
 		trace_classes.close
@@ -188,6 +189,13 @@ redef class VirtualMachine
 		mpropdef.nb_executions += 1
 
 		return super
+	end
+
+	redef fun init_instance(recv: Instance)
+	do
+		super
+
+		recv.mtype.as(MClassType).mclass.nb_instances += 1
 	end
 
 	# The class to gather all statistics
@@ -1651,6 +1659,11 @@ redef class AVarFormExpr
 	do
 		variable.pretty_print(file)
 	end
+end
+
+redef class MClass
+	# The number of instances of this class
+	var nb_instances: Int = 0
 end
 
 redef class MMethod

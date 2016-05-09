@@ -1579,7 +1579,7 @@ redef class MOSubtypeSite
 				var subtype_res: Bool
 
 				# if rst isa MClassType then
-					# print "rst {rst} pattern.rsc {pattern.rsc} patternb.target_mclass {pattern.target_mclass}"
+					# print "rst {rst} pattern.rsc {pattern.rsc} pattern.target_mclass {pattern.target_mclass}"
 					subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
 				# else
 				# 	subtype_res = vm.is_subtype(rst, pattern.target)
