@@ -1389,7 +1389,7 @@ redef class MOPropSitePattern
 
 	redef fun trace
 	do
-		return super + "#{gp} rsc_loaded = {rsc.abstract_loaded} nb_sites {sites.length} "
+		return super + "#{gp} rsc_loaded = {rsc.abstract_loaded} nb_sites {sites.length} impl {get_impl(vm)}"
 	end
 end
 
