@@ -1275,11 +1275,6 @@ class MOReadSite
 
 	redef type P: MOReadSitePattern
 
-	redef init(mpropdef: MPropDef, node: AExpr)
-	do
-		super(mpropdef, node)
-	end
-
 	redef fun pattern_factory(rst, gp, rsc)
 	do
 		return (new MOReadSitePattern(rst, rsc, gp.as(MAttribute))).init_abstract
@@ -1318,6 +1313,7 @@ class MOWriteSite
 	redef init(mpropdef: MPropDef, node: AExpr)
 	do
 		super(mpropdef, node)
+		add_entities
 	end
 
 	redef fun pattern_factory(rst, gp, rsc)
