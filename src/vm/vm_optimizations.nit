@@ -125,6 +125,23 @@ redef class VirtualMachine
 	do
 		super(mclass)
 
+		# `mclass` was the pic of some patterns and was not loaded
+		if not mclass.null_patterns.is_empty then
+			for pattern in mclass.null_patterns do
+				pattern.reinit_impl
+				pattern.impl = pattern.compute_impl
+
+				for site in pattern.sites do
+					if site.impl isa NullImpl then
+						site.reinit_impl
+						site.get_impl(vm)
+					end
+				end
+			end
+
+			mclass.null_patterns.clear
+		end
+
 		# Update Patterns and sites
 		for site in mclass.concrete_sites do
 			if site.impl != null and site.impl.is_mutable then
@@ -751,6 +768,10 @@ redef class MClass
 			pic_pattern.propagate_ph_impl
 		end
 	end
+
+	# The patterns which are null because self is the PIC and is not loaded,
+	# Loading self will trigger a recompilation of all these patterns and their sites
+	var null_patterns = new List[MOSitePattern] is lazy
 end
 
 redef class PICPattern
@@ -935,6 +956,13 @@ redef abstract class MOSitePattern
 		return false
 	end
 
+	fun null_impl: Implementation
+	do
+		# Keep the relation between the pic class and self pattern
+		get_pic(vm).null_patterns.add(self)
+		return new NullImpl(self, true, 0, get_pic(vm))
+	end
+
 	# Compute and return an appropriate static Implementation
 	# `mutable` If true, the implementation can change in the future
 	fun static_impl(mutable: Bool): Implementation is abstract
@@ -992,7 +1020,7 @@ redef class MOAttrPattern
 				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				return new NullImpl(self, true, 0, get_pic(vm))
+				return null_impl
 			end
 		end
 	end
@@ -1063,7 +1091,7 @@ redef class MOCallSitePattern
 				return ph_impl(vm, true, get_pic(vm).vtable.id)
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				return new NullImpl(self, true, 0, get_pic(vm))
+				return null_impl
 			end
 		end
 	end
@@ -1210,10 +1238,9 @@ redef class MOSubtypeSitePattern
 		# If the rsc is a subclass of the target, then the test will always be true
 		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then return true
 
-		# If one of the two classes is loaded but not both, then it is static (unrelated classes)
-		if target_mclass.abstract_loaded and not rsc.abstract_loaded then return true
+		# If the rsc is loaded but not the target then it is static (unrelated classes)
 		if rsc.abstract_loaded and not target_mclass.abstract_loaded then return true
-		if not rsc.abstract_loaded and not target_mclass.abstract_loaded then return true
+
 		return false
 	end
 
@@ -1230,16 +1257,10 @@ redef class MOSubtypeSitePattern
 		# If the target is not loaded, the test will always fail
 		if not target_mclass.abstract_loaded then res = false
 
-		# if rst isa MGenericType then
-
-		# end
-
 		# If the rsc is a subclass of the target, then the test will always be true
 		if rst isa MClassType and vm.is_subclass(rsc, target_mclass) then res = true
 
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then res = false
-		if rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
-		if not rsc.abstract_loaded and not target_mclass.abstract_loaded then res = false
 
 		return new StaticImplSubtype(self, true, res)
 	end
@@ -1287,7 +1308,7 @@ redef class MOAsNotNullPattern
 				end
 			else
 				# The RST and the PIC are not loaded, make a null implementation by default
-				return new NullImpl(self, true, 0, get_pic(vm))
+				return null_impl
 			end
 		end
 	end
@@ -1553,7 +1574,7 @@ redef abstract class MOSite
 			end
 		else
 			if not get_pic(vm).abstract_loaded then
-				return new NullImpl(self, true, get_offset(sys.vm), get_pic(sys.vm))
+				return null_impl
 			else if get_pic(vm).is_instance_of_object(vm) then
 				# SST for a property introduced in Object
 				var offset = get_offset(vm)
@@ -1645,7 +1666,7 @@ redef class MOSubtypeSite
 	redef fun conservative_implementation: Implementation
 	do
 		if not pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
-			return new StaticImplSubtype(self, false, false)
+			return null_impl
 		else if pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return new StaticImplSubtype(self, false, false)
 		else if sys.vm.is_subclass(pattern.rsc, pattern.target_mclass) then
@@ -1858,15 +1879,6 @@ class NullImpl
 
 	# The PIC of the implementation (not loaded at compile-time)
 	var pic: MClass
-
-	# The method load the PIC (the class which introduced the property),
-	# Then it creates a new PHImpl for this site and return it
-	fun trampoline(recv: Instance): PHImpl
-	do
-		sys.vm.load_class(recv.mtype.as(MClassType).mclass)
-
-		return new PHImpl(self, true, offset, pic.vtable.id)
-	end
 end
 
 # Commons properties on object mecanism implementations (sst, ph)

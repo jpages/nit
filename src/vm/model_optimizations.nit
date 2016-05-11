@@ -1701,21 +1701,23 @@ redef class ANewExpr
 		recvtype.as(not null).mclass.set_new_pattern(monew)
 
 		# Creation of the MOCallSite
-		var cs = callsite.as(not null)
-		var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
-		var mocallsite = new MOInitSite(mpropdef, self, cs)
+		if callsite != null then
+			var cs = callsite.as(not null)
+			var recv_class = cs.recv.get_mclass(vm, mpropdef).as(not null)
+			var mocallsite = new MOInitSite(mpropdef, self, cs)
 
-		recv_class.set_site_pattern(mocallsite, cs.mproperty)
+			recv_class.set_site_pattern(mocallsite, cs.mproperty)
 
-		# Association of the receiver with the new callsite
-		mocallsite.expr_recv = monew
+			# Association of the receiver with the new callsite
+			mocallsite.expr_recv = monew
 
-		for arg in n_args.n_exprs do
-			mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
+			for arg in n_args.n_exprs do
+				mocallsite.given_args.add(arg.ast2mo(mpropdef).as(MOExpr))
+			end
+
+			# Associate the monew with the callsite
+			monew.callsite = mocallsite
 		end
-
-		# Associate the monew with the callsite
-		monew.callsite = mocallsite
 
 		# If the option `improve_loading` is set, load the corresponding class is the new is toplevel
 		if sys.improve_loading then
