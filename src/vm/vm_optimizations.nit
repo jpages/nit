@@ -150,17 +150,12 @@ redef class VirtualMachine
 			end
 		end
 
-		# Some method patterns can be static and become in SST
+		# Some method patterns can be static and become SST
 		for pattern in mclass.sites_patterns do
 			# First, we need to update callees for these patterns
 			if pattern isa MOCallSitePattern then
 				var lp_rsc = pattern.gp.lookup_first_definition(mainmodule, pattern.rsc.intro.bound_mtype)
 				pattern.add_lp(lp_rsc)
-			end
-
-			if not pattern.impl == null and pattern.impl.as(not null).is_mutable then
-				pattern.reinit_impl
-				pattern.impl = pattern.compute_impl
 			end
 
 			for mosite in pattern.sites do
@@ -943,7 +938,7 @@ redef abstract class MOSitePattern
 
 		reinit_impl
 
-		ph_impl(vm, false, get_pic(vm).vtable.id)
+		impl = ph_impl(vm, false, get_pic(vm).vtable.id)
 
 		for site in sites do
 			site.propagate_ph_impl
@@ -1129,8 +1124,8 @@ redef class MOCallSitePattern
 
 	redef fun add_lp(lp)
 	do
-		# For the computation of the pattern before
-		get_impl(vm)
+		# Force the computation of the pattern before
+		if not callees.is_empty then get_impl(vm)
 
 		# If this lp is unknown
 		var need_reset = not callees.has(lp)
@@ -1142,7 +1137,7 @@ redef class MOCallSitePattern
 
 				for site in sites do
 					# Adding a candidate to a site which was static leads to recompilation
-					if site.impl isa StaticImplMethod and site.concrete_receivers == null and site.impl.is_mutable then
+					if site.impl isa StaticImplMethod and site.concrete_receivers == null then
 						site.reinit_impl
 					end
 				end
