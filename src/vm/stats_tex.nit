@@ -1261,7 +1261,7 @@ redef class MOStats
 	# Output statistics about MOSites and their implementations
 	private fun table_site_implementations(file: FileWriter)
 	do
-		file.write("%Table implementations of sites\n")
+		file.write("%Table optimistic implementations of sites\n")
 		file.write("% Methods & Attributes & Casts & Total\n")
 
 		var primitive_methods = 0

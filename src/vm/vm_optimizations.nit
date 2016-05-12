@@ -377,38 +377,50 @@ redef class ASubtypeExpr
 
 		var anchor = vm.frame.arguments.first.mtype.as(MClassType)
 
-		# `sub` or `sup` are formal or virtual types, resolve them to concrete types
-		if sub isa MFormalType then
-			sub = sub.resolve_for(anchor.mclass.mclass_type, anchor, vm.mainmodule, false)
-		end
-		if sup isa MFormalType then
-			sup = sup.resolve_for(anchor.mclass.mclass_type, anchor, vm.mainmodule, false)
-		end
+		sub = sub.lookup_fixed(vm.mainmodule, anchor)
+		sup = sup.lookup_fixed(vm.mainmodule, anchor)
 
+		# Does `sup` accept null or not?
+		# Discard the nullable marker if it exists
 		var sup_accept_null = false
 		if sup isa MNullableType then
 			sup_accept_null = true
+			sup = sup.mtype
+		else if sup isa MNotNullType then
 			sup = sup.mtype
 		else if sup isa MNullType then
 			sup_accept_null = true
 		end
 
-		# Can `sub` provides null or not?
+		# Can `sub` provide null or not?
 		# Thus we can match with `sup_accept_null`
 		# Also discard the nullable marker if it exists
+		var sub_reject_null = false
 		if sub isa MNullableType then
 			if not sup_accept_null then return false
+			sub = sub.mtype
+		else if sub isa MNotNullType then
+			sub_reject_null = true
 			sub = sub.mtype
 		else if sub isa MNullType then
 			return sup_accept_null
 		end
-		# Now the case of direct null and nullable is over
+		# Now the case of direct null and nullable is over.
 
-		if sub isa MFormalType then
-			sub = sub.anchor_to(vm.mainmodule, anchor)
+		# If `sub` is a formal type, then it is accepted if its bound is accepted
+		while sub isa MFormalType do
+			# A unfixed formal type can only accept itself
+			if sub == sup then return true
+
+			sub = sub.lookup_bound(vm.mainmodule, anchor)
+			if sub_reject_null then sub = sub.as_notnull
+
 			# Manage the second layer of null/nullable
 			if sub isa MNullableType then
-				if not sup_accept_null then return false
+				if not sup_accept_null and not sub_reject_null then return false
+				sub = sub.mtype
+			else if sub isa MNotNullType then
+				sub_reject_null = true
 				sub = sub.mtype
 			else if sub isa MNullType then
 				return sup_accept_null
@@ -420,7 +432,7 @@ redef class ASubtypeExpr
 		end
 
 		# `sup` accepts only null
-		if sup isa MNullType or sup isa MNullType or sup isa MBottomType then return false
+		if sup isa MFormalType or sup isa MNullType or sup isa MBottomType then return false
 
 		# All cases have been checked, now the test is class against class
 		return null
@@ -605,9 +617,11 @@ redef class AAsCastExpr
 
 			var res_mo = subtype_commons(recv.mtype, mtype)
 			if res_mo != null then
-				if res_mo != res then
-					abort
-				end
+				# if res_mo != res then
+				# 	print vm.stack_trace
+				# 	print "res_mo {res_mo} res by vm {res} {recv.mtype} as {}"
+				# 	abort
+				# end
 
 				return recv
 			end
