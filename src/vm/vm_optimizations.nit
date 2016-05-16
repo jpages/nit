@@ -1381,6 +1381,7 @@ redef abstract class MOSite
 	do
 		var res: Implementation
 
+		pattern.get_impl(vm)
 		conservative_impl = conservative_implementation
 
 		if lp.recompilation then
