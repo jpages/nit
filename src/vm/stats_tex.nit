@@ -84,6 +84,9 @@ redef class MOStats
 		table_site_implementations(new FileWriter.open("{dir}/table_implementations-{lbl}.tex"))
 
 		table_site_implementations_simplified(new FileWriter.open("{dir}/table_implementations_simplified-{lbl}.tex"))
+
+		generate_line_methods(new FileWriter.open("{dir}/table_benchmarks_methods-{lbl}.tex"))
+		generate_line_attributes(new FileWriter.open("{dir}/table_benchmarks_attributes-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -1342,6 +1345,49 @@ redef class MOStats
 		table += "total & {polymorph_methods} & {polymorph_attributes} & {polymorph_casts} & {polymorph_methods + polymorph_attributes + polymorph_casts}\\\\\n"
 
 		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
+	# Generate a line per execution (extended or original) with a summary of data
+	private fun generate_line_methods(file: FileWriter)
+	do
+		file.write("%Table summary of benchmarks for methods\n")
+		file.write("%Benchmark & original & extended & improvement\n")
+
+		# Original mode
+		if sys.disable_preexistence_extensions then
+			file.write("{sys.program_name} & {vm.pstats.matrix[7][0]} & \\\\\n")
+		else
+			file.write("{sys.program_name} & & {vm.pstats.matrix[7][0]} \\\\\n")
+		end
+
+		file.write("\n\n")
+		file.close
+	end
+
+	# Generate a line per execution (extended or original) with a summary of data
+	private fun generate_line_attributes(file: FileWriter)
+	do
+		file.write("%Table summary of benchmarks for attributes\n")
+		file.write("%Benchmark & original & extended & improvement\n")
+
+		# Original mode
+		if sys.disable_preexistence_extensions then
+			file.write("{sys.program_name} & {vm.pstats.matrix[10][1]} & \\\\\n")
+		else
+			file.write("{sys.program_name} & & {vm.pstats.matrix[10][1]} \\\\\n")
+		end
+
+		print sys.program_args
+
+		for arg in program_args do
+			if arg.search("[a-zA-Z]*\.nit") != null then
+				print "found"
+				# Extract the program name
+				print arg.search("[a-zA-Z_]*\.nit").as(not null)
+			end
+		end
 		file.write("\n\n")
 		file.close
 	end

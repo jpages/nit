@@ -193,7 +193,7 @@ class VirtualMachine super NaiveInterpreter
 
 	# Subtyping test with Cohen test (direct access)
 	# * `id` is the identifier of the target class
-	# * `mask` is the absolute position of the target identifier in the virtual table
+	# * `position` is where to find the target identifier (if the test is positive)
 	# * `vtable` is the pointer to the virtual table of the receiver class
 	fun inter_is_subtype_sst(id: Int, position: Int, vtable: Pointer): Bool `{
 		// Direct access to the position given in parameter

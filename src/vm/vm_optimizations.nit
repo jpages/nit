@@ -85,10 +85,15 @@ redef class VirtualMachine
 
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
-				abort
+
+				# TEMPORARY PATCH
+				callsite.mocallsite.reinit_impl
+				callsite.mocallsite.get_impl(sys.vm)
+				# abort
 			end
 
-			return self.call(impl.exec_method(recv), args)
+			return self.call(propdef, args)
+			# return self.call(impl.exec_method(recv), args)
 		else
 			# TODO: handle this
 			# print "CallSite without MOCallSite {callsite} {callsite.mproperty}"
@@ -525,6 +530,7 @@ redef class AIsaExpr
 
 					print "mo_entity.as(MOSubtypeSite).pattern.can_be_sst {mo_entity.as(MOSubtypeSite).pattern.can_be_sst}"
 					print "can_be_static {mo_entity.as(MOSubtypeSite).pattern.can_be_static}"
+					print "final target {mo_entity.as(MOSubtypeSite).pattern.target_mclass.is_final}"
 					print vm.stack_trace
 					abort
 				end
@@ -1185,6 +1191,10 @@ redef class MOSubtypeSitePattern
 
 	redef fun compute_impl
 	do
+		if get_pic(vm).abstract_loaded then
+			if can_be_final then return final_impl
+		end
+
 		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
 			if can_be_static then
 				return static_impl(true)
@@ -1202,6 +1212,11 @@ redef class MOSubtypeSitePattern
 				return ph_impl(vm, false, get_pic(vm).vtable.id)
 			end
 		end
+	end
+
+	fun can_be_final: Bool
+	do
+		return target_mclass.is_final
 	end
 
 	# Indicates if self can be implemented with sst,
@@ -1272,6 +1287,11 @@ redef class MOSubtypeSitePattern
 		if target_mclass.abstract_loaded and not rsc.abstract_loaded then res = false
 
 		return new StaticImplSubtype(self, true, res)
+	end
+
+	fun final_impl: Implementation
+	do
+		return new FinalImplementation(self, false, true, target_mclass.vtable.as(not null))
 	end
 
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
@@ -1423,7 +1443,9 @@ redef abstract class MOSite
 		if concrete_receivers == null and not is_monomorph then
 			# Recopy the implementation of the pattern
 			var pattern_impl = pattern.get_impl(vm)
-			if pattern_impl isa StaticImpl then
+			if pattern_impl isa FinalImplementation then
+				impl = pattern.as(MOSubtypeSitePattern).final_impl
+			else if pattern_impl isa StaticImpl then
 				impl = static_impl(vm, true)
 			else if pattern_impl isa SSTImpl then
 				impl = sst_impl(vm, true)
@@ -1609,14 +1631,7 @@ redef class MOSubtypeSite
 		if is_monomorph then
 			# Ensure that the concrete type of the site is loaded
 			if concrete_receivers.first.abstract_loaded then
-				var subtype_res: Bool
-
-				# if rst isa MClassType then
-					# print "rst {rst} pattern.rsc {pattern.rsc} pattern.target_mclass {pattern.target_mclass}"
-					subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
-				# else
-				# 	subtype_res = vm.is_subtype(rst, pattern.target)
-				# end
+				var subtype_res = vm.is_subclass(concrete_receivers.first, pattern.target_mclass)
 
 				return new StaticImplSubtype(self, false, subtype_res)
 			end
@@ -1977,7 +1992,7 @@ class StaticImplMethod
 	end
 end
 
-# Static implementation (used only for subtype tests)
+# Static implementation of subtyping-tests
 class StaticImplSubtype
 	super StaticImpl
 
@@ -1988,5 +2003,20 @@ class StaticImplSubtype
 	do
 		# Directly return the cached value
 		return is_subtype
+	end
+end
+
+# A finalImplementation is a special case of subtyping test where
+# only the target is loaded without any subclasses
+class FinalImplementation
+	super StaticImplSubtype
+
+	# The virtual table of the target
+	var target_vtable: VTable
+
+	redef fun exec_subtype(recv: Instance)
+	do
+		# We compare the VTable of the target with the one of the receiver
+		return recv.vtable.as(not null) == target_vtable
 	end
 end
