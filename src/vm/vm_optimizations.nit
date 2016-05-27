@@ -85,15 +85,10 @@ redef class VirtualMachine
 
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
-
-				# TEMPORARY PATCH
-				callsite.mocallsite.reinit_impl
-				callsite.mocallsite.get_impl(sys.vm)
-				# abort
 			end
 
-			return self.call(propdef, args)
 			# return self.call(impl.exec_method(recv), args)
+			return self.call(propdef, args)
 		else
 			# TODO: handle this
 			# print "CallSite without MOCallSite {callsite} {callsite.mproperty}"
@@ -1191,9 +1186,7 @@ redef class MOSubtypeSitePattern
 
 	redef fun compute_impl
 	do
-		if get_pic(vm).abstract_loaded then
-			if can_be_final then return final_impl
-		end
+		if can_be_final then return final_impl
 
 		if rsc.abstract_loaded and get_pic(vm).abstract_loaded then
 			if can_be_static then
@@ -1216,7 +1209,7 @@ redef class MOSubtypeSitePattern
 
 	fun can_be_final: Bool
 	do
-		return target_mclass.is_final
+		return target_mclass.is_final and target_mclass.abstract_loaded
 	end
 
 	# Indicates if self can be implemented with sst,
@@ -1369,6 +1362,9 @@ redef abstract class MOSite
 	# The conservative implementation of the site
 	var conservative_impl: nullable Implementation
 
+	# Indicate if self uses a conservative implementation
+	var is_conservative: Bool = false
+
 	# Assign `null` to `impl`
 	# NOTE: This method must be use to set to null an Implementation before recompute it
 	# This method can be redefined to count recompilations in the vm
@@ -1379,6 +1375,7 @@ redef abstract class MOSite
 		else
 			# Code-patching approach
 			impl = null
+			conservative_impl = null
 		end
 	end
 
@@ -1402,6 +1399,8 @@ redef abstract class MOSite
 		var res: Implementation
 
 		pattern.get_impl(vm)
+
+		# TODO: fix this
 		conservative_impl = conservative_implementation
 
 		if lp.recompilation then
@@ -1420,6 +1419,7 @@ redef abstract class MOSite
 					if not expr_recv.is_pre then
 						# Use the conservative implementation
 						res = conservative_impl.as(not null)
+						is_conservative = true
 					else
 						res = compute_impl
 					end
@@ -1690,7 +1690,9 @@ redef class MOSubtypeSite
 
 	redef fun conservative_implementation: Implementation
 	do
-		if not pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
+		if pattern.can_be_final then
+			return pattern.final_impl
+		else if not pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return null_impl
 		else if pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return new StaticImplSubtype(self, false, false)
@@ -1846,6 +1848,7 @@ redef class MOCallSite
 			end
 
 			impl = null
+			conservative_impl = null
 		end
 	end
 end

@@ -87,6 +87,8 @@ redef class MOStats
 
 		generate_line_methods(new FileWriter.open("{dir}/table_benchmarks_methods-{lbl}.tex"))
 		generate_line_attributes(new FileWriter.open("{dir}/table_benchmarks_attributes-{lbl}.tex"))
+
+		table_optimistic_implementations(new FileWriter.open("{dir}/table_optimistic_implementations-{lbl}.tex"))
 	end
 
 	private var improvable_methods: Int is noinit
@@ -1309,6 +1311,110 @@ redef class MOStats
 		file.close
 	end
 
+	# Statistics on optimistic or conservative implementations of sites
+	fun table_optimistic_implementations(file: FileWriter)
+	do
+		file.write("%Table optimistic and conservative implementations of sites\n")
+		file.write("% Methods & Attributes & Casts & Total\n")
+
+		var primitive_methods = 0
+		var primitive_attributes = 0
+		var primitive_casts = 0
+
+		var stats_array_size = 3
+		var stats_array = new Array[Array[Int]].with_capacity(4)
+		for i in [0..stats_array_size] do
+			stats_array[i] = new Array[Int].filled_with(0, 4)
+		end
+
+		for site in sys.vm.all_moentities do
+			var index_x: Int = -1
+
+			if not site isa MOSite then continue
+			if site.is_monomorph then continue
+			if site.is_primitive then continue
+
+			var impl = site.get_impl(vm)
+
+			# A conservative implementation is used
+			if site.is_conservative then
+				if site isa MOCallSite then
+					if impl isa StaticImplMethod then
+						# Conservative optimized
+						stats_array[0][0] += 1
+						stats_array[0][3] += 1
+					else
+						stats_array[1][0] += 1
+						stats_array[1][3] += 1
+					end
+				else if site isa MOAttrSite then
+					if impl isa SSTImpl then
+						# Conservative optimized
+						stats_array[0][1] += 1
+						stats_array[0][3] += 1
+					else
+						stats_array[1][1] += 1
+						stats_array[1][3] += 1
+					end
+				else if site isa MOSubtypeSite then
+					if impl isa StaticImplSubtype then
+						# Conservative optimized
+						stats_array[0][2] += 1
+						stats_array[0][3] += 1
+					else
+						stats_array[1][2] += 1
+						stats_array[1][3] += 1
+					end
+				end
+			else
+				# An optimistic implementation is used
+				if site isa MOCallSite then
+					if impl isa StaticImplMethod then
+						stats_array[2][0] += 1
+						stats_array[2][3] += 1
+					else
+						stats_array[3][0] += 1
+						stats_array[3][3] += 1
+					end
+				else if site isa MOAttrSite then
+					if impl isa SSTImpl then
+						stats_array[2][1] += 1
+						stats_array[2][3] += 1
+					else
+						stats_array[3][1] += 1
+						stats_array[3][3] += 1
+					end
+				else if site isa MOSubtypeSite then
+					if impl isa StaticImplSubtype then
+						stats_array[2][2] += 1
+						stats_array[2][3] += 1
+					else
+						stats_array[3][2] += 1
+						stats_array[3][3] += 1
+					end
+				end
+			end
+		end
+
+		# Primitive and monomorphic sites are excluded
+
+		var table = "Optimized conservative & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]} \\\\\n"
+		table += "Non-optimized conservative & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
+		table += "Optimized optimistic & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "Non-optimized optimistic & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+
+		var total1 = stats_array[0][0] + stats_array[1][0] + stats_array[2][0] + stats_array[3][0]
+		var total2 = stats_array[0][1] + stats_array[1][1] + stats_array[2][1] + stats_array[3][1]
+		var total3 = stats_array[0][2] + stats_array[1][2] + stats_array[2][2] + stats_array[3][2]
+
+		table += "\\hline\n"
+		table += "total & {total1} & {total2} & {total3} & {total1 + total2 + total3} \\\\\n"
+
+		file.write(table)
+		file.write("\n\n")
+		file.close
+	end
+
 	# Output simplified statistics about MOSites and their implementations
 	private fun table_site_implementations_simplified(file: FileWriter)
 	do
@@ -1383,7 +1489,6 @@ redef class MOStats
 
 		for arg in program_args do
 			if arg.search("[a-zA-Z]*\.nit") != null then
-				print "found"
 				# Extract the program name
 				print arg.search("[a-zA-Z_]*\.nit").as(not null)
 			end
