@@ -245,6 +245,8 @@ end
 redef class MOVar
 	fun return_preexist: Int
 	do
+		if sys.disable_preexistence_extensions or sys.disable_method_return then return 24
+
 		if preexist_value.bit_unknown then
 			preexist_value = 32
 
@@ -373,7 +375,7 @@ end
 redef class MOProcedureSite
 	redef fun compute_preexist
 	do
-		return expr_recv.expr_preexist
+		return 24
 	end
 end
 
@@ -384,7 +386,7 @@ redef class MOFunctionSite
 	do
 		# If the preexistence extension is deactivated, the callsite is not preexistant
 		if disable_preexistence_extensions or disable_method_return then
-			return 8
+			return 24
 		end
 
 		counter += 1
@@ -484,6 +486,18 @@ redef class MOFunctionSite
 	end
 end
 
+redef class MOInitSite
+	redef fun compute_preexist
+	do
+		# If the preexistence extension is deactivated, the callsite is not preexistant
+		if disable_preexistence_extensions or disable_method_return then
+			return 24
+		end
+
+		return super
+	end
+end
+
 redef class MMethodDef
 	# Compute the preexistence of all invocation sites of the method
 	# Return true if the method is analysed, false otherwise (already compiled, extern or extern method)
@@ -560,6 +574,8 @@ end
 redef class MOAsSubtypeSite
 	redef fun compute_preexist
 	do
+		if sys.disable_preexistence_extensions then return 24
+
 		# Compute the returned preexistence of this expression
 		var concretes = compute_concretes(null)
 
@@ -580,7 +596,11 @@ end
 redef class MOIsaSubtypeSite
 	redef fun compute_preexist
 	do
-		return 3
+		if sys.disable_preexistence_extensions then
+			return 24
+		else
+			return 3
+		end
 	end
 end
 
