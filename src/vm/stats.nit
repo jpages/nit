@@ -1057,7 +1057,7 @@ redef class MOSite
 			vm.pstats.matrix[23][index_x] += 1
 			vm.pstats.matrix[23][5] += 1
 
-			if expr_recv.is_pre then
+			if expr_recv.is_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[24][index_x] += 1
 				vm.pstats.matrix[24][5] += 1
 			else
@@ -1071,7 +1071,7 @@ redef class MOSite
 			vm.pstats.matrix[26][5] += 1
 
 			# If the receiver is preexisting
-			if expr_recv.is_pre then
+			if expr_recv.is_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[27][index_x] += 1
 				vm.pstats.matrix[27][5] += 1
 			else
@@ -1082,7 +1082,7 @@ redef class MOSite
 			# If the receiver comes only from an attribute read
 			readsite_statistics
 
-			if expr_recv.is_pre then
+			if expr_recv.is_pre and not disable_preexistence_extensions then
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
@@ -1095,14 +1095,14 @@ redef class MOSite
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
-			if expr_recv.is_pre then
+			if expr_recv.is_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[78][index_x] += 1
 				vm.pstats.matrix[78][5] += 1
 			else
 				vm.pstats.matrix[79][index_x] += 1
 				vm.pstats.matrix[79][5] += 1
 			end
-		else if expr_recv.is_pre then
+		else if expr_recv.is_pre and not disable_preexistence_extensions then
 			# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 			# If the site is preexisting
 			vm.pstats.matrix[29][index_x] += 1
