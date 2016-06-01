@@ -87,8 +87,7 @@ redef class VirtualMachine
 				print stack_trace
 			end
 
-			# return self.call(impl.exec_method(recv), args)
-			return self.call(propdef, args)
+			return self.call(impl.exec_method(recv), args)
 		else
 			# TODO: handle this
 			# print "CallSite without MOCallSite {callsite} {callsite.mproperty}"
@@ -1691,7 +1690,7 @@ redef class MOSubtypeSite
 	redef fun conservative_implementation: Implementation
 	do
 		if pattern.can_be_final then
-			return pattern.final_impl
+			return final_impl
 		else if not pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
 			return null_impl
 		else if pattern.rsc.abstract_loaded and not target_mclass.abstract_loaded then
@@ -1703,6 +1702,11 @@ redef class MOSubtypeSite
 			# Else we use the default computation of conservative implementation
 			return super
 		end
+	end
+
+	fun final_impl: Implementation
+	do
+		return new FinalImplementation(self, false, true, target_mclass.vtable.as(not null))
 	end
 end
 

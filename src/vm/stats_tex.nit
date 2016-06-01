@@ -1398,9 +1398,10 @@ redef class MOStats
 
 		# Primitive and monomorphic sites are excluded
 
-		var table = "Optimized conservative & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]} \\\\\n"
+		var table = "Optimal conservative & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]} \\\\\n"
 		table += "Non-optimized conservative & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
-		table += "Optimized optimistic & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table += "Optimal optimistic & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
+		table +=
 		table += "Non-optimized optimistic & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
 
 		var total1 = stats_array[0][0] + stats_array[1][0] + stats_array[2][0] + stats_array[3][0]

@@ -1479,6 +1479,26 @@ redef class StaticImplSubtype
 	end
 end
 
+redef class FinalImplementation
+
+	redef fun exec_subtype(recv)
+	do
+		if mo_entity.as(MOSite).is_primitive then
+			vm.pstats.primitive_cast_executions += 1
+		else if mo_entity.as(MOSite).is_monomorph then
+			sys.vm.pstats.monomorph_cast_executions += 1
+		else
+			sys.vm.pstats.cast_static += 1
+		end
+
+		mo_entity.as(MOSite).executions += 1
+
+		mo_entity.as(MOSite).set_executed
+
+		return super
+	end
+end
+
 redef class SSTImpl
 	redef var index_y = 9
 
