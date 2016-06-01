@@ -88,6 +88,8 @@ redef class MOStats
 		generate_line_methods(new FileWriter.open("{dir}/table_benchmarks_methods-{lbl}.tex"))
 		generate_line_attributes(new FileWriter.open("{dir}/table_benchmarks_attributes-{lbl}.tex"))
 
+		generate_line_table4(new FileWriter.open("{dir}/table_rules_summary-{lbl}.tex"))
+
 		table_optimistic_implementations(new FileWriter.open("{dir}/table_optimistic_implementations-{lbl}.tex"))
 	end
 
@@ -182,6 +184,7 @@ redef class MOStats
 	private fun table3(file: FileWriter)
 	do
 		file.write("%Table 3\n")
+		file.write("Methods & Attributes & Casts & Total improved & percentage improvement\n")
 
 		var total_callsites_improved = vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]
 		var total_callsites_improvable = vm.pstats.matrix[26][0] + vm.pstats.matrix[26][1] + vm.pstats.matrix[26][2]
@@ -1321,7 +1324,7 @@ redef class MOStats
 		var primitive_attributes = 0
 		var primitive_casts = 0
 
-		var stats_array_size = 3
+		var stats_array_size = 4
 		var stats_array = new Array[Array[Int]].with_capacity(4)
 		for i in [0..stats_array_size] do
 			stats_array[i] = new Array[Int].filled_with(0, 4)
@@ -1332,14 +1335,13 @@ redef class MOStats
 
 			if not site isa MOSite then continue
 			if site.is_monomorph then continue
-			if site.is_primitive then continue
 
 			var impl = site.get_impl(vm)
 
 			# A conservative implementation is used
 			if site.is_conservative then
 				if site isa MOCallSite then
-					if impl isa StaticImplMethod then
+					if impl isa StaticImpl then
 						# Conservative optimized
 						stats_array[0][0] += 1
 						stats_array[0][3] += 1
@@ -1369,44 +1371,49 @@ redef class MOStats
 			else
 				# An optimistic implementation is used
 				if site isa MOCallSite then
-					if impl isa StaticImplMethod then
+					if impl isa StaticImpl then
 						stats_array[2][0] += 1
 						stats_array[2][3] += 1
-					else
+					else if impl isa SSTImpl then
 						stats_array[3][0] += 1
 						stats_array[3][3] += 1
+					else
+						stats_array[4][0] += 1
+						stats_array[4][3] += 1
 					end
 				else if site isa MOAttrSite then
 					if impl isa SSTImpl then
 						stats_array[2][1] += 1
 						stats_array[2][3] += 1
 					else
-						stats_array[3][1] += 1
-						stats_array[3][3] += 1
+						stats_array[4][1] += 1
+						stats_array[4][3] += 1
 					end
 				else if site isa MOSubtypeSite then
 					if impl isa StaticImplSubtype then
 						stats_array[2][2] += 1
 						stats_array[2][3] += 1
-					else
+					else if impl isa SSTImplSubtype then
 						stats_array[3][2] += 1
 						stats_array[3][3] += 1
+					else
+						stats_array[4][2] += 1
+						stats_array[4][3] += 1
 					end
 				end
 			end
 		end
 
 		# Primitive and monomorphic sites are excluded
-
 		var table = "Optimal conservative & {stats_array[0][0]} & {stats_array[0][1]} & {stats_array[0][2]} & {stats_array[0][3]} \\\\\n"
 		table += "Non-optimized conservative & {stats_array[1][0]} & {stats_array[1][1]} & {stats_array[1][2]} & {stats_array[1][3]} \\\\\n"
 		table += "Optimal optimistic & {stats_array[2][0]} & {stats_array[2][1]} & {stats_array[2][2]} & {stats_array[2][3]} \\\\\n"
-		table +=
-		table += "Non-optimized optimistic & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+		table += "Non-optimal optimistic & {stats_array[3][0]} & {stats_array[3][1]} & {stats_array[3][2]} & {stats_array[3][3]} \\\\\n"
+		table += "Non-optimized optimistic & {stats_array[4][0]} & {stats_array[4][1]} & {stats_array[4][2]} & {stats_array[4][3]} \\\\\n"
 
-		var total1 = stats_array[0][0] + stats_array[1][0] + stats_array[2][0] + stats_array[3][0]
-		var total2 = stats_array[0][1] + stats_array[1][1] + stats_array[2][1] + stats_array[3][1]
-		var total3 = stats_array[0][2] + stats_array[1][2] + stats_array[2][2] + stats_array[3][2]
+		var total1 = stats_array[0][0] + stats_array[1][0] + stats_array[2][0] + stats_array[3][0] + stats_array[4][0]
+		var total2 = stats_array[0][1] + stats_array[1][1] + stats_array[2][1] + stats_array[3][1] + stats_array[4][1]
+		var total3 = stats_array[0][2] + stats_array[1][2] + stats_array[2][2] + stats_array[3][2] + stats_array[4][2]
 
 		table += "\\hline\n"
 		table += "total & {total1} & {total2} & {total3} & {total1 + total2 + total3} \\\\\n"
@@ -1459,42 +1466,52 @@ redef class MOStats
 	# Generate a line per execution (extended or original) with a summary of data
 	private fun generate_line_methods(file: FileWriter)
 	do
-		file.write("%Table summary of benchmarks for methods\n")
-		file.write("%Benchmark & original & extended & improvement\n")
+		# file.write("%Table summary of benchmarks for methods\n")
+		# file.write("%Benchmark & original & extended & improvement\n")
 
-		# Original mode
-		if sys.disable_preexistence_extensions then
-			file.write("{sys.program_name} & {vm.pstats.matrix[7][0]} & \\\\\n")
-		else
-			file.write("{sys.program_name} & & {vm.pstats.matrix[7][0]} \\\\\n")
-		end
+		file.write("{vm.pstats.matrix[7][0]} \\\\\n")
 
-		file.write("\n\n")
 		file.close
 	end
 
 	# Generate a line per execution (extended or original) with a summary of data
 	private fun generate_line_attributes(file: FileWriter)
 	do
-		file.write("%Table summary of benchmarks for attributes\n")
-		file.write("%Benchmark & original & extended & improvement\n")
+		# file.write("%Table summary of benchmarks for attributes\n")
+		# file.write("%Benchmark & original & extended & improvement\n")
 
-		# Original mode
-		if sys.disable_preexistence_extensions then
-			file.write("{sys.program_name} & {vm.pstats.matrix[10][1]} & \\\\\n")
-		else
-			file.write("{sys.program_name} & & {vm.pstats.matrix[10][1]} \\\\\n")
-		end
+		file.write("{vm.pstats.matrix[10][1]} \n")
 
-		print sys.program_args
+		# print sys.program_args
 
-		for arg in program_args do
-			if arg.search("[a-zA-Z]*\.nit") != null then
-				# Extract the program name
-				print arg.search("[a-zA-Z_]*\.nit").as(not null)
-			end
-		end
-		file.write("\n\n")
+		# for arg in program_args do
+		# 	if arg.search("[a-zA-Z]*\.nit") != null then
+		# 		# Extract the program name
+		# 		print arg.search("[a-zA-Z_]*\.nit").as(not null)
+		# 	end
+		# end
+		file.close
+	end
+
+	# Generate one line related to table4 for each benchmark
+	fun generate_line_table4(file: FileWriter)
+	do
+		file.write("%Table summary of the rules effect for each benchmark\n")
+		file.write("%Benchmark & Method & Attribute & Cast & Total improved & Total sites\n")
+
+		var total_method_rules = vm.pstats.matrix[27][0] + vm.pstats.matrix[24][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[78][0]
+		var total_improvable_method = vm.pstats.matrix[26][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[23][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[77][2]
+
+		var total_attribute_rules = vm.pstats.matrix[27][1] + vm.pstats.matrix[24][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[78][1]
+		var total_improvable_attribute = vm.pstats.matrix[26][1] + vm.pstats.matrix[23][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[77][1]
+
+		var total_cast_rules = vm.pstats.matrix[27][2] + vm.pstats.matrix[24][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[78][2]
+		var total_improvable_cast = vm.pstats.matrix[26][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[23][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2] + vm.pstats.matrix[32][2] + vm.pstats.matrix[77][2]
+
+		var total_rules = total_method_rules + total_attribute_rules + total_cast_rules
+
+		file.write(" & {total_method_rules} & {total_attribute_rules} & {total_cast_rules} & {total_rules} & {vm.pstats.matrix[1][5] + vm.pstats.matrix[2][5]}\\\\\n")
+
 		file.close
 	end
 end

@@ -1224,6 +1224,7 @@ redef class MOSite
 	do
 		var res = "{self} recv {expr_recv} "
 		if is_monomorph then res += "monomorph "
+		if is_conservative then res += "is_conservative "
 
 		if pattern.rsc.is_final then res += "final_rcv = {pattern.rsc} "
 
@@ -1234,8 +1235,6 @@ redef class MOSite
 		end
 
 		res += " used impl {get_impl(sys.vm)} conservative_impl {conservative_impl.as(not null)}"
-
-		if get_impl(sys.vm) == conservative_impl then res += " is_conservative"
 
 		res += " preexistence {expr_recv.compute_preexist} preexistence_origin {expr_recv.preexistence_origin}"
 		res += " executions {executions}"
