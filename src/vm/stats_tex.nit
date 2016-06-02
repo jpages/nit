@@ -198,11 +198,14 @@ redef class MOStats
 		var total_other_improved = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2]
 		var total_other_improvable = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][0] + vm.pstats.matrix[30][1] + vm.pstats.matrix[30][2]
 
+		print "total_other_improvable {total_other_improved}"
+		print "total_other_improved {total_other_improved}"
+
 		var table3 = "Read & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_readsite_improved} & {if total_readsite_improvable != 0 then total_readsite_improved*100/total_readsite_improvable else 0}\\\\\n"
 		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {if total_new_improvable != 0 then total_new_improved*100/total_new_improvable else 0}\\\\\n"
 		table3 += "Call & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
 		table3 += "Cast & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
-		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then total_other_improved*100/total_other_improvable else 0}\\\\\n"
+		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then (total_other_improved*100)/total_other_improvable else 0}\\\\\n"
 
 		table3 += "\\hline\n"
 
@@ -312,7 +315,7 @@ redef class MOStats
 
 		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][5] -vm.pstats.matrix[27][3])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
 
-		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]}\\\\\n"
+		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
 
 		file.write(table6)
 		file.write("\n\n")
