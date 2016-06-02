@@ -85,6 +85,7 @@ redef class VirtualMachine
 
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
+				return self.call(propdef, args)
 			end
 
 			return self.call(impl.exec_method(recv), args)

@@ -85,8 +85,11 @@ redef class MOStats
 
 		table_site_implementations_simplified(new FileWriter.open("{dir}/table_implementations_simplified-{lbl}.tex"))
 
-		generate_line_methods(new FileWriter.open("{dir}/table_benchmarks_methods-{lbl}.tex"))
-		generate_line_attributes(new FileWriter.open("{dir}/table_benchmarks_attributes-{lbl}.tex"))
+		generate_line_methods(new FileWriter.open("{dir}/line_methods-{lbl}.tex"))
+		generate_line_attributes(new FileWriter.open("{dir}/line_attributes-{lbl}.tex"))
+
+		generate_line_methods_total(new FileWriter.open("{dir}/line_total_methods-{lbl}.tex"))
+		generate_line_attributes_total(new FileWriter.open("{dir}/line_total_attributes-{lbl}.tex"))
 
 		generate_line_summary(new FileWriter.open("{dir}/table_rules_summary-{lbl}.tex"))
 
@@ -164,11 +167,11 @@ redef class MOStats
 
 		var general_total = total_from_new + total_from_callsite + total_from_readsite + total_from_cast + other_methods + other_attributes + other_casts
 
-		var table2 = "Read & {vm.pstats.matrix[32][0]} & {vm.pstats.matrix[32][1]} & {vm.pstats.matrix[32][2]} & {total_from_readsite} & {total_from_readsite*100/general_total}\\\\\n"
-		table2 += "New & {vm.pstats.matrix[23][0]} & {vm.pstats.matrix[23][1]} & {vm.pstats.matrix[23][2]} & {total_from_new} & {total_from_new*100/general_total}\\\\\n"
-		table2 += "Call & {vm.pstats.matrix[26][0]} & {vm.pstats.matrix[26][1]} & {vm.pstats.matrix[26][2]} & {total_from_callsite} & {total_from_callsite*100/general_total}\\\\\n"
-		table2 += "Cast & {vm.pstats.matrix[79][0]} & {vm.pstats.matrix[79][1]} & {vm.pstats.matrix[79][2]} & {total_from_cast} & {total_from_cast*100/general_total}\\\\\n"
-		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {total_others*100/general_total}\\\\\n"
+		var table2 = "Read & {vm.pstats.matrix[32][0]} & {vm.pstats.matrix[32][1]} & {vm.pstats.matrix[32][2]} & {total_from_readsite} & {(total_from_readsite*100).to_f/general_total.to_f}\\\\\n"
+		table2 += "New & {vm.pstats.matrix[23][0]} & {vm.pstats.matrix[23][1]} & {vm.pstats.matrix[23][2]} & {total_from_new} & {(total_from_new*100).to_f/general_total.to_f}\\\\\n"
+		table2 += "Call & {vm.pstats.matrix[26][0]} & {vm.pstats.matrix[26][1]} & {vm.pstats.matrix[26][2]} & {total_from_callsite} & {(total_from_callsite*100).to_f/general_total.to_f}\\\\\n"
+		table2 += "Cast & {vm.pstats.matrix[79][0]} & {vm.pstats.matrix[79][1]} & {vm.pstats.matrix[79][2]} & {total_from_cast} & {(total_from_cast*100).to_f/general_total.to_f}\\\\\n"
+		table2 += "other & {other_methods} & {other_attributes} & {other_casts} & {total_others} & {(total_others*100).to_f/general_total.to_f}\\\\\n"
 		table2 += "\\hline\n"
 
 		table2 += "total & {vm.pstats.matrix[23][0] + vm.pstats.matrix[28][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[79][0] + other_methods} & {vm.pstats.matrix[23][1] + vm.pstats.matrix[28][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[79][1] + other_attributes} & {vm.pstats.matrix[23][2] + vm.pstats.matrix[28][2] + vm.pstats.matrix[32][2] + vm.pstats.matrix[79][2] + other_casts} & {general_total} & 100\\\\\n"
@@ -198,14 +201,11 @@ redef class MOStats
 		var total_other_improved = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2]
 		var total_other_improvable = vm.pstats.matrix[29][0] + vm.pstats.matrix[29][1] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][0] + vm.pstats.matrix[30][1] + vm.pstats.matrix[30][2]
 
-		print "total_other_improvable {total_other_improved}"
-		print "total_other_improved {total_other_improved}"
-
-		var table3 = "Read & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_readsite_improved} & {if total_readsite_improvable != 0 then total_readsite_improved*100/total_readsite_improvable else 0}\\\\\n"
-		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {if total_new_improvable != 0 then total_new_improved*100/total_new_improvable else 0}\\\\\n"
-		table3 += "Call & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {total_callsites_improved*100/total_callsites_improvable}\\\\\n"
-		table3 += "Cast & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {vm.pstats.matrix[78][5]*100/vm.pstats.matrix[77][5]}\\\\\n"
-		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then (total_other_improved*100)/total_other_improvable else 0}\\\\\n"
+		var table3 = "Read & {vm.pstats.matrix[31][0]} & {vm.pstats.matrix[31][1]} & {vm.pstats.matrix[31][2]} & {total_readsite_improved} & {if total_readsite_improvable != 0 then ((total_readsite_improved*100).to_f/total_readsite_improvable.to_f).round.to_i else 0}\\\\\n"
+		table3 += "New & {vm.pstats.matrix[24][0]} & {vm.pstats.matrix[24][1]} & {vm.pstats.matrix[24][2]} & {total_new_improved} & {if total_new_improvable != 0 then ((total_new_improved*100).to_f/total_new_improvable.to_f).round.to_i else 0}\\\\\n"
+		table3 += "Call & {vm.pstats.matrix[27][0]} & {vm.pstats.matrix[27][1]} & {vm.pstats.matrix[27][2]}  & {total_callsites_improved} & {((total_callsites_improved*100).to_f/total_callsites_improvable.to_f).round.to_i}\\\\\n"
+		table3 += "Cast & {vm.pstats.matrix[78][0]} & {vm.pstats.matrix[78][1]} & {vm.pstats.matrix[78][2]} & {vm.pstats.matrix[78][5]} & {((vm.pstats.matrix[78][5]*100).to_f/(vm.pstats.matrix[77][5]).to_f).round.to_i}\\\\\n"
+		table3 += "other & {vm.pstats.matrix[29][0]} & {vm.pstats.matrix[29][1]} & {vm.pstats.matrix[29][2]} & {total_other_improved} & {if total_other_improvable != 0 then ((total_other_improved*100).to_f/total_other_improvable.to_f).round.to_i else 0}\\\\\n"
 
 		table3 += "\\hline\n"
 
@@ -276,21 +276,21 @@ redef class MOStats
 	do
 		file.write("%Table 4\n")
 
-		var optimizable_inline = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
+		var optimizable_inline = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2]
 		optimizable_inline += vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
 
-		var nonoptimizable_inline = vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2]
+		var nonoptimizable_inline = vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2] + vm.pstats.matrix[10][2]
 		var total_table4 = optimizable_inline + nonoptimizable_inline
 
 		var total_preexisting = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
 		var total_nonpreexisting = vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
 
-		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\\\\n"
+		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\\\\n"
 		table4 += "non preexisting & {vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\\\\n"
 		table4 += "\\hline\n"
 
-		table4 += "total inlinable & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
-		table4 += "non-inlinable & {vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2]} & {nonoptimizable_inline} & {nonoptimizable_inline*100/total_table4}\\\\\\hline\n"
+		table4 += "total inlinable & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
+		table4 += "non-inlinable & {vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2] + vm.pstats.matrix[10][2]} & {nonoptimizable_inline} & {nonoptimizable_inline*100/total_table4}\\\\\\hline\n"
 		table4 += "total & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[12][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2] + vm.pstats.matrix[12][2]} & {total_table4} & 100\\\\\n"
 
 		file.write(table4)
@@ -1469,13 +1469,10 @@ redef class MOStats
 	# Generate a line per execution (extended or original) with a summary of data
 	private fun generate_line_methods(file: FileWriter)
 	do
-		# file.write("%Table summary of benchmarks for methods\n")
-		# file.write("%Benchmark & original & extended & improvement\n")
-
 		if sys.disable_preexistence_extensions then
-			file.write("\setcounter\{original\}{vm.pstats.matrix[7][0]} \n")
+			file.write("\\setcounter\{original\}\{{vm.pstats.matrix[7][0]}\} \n")
 		else
-			file.write("\setcounter\{extend\}{vm.pstats.matrix[7][0]} \n")
+			file.write("\\setcounter\{extend\}\{{vm.pstats.matrix[7][0]}\} \n")
 		end
 
 		file.close
@@ -1484,21 +1481,24 @@ redef class MOStats
 	# Generate a line per execution (extended or original) with a summary of data
 	private fun generate_line_attributes(file: FileWriter)
 	do
-		# file.write("%Table summary of benchmarks for attributes\n")
-		# file.write("%Benchmark & original & extended & improvement\n")
-
 		if sys.disable_preexistence_extensions then
-			file.write("\setcounter\{original\}{vm.pstats.matrix[10][1]} \n")
+			file.write("\\setcounter\{original\}\{{vm.pstats.matrix[10][1]}\} \n")
 		else
-			file.write("\setcounter\{extend\}{vm.pstats.matrix[10][1]} \n")
+			file.write("\\setcounter\{extend\}\{{vm.pstats.matrix[10][1]}\} \n")
 		end
 
-		# for arg in program_args do
-		# 	if arg.search("[a-zA-Z]*\.nit") != null then
-		# 		# Extract the program name
-		# 		print arg.search("[a-zA-Z_]*\.nit").as(not null)
-		# 	end
-		# end
+		file.close
+	end
+
+	private fun generate_line_methods_total(file: FileWriter)
+	do
+		file.write("{vm.pstats.matrix[6][0]}\n")
+		file.close
+	end
+
+	private fun generate_line_attributes_total(file: FileWriter)
+	do
+		file.write("{vm.pstats.matrix[9][1]}\n")
 		file.close
 	end
 
