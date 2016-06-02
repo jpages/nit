@@ -88,7 +88,7 @@ redef class MOStats
 		generate_line_methods(new FileWriter.open("{dir}/table_benchmarks_methods-{lbl}.tex"))
 		generate_line_attributes(new FileWriter.open("{dir}/table_benchmarks_attributes-{lbl}.tex"))
 
-		generate_line_table4(new FileWriter.open("{dir}/table_rules_summary-{lbl}.tex"))
+		generate_line_summary(new FileWriter.open("{dir}/table_rules_summary-{lbl}.tex"))
 
 		table_optimistic_implementations(new FileWriter.open("{dir}/table_optimistic_implementations-{lbl}.tex"))
 	end
@@ -105,7 +105,7 @@ redef class MOStats
 
 	private var total_npre: Int is noinit
 
-	# Generate a first table in latex format
+	# Generate a table about preexistence of object-sites
 	# `file` An already opened output file
 	private fun table1(file: FileWriter)
 	do
@@ -184,7 +184,7 @@ redef class MOStats
 	private fun table3(file: FileWriter)
 	do
 		file.write("%Table 3\n")
-		file.write("Methods & Attributes & Casts & Total improved & percentage improvement\n")
+		file.write("%Methods & Attributes & Casts & Total improved & percentage improvement\n")
 
 		var total_callsites_improved = vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]
 		var total_callsites_improvable = vm.pstats.matrix[26][0] + vm.pstats.matrix[26][1] + vm.pstats.matrix[26][2]
@@ -267,7 +267,7 @@ redef class MOStats
 		file.close
 	end
 
-	# Generate a fourth table in latex format
+	# Generate statistics about inlinability of object-sites
 	# `file` An already opened output file
 	private fun table4(file: FileWriter)
 	do
@@ -1469,7 +1469,11 @@ redef class MOStats
 		# file.write("%Table summary of benchmarks for methods\n")
 		# file.write("%Benchmark & original & extended & improvement\n")
 
-		file.write("{vm.pstats.matrix[7][0]} \\\\\n")
+		if sys.disable_preexistence_extensions then
+			file.write("\setcounter\{original\}{vm.pstats.matrix[7][0]} \n")
+		else
+			file.write("\setcounter\{extend\}{vm.pstats.matrix[7][0]} \n")
+		end
 
 		file.close
 	end
@@ -1480,9 +1484,11 @@ redef class MOStats
 		# file.write("%Table summary of benchmarks for attributes\n")
 		# file.write("%Benchmark & original & extended & improvement\n")
 
-		file.write("{vm.pstats.matrix[10][1]} \n")
-
-		# print sys.program_args
+		if sys.disable_preexistence_extensions then
+			file.write("\setcounter\{original\}{vm.pstats.matrix[10][1]} \n")
+		else
+			file.write("\setcounter\{extend\}{vm.pstats.matrix[10][1]} \n")
+		end
 
 		# for arg in program_args do
 		# 	if arg.search("[a-zA-Z]*\.nit") != null then
@@ -1493,24 +1499,25 @@ redef class MOStats
 		file.close
 	end
 
-	# Generate one line related to table4 for each benchmark
-	fun generate_line_table4(file: FileWriter)
+	# Generate one line related to efficiency of preexistence rules for each benchmark
+	fun generate_line_summary(file: FileWriter)
 	do
 		file.write("%Table summary of the rules effect for each benchmark\n")
-		file.write("%Benchmark & Method & Attribute & Cast & Total improved & Total sites\n")
+		file.write("%Benchmark & Method & Attribute & Cast & Total improved & Total improvable sites\n")
+
 
 		var total_method_rules = vm.pstats.matrix[27][0] + vm.pstats.matrix[24][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[78][0]
-		var total_improvable_method = vm.pstats.matrix[26][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[23][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[77][2]
-
 		var total_attribute_rules = vm.pstats.matrix[27][1] + vm.pstats.matrix[24][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[78][1]
-		var total_improvable_attribute = vm.pstats.matrix[26][1] + vm.pstats.matrix[23][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[77][1]
-
 		var total_cast_rules = vm.pstats.matrix[27][2] + vm.pstats.matrix[24][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[78][2]
+
+		var total_improvable_method = vm.pstats.matrix[26][0] + vm.pstats.matrix[31][0] + vm.pstats.matrix[23][0] + vm.pstats.matrix[29][0] + vm.pstats.matrix[30][0] + vm.pstats.matrix[32][0] + vm.pstats.matrix[77][0]
+		var total_improvable_attribute = vm.pstats.matrix[26][1] + vm.pstats.matrix[23][1] + vm.pstats.matrix[29][1] + vm.pstats.matrix[30][1] + vm.pstats.matrix[31][1] + vm.pstats.matrix[32][1] + vm.pstats.matrix[77][1]
 		var total_improvable_cast = vm.pstats.matrix[26][2] + vm.pstats.matrix[31][2] + vm.pstats.matrix[23][2] + vm.pstats.matrix[29][2] + vm.pstats.matrix[30][2] + vm.pstats.matrix[32][2] + vm.pstats.matrix[77][2]
 
 		var total_rules = total_method_rules + total_attribute_rules + total_cast_rules
+		var total_improvable = total_improvable_method + total_improvable_attribute + total_improvable_cast
 
-		file.write(" & {total_method_rules} & {total_attribute_rules} & {total_cast_rules} & {total_rules} & {vm.pstats.matrix[1][5] + vm.pstats.matrix[2][5]}\\\\\n")
+		file.write(" & {total_method_rules} & {total_attribute_rules} & {total_cast_rules} & {total_rules} & {total_improvable}\\\\\n")
 
 		file.close
 	end
