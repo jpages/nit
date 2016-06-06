@@ -141,7 +141,7 @@ redef class MOStats
 		table1 += "non preexisting & {vm.pstats.matrix[2][0]} & {vm.pstats.matrix[2][1]} & {vm.pstats.matrix[2][2]} & {total_npre}\\\\\n"
 		table1 += "\\hline\n"
 		table1 += "total polymorph & {vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]} & {vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]} & {vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2]} & {(total_pre + total_npre)}\\\\\n"
-		table1 += "preexistence rate & {vm.pstats.matrix[1][0]*100/(vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0])}\\% & {vm.pstats.matrix[1][1]*100/(vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1])}\\% & {vm.pstats.matrix[1][2]*100/(vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\\\n"
+		table1 += "preexistence rate & {vm.pstats.matrix[1][0]*100/(vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0])}\\% & {vm.pstats.matrix[1][1]*100/(vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1])}\\% & {vm.pstats.matrix[1][2]*100/(vm.pstats.matrix[1][2] + vm.pstats.matrix[2][2])}\\% & {total_pre*100/(total_pre + total_npre)}\\%\\\\\n"
 
 		file.write(table1)
 		file.write("\n\n")
@@ -308,12 +308,12 @@ redef class MOStats
 		file.write("%Table 6\n")
 		file.write("%Method & Pattern & Site & receiver\n")
 
-		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][5] - vm.pstats.matrix[27][3]}\\\\\n"
+		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]}\\\\\n"
 		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5] -vm.pstats.matrix[28][3]}\\\\\n"
 		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
 		table6 += "\\hline\n"
 
-		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][5] -vm.pstats.matrix[27][3])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
+		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
 
 		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
 
