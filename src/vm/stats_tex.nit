@@ -1492,13 +1492,13 @@ redef class MOStats
 
 	private fun generate_line_methods_total(file: FileWriter)
 	do
-		file.write("{vm.pstats.matrix[6][0]}\n")
+		file.write("{vm.pstats.matrix[1][0] + vm.pstats.matrix[2][0]}\n")
 		file.close
 	end
 
 	private fun generate_line_attributes_total(file: FileWriter)
 	do
-		file.write("{vm.pstats.matrix[9][1]}\n")
+		file.write("{vm.pstats.matrix[1][1] + vm.pstats.matrix[2][1]}\n")
 		file.close
 	end
 
