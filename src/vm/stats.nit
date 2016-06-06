@@ -1050,7 +1050,7 @@ redef class MOSite
 	fun incr_from_site
 	do
 		# Filter the receiver which come from a parameter or a literal
-		#if origin == 1 or origin == 8 then return
+		if origin == 1 or origin == 8 or is_primitive or is_monomorph then return
 
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then

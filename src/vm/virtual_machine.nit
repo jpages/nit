@@ -576,6 +576,12 @@ redef class MClass
 			superclass.subclasses.add(self)
 		end
 
+		#TODO: some debugs
+		if name == "FlatText" or name == "FlatString" then
+			print "{name} {ordering}"
+			if prefix != null then print "\t {prefix.as(not null)}"
+		end
+
 		if not explicit then
 			# Just init the C-pointer to NULL to avoid errors
 			vtable.internal_vtable = vm.memory_manager.null_ptr
@@ -759,7 +765,8 @@ redef class MClass
 			for cl in direct_parents do
 				# If we never have visited this class
 				if not res.has(cl) then
-					var properties_length = cl.mmethods.length + cl.mattributes.length
+					# var properties_length = cl.mmethods.length + cl.mattributes.length
+					var properties_length = cl.mattributes.length
 					if properties_length > max then
 						max = properties_length
 						prefix = cl
