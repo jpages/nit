@@ -343,6 +343,9 @@ class VirtualMachine super NaiveInterpreter
 		var position = recv.mtype.as(MClassType).mclass.get_position_attributes(mproperty.intro_mclassdef.mclass)
 		if position > 0 then
 			# if this attribute class has an unique position for this receiver, then use direct access
+
+			print "position {position} recv.mclass.ordering_attributes {recv.mtype.as(MClassType).mclass.ordering_attributes}"
+			print "recv.mclass.ordering_vtable {recv.mtype.as(MClassType).mclass.ordering_vtable} mproperty {mproperty} offset {mproperty.offset}"
 			i = read_attribute_sst(recv.internal_attributes, position + mproperty.offset)
 		else
 			# Otherwise, read the attribute value with perfect hashing
@@ -487,10 +490,16 @@ redef class MClass
 	# The chosen prefix for this class.
 	# The prefix is the direct superclass which has the most properties,
 	# this class will stay at its usual position in virtual table and attribute table
-	var prefix: nullable MClass
+	var prefix_methods: nullable MClass
+
+	# The prefix of attributes table
+	var prefix_attributes: nullable MClass
 
 	# The linear extension of all superclasses with the prefix rule
-	var ordering: Array[MClass]
+	var ordering_vtable: Array[MClass]
+
+	# The ordering for attributes table (similar to `ordering_vtable`)
+	var ordering_attributes: Array[MClass]
 
 	# The `MAttribute` this class introduced
 	var intro_mattributes = new Array[MAttribute]
@@ -516,8 +525,11 @@ redef class MClass
 	private fun make_vt(vm: VirtualMachine, explicit: Bool)
 	do
 		# `ordering` contains the order of superclasses for virtual tables
-		ordering = superclasses_ordering(vm)
-		ordering.remove(self)
+		ordering_vtable = superclasses_ordering(vm, false)
+		ordering_attributes = superclasses_ordering(vm, true)
+
+		ordering_vtable.remove(self)
+		ordering_attributes.remove(self)
 
 		var ids = new Array[Int]
 		var nb_methods = new Array[Int]
@@ -532,37 +544,50 @@ redef class MClass
 		var offset_methods = 3
 
 		var parent
-		var prefix_index = ordering.index_of(prefix.as(not null))
-		for i in [0..ordering.length[ do
-			parent = ordering[i]
+		var prefix_index = ordering_vtable.index_of(prefix_methods.as(not null))
+		for i in [0..ordering_vtable.length[ do
+			parent = ordering_vtable[i]
 
 			# Get the number of introduced methods and attributes for this class
 			var methods = parent.intro_mmethods.length
-			var attributes = parent.intro_mattributes.length
-
-			# Updates `mmethods` and `mattributes`
 			mmethods.add_all(parent.intro_mmethods)
-			mattributes.add_all(parent.intro_mattributes)
 
 			ids.push(parent.vtable.id)
 			nb_methods.push(methods)
+
+			# If the class is in the suffix part of the order
+			if i > prefix_index then
+				moved_class_methods(vm, ordering_vtable[i], offset_methods)
+			end
+
+			offset_methods += methods
+			offset_methods += 2 # Because each block starts with an id and the delta
+		end
+
+		var prefix_index_attributes = ordering_attributes.index_of(prefix_attributes.as(not null))
+		for i in [0..ordering_attributes.length[ do
+			parent = ordering_attributes[i]
+
+			# Get the number of introduced methods and attributes for this class
+			var attributes = parent.intro_mattributes.length
+
+			# Updates `mmethods` and `mattributes`
+			mattributes.add_all(parent.intro_mattributes)
 			nb_attributes.push(attributes)
 
 			# If the class is in the suffix part of the order
 			if i > prefix_index then
-				moved_class_attributes(vm, ordering[i], offset_attributes)
-				moved_class_methods(vm, ordering[i], offset_methods)
+				moved_class_attributes(vm, ordering_vtable[i], offset_attributes)
 			end
 
 			offset_attributes += attributes
-			offset_methods += methods
-			offset_methods += 2 # Because each block starts with an id and the delta
 		end
 
 		# Update the positions of the class
 		update_positions(offset_attributes, offset_methods)
 
-		ordering.add(self)
+		ordering_vtable.add(self)
+		ordering_attributes.add(self)
 
 		# Compute the identifier with Perfect Hashing
 		compute_identifier(vm, ids, offset_methods)
@@ -574,12 +599,6 @@ redef class MClass
 		# Indicate to the direct parents of this class that `self` is loaded
 		for superclass in self.in_hierarchy(vm.mainmodule).direct_greaters do
 			superclass.subclasses.add(self)
-		end
-
-		#TODO: some debugs
-		if name == "FlatText" or name == "FlatString" then
-			print "{name} {ordering}"
-			if prefix != null then print "\t {prefix.as(not null)}"
 		end
 
 		if not explicit then
@@ -615,11 +634,11 @@ redef class MClass
 	private fun update_positions(offset_attributes: Int, offset_methods: Int)
 	do
 		# Recopy the position tables of the prefix in `self`
-		for key, value in prefix.positions_methods do
+		for key, value in prefix_methods.positions_methods do
 			positions_methods[key] = value
 		end
 
-		for key, value in prefix.positions_attributes do
+		for key, value in prefix_attributes.positions_attributes do
 			positions_attributes[key] = value
 		end
 
@@ -673,18 +692,38 @@ redef class MClass
 		var nb_methods_total = new Array[Int]
 		var nb_attributes_total = new Array[Int]
 
-		for cl in ordering do
+		for cl in ordering_vtable do
 			ids.add(cl.vtable.id)
 			nb_methods_total.add(cl.intro_mmethods.length)
+		end
+
+		for cl in ordering_attributes do
 			nb_attributes_total.add(cl.intro_mattributes.length)
 		end
 
-		# Calculate the delta to prepare object structure
+		# Calculate the delta to prepare object's structure
 		var deltas = calculate_delta(nb_attributes_total)
-		vtable.internal_vtable = vm.memory_manager.init_vtable(ids, nb_methods_total, deltas, vtable.mask)
+
+		var positions_map = new HashMap[MClass, Int]
+		for i in [0..deltas.length[ do
+			positions_map[ordering_attributes[i]] = deltas[i]
+		end
+
+		# Sort the deltas according to the ordering in vtable
+		var deltas_sorted = new Array[Int]
+		var i = 0
+		for cl in ordering_vtable do
+			deltas_sorted[i] = positions_map[cl]
+			i += 1
+		end
+
+		# print "ordering_attributes {ordering_attributes} ordering_vtable {ordering_vtable}"
+		# print "deltas {deltas} deltas_sorted {deltas_sorted}"
+
+		vtable.internal_vtable = vm.memory_manager.init_vtable(ids, nb_methods_total, deltas_sorted, vtable.mask)
 
 		# The virtual table now needs to be filled with pointer to methods
-		for cl in ordering do
+		for cl in ordering_vtable do
 			fill_vtable(vm, vtable.as(not null), cl)
 		end
 
@@ -727,7 +766,8 @@ redef class MClass
 
 	# Order superclasses of self
 	# Return the order of superclasses in runtime structures of this class
-	private fun superclasses_ordering(v: VirtualMachine): Array[MClass]
+	# `attr` If true, compute the ordering of attributes table
+	private fun superclasses_ordering(v: VirtualMachine, attr: Bool): Array[MClass]
 	do
 		var superclasses = new Array[MClass]
 
@@ -737,12 +777,19 @@ redef class MClass
 		var res = new Array[MClass]
 		if superclasses.length > 1 then
 			# Starting at self
-			var ordering = self.dfs(v, res)
+			var ordering
+			if attr then
+				ordering = dfs_attributes(v, res)
+			else
+				ordering = dfs(v, res)
+			end
 
 			return ordering
 		else
-			# There is no super-class, self is Object
-			prefix = self
+			# There is only one superclass
+			prefix_methods = self
+			prefix_attributes = self
+
 			return superclasses
 		end
 	end
@@ -765,8 +812,7 @@ redef class MClass
 			for cl in direct_parents do
 				# If we never have visited this class
 				if not res.has(cl) then
-					# var properties_length = cl.mmethods.length + cl.mattributes.length
-					var properties_length = cl.mattributes.length
+					var properties_length = cl.mmethods.length
 					if properties_length > max then
 						max = properties_length
 						prefix = cl
@@ -775,7 +821,7 @@ redef class MClass
 			end
 
 			if prefix != null then
-				if self.prefix == null then self.prefix = prefix
+				if self.prefix_methods == null then prefix_methods = prefix
 
 				# Add the prefix class ordering at the beginning of our sequence
 				var prefix_res = new Array[MClass]
@@ -798,7 +844,66 @@ redef class MClass
 			res.push(self)
 		else
 			if direct_parents.length > 0 then
-				if prefix == null then prefix = direct_parents.first
+				if prefix_methods == null then prefix_methods = direct_parents.first
+
+				res = direct_parents.first.dfs(v, res)
+			end
+		end
+
+		if not res.has(self) then res.push(self)
+
+		return res
+	end
+
+	# Ordering of superclasses for attributes table
+	private fun dfs_attributes(v: VirtualMachine, res: Array[MClass]): Array[MClass]
+	do
+		# Add this class at the beginning
+		res.insert(self, 0)
+
+		var direct_parents = self.in_hierarchy(v.mainmodule).direct_greaters.to_a
+
+		if direct_parents.length > 1 then
+			# Prefix represents the class which has the most properties
+			# we try to choose it in first to reduce the number of potential recompilations
+			var prefix = null
+			var max = -1
+			for cl in direct_parents do
+				# If we never have visited this class
+				if not res.has(cl) then
+					var properties_length = cl.mattributes.length
+					if properties_length > max then
+						max = properties_length
+						prefix = cl
+					end
+				end
+			end
+
+			if prefix != null then
+				if self.prefix_attributes == null then prefix_attributes = prefix
+
+				# Add the prefix class ordering at the beginning of our sequence
+				var prefix_res = new Array[MClass]
+				prefix_res = prefix.dfs(v, prefix_res)
+
+				# Then we recurse on other classes
+				for cl in direct_parents do
+					if cl != prefix then
+						res = new Array[MClass]
+						res = cl.dfs(v, res)
+
+						for cl_res in res do
+							if not prefix_res.has(cl_res) then prefix_res.push(cl_res)
+						end
+					end
+				end
+				res = prefix_res
+			end
+
+			res.push(self)
+		else
+			if direct_parents.length > 0 then
+				if prefix_attributes == null then prefix_attributes = direct_parents.first
 
 				res = direct_parents.first.dfs(v, res)
 			end
@@ -855,7 +960,7 @@ redef class MClass
 			# The class has already several positions and an update is needed
 			current_class.positions_methods[current_class] = -current_class.positions_methods[current_class]
 
-			for sub in ordering do
+			for sub in ordering_vtable do
 				if sub == current_class then continue
 
 				if vm.is_subclass(sub, current_class) then
@@ -896,7 +1001,7 @@ redef class MClass
 			# The class has already several positions and an update is needed
 			current_class.positions_attributes[current_class] = - current_class.positions_attributes[current_class]
 
-			for sub in ordering do
+			for sub in ordering_attributes do
 				if sub == current_class then continue
 
 				if vm.is_subclass(sub, current_class) then
