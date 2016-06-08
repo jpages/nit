@@ -840,7 +840,7 @@ redef class PICPattern
 	# *`mutable` Indicate if the implementation can change in the future
 	fun sst_impl(mutable: Bool): Implementation
 	do
-		var pos_cls = get_block_position
+		var pos_cls = get_pic_position
 
 		return new SSTImpl(self, mutable, pos_cls)
 	end
@@ -850,7 +850,7 @@ redef class PICPattern
 	# *`id` The target identifier
 	fun ph_impl(mutable: Bool, id: Int): Implementation
 	do
-		return new PHImpl(self, mutable, get_block_position, id)
+		return new PHImpl(self, mutable, get_pic_position, id)
 	end
 
 	# Set a null Implementation, i.e. the pic is not loaded
@@ -868,7 +868,7 @@ redef class PICPattern
 
 		# Replace the old implementation
 		reinit_impl
-		impl = new PHImpl(self, false, get_block_position, pic_class.vtable.id)
+		impl = new PHImpl(self, false, get_pic_position, pic_class.vtable.id)
 
 		# Propagate this change in patterns
 		for pattern in patterns do
@@ -882,38 +882,21 @@ redef class PICPattern
 		return get_pic_position > 0
 	end
 
-	# Return the position of the PIC block in recv class
-	fun get_block_position: Int is abstract
-
 	# Return the position of the pic (neg. value if pic is at multiple positions)
 	fun get_pic_position: Int is abstract
 end
 
 redef class MethodPICPattern
-	redef fun get_block_position: Int
-	do
-		return recv_class.get_position_methods(pic_class)
-	end
-
 	redef fun get_pic_position: Int
 	do
-		if pic_class.position_methods > 0 then return pic_class.position_methods
-
 		# See if loaded subclasses of the RSC have a unique position
 		return recv_class.get_position_methods(pic_class)
 	end
 end
 
 redef class AttributePICPattern
-	redef fun get_block_position: Int
-	do
-		return recv_class.get_position_attributes(pic_class)
-	end
-
 	redef fun get_pic_position: Int
 	do
-		if pic_class.position_attributes > 0 then return pic_class.position_attributes
-
 		# See if loaded subclasses of the RSC have a unique position
 		return recv_class.get_position_attributes(pic_class)
 	end
@@ -981,7 +964,7 @@ redef abstract class MOSitePattern
 	fun sst_impl(vm: VirtualMachine, mutable: Bool): Implementation
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_block_position
+		var pos_cls = get_pic_position
 
 		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
@@ -999,11 +982,8 @@ redef abstract class MOSitePattern
 	# Return true if the pic is at a unique position on the whole class hierarchy
 	fun pic_pos_unique: Bool
 	do
-		return get_pic(vm).position_attributes > 0
+		return get_pic_position > 0
 	end
-
-	# Return the offset of the introduction property of the class
-	fun get_block_position: Int is abstract
 
 	# Return the position of the pic for this rsc (neg. value if pic is at multiple positions)
 	fun get_pic_position: Int is abstract
@@ -1035,9 +1015,9 @@ redef class MOAttrPattern
 		end
 	end
 
-	redef fun get_block_position
+	redef fun pic_pos_unique
 	do
-		return rsc.get_position_attributes(get_pic(vm))
+		return get_pic(vm).position_attributes > 0
 	end
 
  	redef fun get_pic_position
@@ -1050,7 +1030,7 @@ redef class MOAttrPattern
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_block_position
+		var pos_cls = get_pic_position
 		return  new SSTImpl(self, mutable, pos_cls + offset)
 	end
 end
@@ -1106,21 +1086,14 @@ redef class MOCallSitePattern
 		end
 	end
 
-	redef fun get_block_position: Int
+	redef fun pic_pos_unique
 	do
-		return rsc.get_position_methods(get_pic(vm))
+		return get_pic(vm).position_methods > 0
 	end
 
 	redef fun get_pic_position: Int
 	do
-		# If the pic is at the same position for all loaded subclasses
-		if get_pic(vm).position_methods > 0 then
-			return get_pic(vm).position_methods
-		else
-			# The pic has not the same position for all loaded subclasses,
-			# see if the position is constant for subclasses of the rst
-			return get_pic(vm).position_methods
-		end
+		return rsc.get_position_methods(get_pic(vm))
 	end
 
 	redef fun add_lp(lp)
@@ -1261,7 +1234,7 @@ redef class MOSubtypeSitePattern
 		return false
 	end
 
-	redef fun get_block_position: Int
+	redef fun get_pic_position: Int
 	do
 		return rsc.get_position_methods(get_pic(vm))
 	end
@@ -1319,7 +1292,6 @@ redef class MOAsNotNullPattern
 			# The rst is not loaded but the pic is,
 			# we can compute the implementation with pic's informations
 			if get_pic(vm).abstract_loaded then
-				var pos_cls = get_block_position
 				if get_pic(vm).is_instance_of_object(vm) then
 					return sst_impl(vm, false)
 				else if can_be_static then
@@ -1335,7 +1307,7 @@ redef class MOAsNotNullPattern
 		end
 	end
 
-	redef fun get_block_position: Int
+	redef fun get_pic_position: Int
 	do
 		return rsc.get_position_methods(get_pic(vm))
 	end
@@ -1446,6 +1418,9 @@ redef abstract class MOSite
 			if pattern_impl isa FinalImplementation then
 				impl = pattern.as(MOSubtypeSitePattern).final_impl
 			else if pattern_impl isa StaticImpl then
+				# if pattern isa MOAttrPattern then assert get_pic_position(vm, pattern.rsc) > 0
+				# if pattern isa MOCallSitePattern then assert get_pic_position(vm, pattern.rsc) > 0
+
 				impl = static_impl(vm, true)
 			else if pattern_impl isa SSTImpl then
 				impl = sst_impl(vm, true)
@@ -1509,17 +1484,17 @@ redef abstract class MOSite
 		var position = -1
 
 		# If the rsc does not have a unique position for its methods in all its loaded subclasses
-		if pattern.rsc.position_methods < 0 then return 0
+		# if pattern.rsc.position_methods < 0 then return 0
 
 		if concrete_receivers != null then
 
-			var current_pos = get_block_position(vm, concrete_receivers.first)
+			var current_pos = get_pic_position(vm, concrete_receivers.first)
 			for recv in concrete_receivers.as(not null) do
 				if not recv.loaded then return -1
 
-				if get_block_position(vm, recv) < 0 then
+				if get_pic_position(vm, recv) < 0 then
 					return 0
-				else if get_block_position(vm, recv) != current_pos then
+				else if get_pic_position(vm, recv) != current_pos then
 					return 0
 				end
 			end
@@ -1531,7 +1506,7 @@ redef abstract class MOSite
 	end
 
 	# Return the position of the block of PIC class in the receiver static class
-	private fun get_block_position(vm: VirtualMachine, recv: MClass): Int
+	private fun get_pic_position(vm: VirtualMachine, recv: MClass): Int
 	do
 		return recv.get_position_methods(get_pic(vm))
 	end
@@ -1541,7 +1516,7 @@ redef abstract class MOSite
 	fun get_pic(vm: VirtualMachine): MClass is abstract
 
 	# Return the offset of the "targeted property"
-	# (eg. gp.offset for MOPropSite, a_class.color for MOSubtypeSite)
+	# (eg. gp.offset for MOPropSite, a class color for MOSubtypeSite)
 	private fun get_offset(vm: VirtualMachine): Int is abstract
 
 	# Tell if the implementation can be static
@@ -1557,7 +1532,7 @@ redef abstract class MOSite
 	fun sst_impl(vm: VirtualMachine, mutable: Bool): Implementation
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_block_position(vm, pattern.rsc)
+		var pos_cls = get_pic_position(vm, pattern.rsc)
 
 		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
@@ -1610,7 +1585,7 @@ redef abstract class MOSite
 			else if get_pic(vm).is_instance_of_object(vm) then
 				# SST for a property introduced in Object
 				var offset = get_offset(vm)
-				var pos_cls = get_block_position(vm, pattern.rsc)
+				var pos_cls = get_pic_position(vm, pattern.rsc)
 
 				return new SSTImpl(self, false, pos_cls + offset)
 			else
@@ -1740,12 +1715,12 @@ redef abstract class MOAttrSite
 
 	redef fun static_impl(vm, mutable) do abort
 
-	redef fun get_block_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
+	redef fun get_pic_position(vm, recv) do return recv.get_position_attributes(get_pic(vm))
 
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
 		var offset = get_offset(vm)
-		var pos_cls = get_block_position(vm, pattern.rsc)
+		var pos_cls = get_pic_position(vm, pattern.rsc)
 		return new SSTImpl(self, mutable, pos_cls + offset)
 	end
 
@@ -1856,6 +1831,8 @@ redef class MOCallSite
 			conservative_impl = null
 		end
 	end
+
+	redef fun get_pic_position(vm, recv) do return recv.get_position_methods(get_pic(vm))
 end
 
 # The superclass of implementations of object mechanisms

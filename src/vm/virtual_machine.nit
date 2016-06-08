@@ -527,13 +527,6 @@ redef class MClass
 		ordering_vtable = superclasses_ordering(vm, false)
 		ordering_attributes = superclasses_ordering(vm, true)
 
-		print "ordering_vtable {ordering_vtable} ordering_attributes {ordering_attributes}"
-		# prefix_methods = prefix_attributes
-		# ordering_vtable = ordering_attributes.clone
-
-		assert ordering_vtable.has_all(ordering_attributes)
-		assert ordering_attributes.has_all(ordering_vtable)
-
 		ordering_vtable.remove(self)
 		ordering_attributes.remove(self)
 
@@ -563,7 +556,7 @@ redef class MClass
 
 			# If the class is in the suffix part of the order
 			if i > prefix_index then
-				moved_class_methods(vm, ordering_vtable[i], offset_methods)
+				moved_class_methods(vm, parent, offset_methods)
 			end
 
 			offset_methods += methods
@@ -582,8 +575,8 @@ redef class MClass
 			nb_attributes.push(attributes)
 
 			# If the class is in the suffix part of the order
-			if i > prefix_index then
-				moved_class_attributes(vm, ordering_vtable[i], offset_attributes)
+			if i > prefix_index_attributes then
+				moved_class_attributes(vm, parent, offset_attributes)
 			end
 
 			offset_attributes += attributes
@@ -709,8 +702,6 @@ redef class MClass
 
 		# Calculate the delta to prepare object's structure
 		var deltas = calculate_deltas(nb_attributes_total)
-
-		# print "nb_attributes_total {nb_attributes_total}"
 
 		var positions_map = new HashMap[MClass, Int]
 		for i in [0..deltas.length[ do
