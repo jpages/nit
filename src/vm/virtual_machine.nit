@@ -341,11 +341,9 @@ class VirtualMachine super NaiveInterpreter
 
 		var i: Instance
 		var position = recv.mtype.as(MClassType).mclass.get_position_attributes(mproperty.intro_mclassdef.mclass)
+		# var position = recv.mtype.as(MClassType).mclass.position_attributes
 		if position > 0 then
 			# if this attribute class has an unique position for this receiver, then use direct access
-
-			print "position {position} recv.mclass.ordering_attributes {recv.mtype.as(MClassType).mclass.ordering_attributes}"
-			print "recv.mclass.ordering_vtable {recv.mtype.as(MClassType).mclass.ordering_vtable} mproperty {mproperty} offset {mproperty.offset}"
 			i = read_attribute_sst(recv.internal_attributes, position + mproperty.offset)
 		else
 			# Otherwise, read the attribute value with perfect hashing
@@ -402,6 +400,7 @@ class VirtualMachine super NaiveInterpreter
 
 		# Replace the old value of mproperty in recv
 		var position = recv.mtype.as(MClassType).mclass.get_position_attributes(mproperty.intro_mclassdef.mclass)
+		# var position = recv.mtype.as(MClassType).mclass.position_attributes
 		if position > -1 then
 			# if this attribute class has an unique position for this receiver, then use direct access
 			write_attribute_sst(recv.internal_attributes, position + mproperty.offset, value)
@@ -527,6 +526,13 @@ redef class MClass
 		# `ordering` contains the order of superclasses for virtual tables
 		ordering_vtable = superclasses_ordering(vm, false)
 		ordering_attributes = superclasses_ordering(vm, true)
+
+		print "ordering_vtable {ordering_vtable} ordering_attributes {ordering_attributes}"
+		# prefix_methods = prefix_attributes
+		# ordering_vtable = ordering_attributes.clone
+
+		assert ordering_vtable.has_all(ordering_attributes)
+		assert ordering_attributes.has_all(ordering_vtable)
 
 		ordering_vtable.remove(self)
 		ordering_attributes.remove(self)
@@ -702,7 +708,9 @@ redef class MClass
 		end
 
 		# Calculate the delta to prepare object's structure
-		var deltas = calculate_delta(nb_attributes_total)
+		var deltas = calculate_deltas(nb_attributes_total)
+
+		# print "nb_attributes_total {nb_attributes_total}"
 
 		var positions_map = new HashMap[MClass, Int]
 		for i in [0..deltas.length[ do
@@ -716,9 +724,6 @@ redef class MClass
 			deltas_sorted[i] = positions_map[cl]
 			i += 1
 		end
-
-		# print "ordering_attributes {ordering_attributes} ordering_vtable {ordering_vtable}"
-		# print "deltas {deltas} deltas_sorted {deltas_sorted}"
 
 		vtable.internal_vtable = vm.memory_manager.init_vtable(ids, nb_methods_total, deltas_sorted, vtable.mask)
 
@@ -751,7 +756,7 @@ redef class MClass
 	# A delta represents the offset for this group of attributes in the object
 	# *`nb_attributes` : number of attributes for each class (classes are linearized from Object to current)
 	# * return deltas for each class
-	private fun calculate_delta(nb_attributes: Array[Int]): Array[Int]
+	private fun calculate_deltas(nb_attributes: Array[Int]): Array[Int]
 	do
 		var deltas = new Array[Int]
 
@@ -884,13 +889,13 @@ redef class MClass
 
 				# Add the prefix class ordering at the beginning of our sequence
 				var prefix_res = new Array[MClass]
-				prefix_res = prefix.dfs(v, prefix_res)
+				prefix_res = prefix.dfs_attributes(v, prefix_res)
 
 				# Then we recurse on other classes
 				for cl in direct_parents do
 					if cl != prefix then
 						res = new Array[MClass]
-						res = cl.dfs(v, res)
+						res = cl.dfs_attributes(v, res)
 
 						for cl_res in res do
 							if not prefix_res.has(cl_res) then prefix_res.push(cl_res)
@@ -905,7 +910,7 @@ redef class MClass
 			if direct_parents.length > 0 then
 				if prefix_attributes == null then prefix_attributes = direct_parents.first
 
-				res = direct_parents.first.dfs(v, res)
+				res = direct_parents.first.dfs_attributes(v, res)
 			end
 		end
 
