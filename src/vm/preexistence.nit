@@ -542,8 +542,12 @@ end
 redef class MOSuper
 	redef fun compute_preexist
 	do
-		# A Super is always preexisting
-		return 1
+		if not sys.disable_preexistence_extensions then
+			# A Super is always preexisting
+			return 1
+		else
+			return 24
+		end
 	end
 
 	redef fun preexistence_origin: Int
