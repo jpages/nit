@@ -1053,6 +1053,8 @@ redef class MOSite
 	do
 		# Filter the receiver which come from a parameter or a literal
 		if origin == 1 or origin == 8 or origin == 16 or is_primitive or is_monomorph then return
+		if origin == 129 or origin == 136 or origin == 144 then return
+		if self isa MOAsNotNullSite then return
 
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
@@ -1110,6 +1112,7 @@ redef class MOSite
 			vm.pstats.matrix[29][index_x] += 1
 			vm.pstats.matrix[29][5] += 1
 		else
+			print "{self} {origin}"
 			vm.pstats.matrix[30][index_x] += 1
 			vm.pstats.matrix[30][5] += 1
 		end
