@@ -1034,6 +1034,7 @@ redef class MOSite
 		var impl = get_impl(vm)
 		var pre = cached_preexistence_value.bit_pre
 
+		if is_primitive or is_monomorph then return
 		vm.pstats.matrix[impl.index_y][index_x] += 1
 		vm.pstats.matrix[impl.index_y][5] += 1
 		vm.pstats.matrix[impl.compute_index_y(self)][5] += 1
@@ -1112,7 +1113,6 @@ redef class MOSite
 			vm.pstats.matrix[29][index_x] += 1
 			vm.pstats.matrix[29][5] += 1
 		else
-			print "{self} {origin}"
 			vm.pstats.matrix[30][index_x] += 1
 			vm.pstats.matrix[30][5] += 1
 		end
