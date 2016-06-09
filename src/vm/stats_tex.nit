@@ -330,14 +330,34 @@ redef class MOStats
 		file.write("%Table 6\n")
 		file.write("%Method & Pattern & Site & receiver\n")
 
-		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]}\\\\\n"
-		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5] -vm.pstats.matrix[28][3]}\\\\\n"
-		table6 += "total & {vm.pstats.matrix[49][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
+		var nb_return_preexist = 0
+		var nb_return_nonpreexist = 0
+		var nb_procedures = 0
+		var nb_attributes = 0
+		for method in vm.pstats.compiled_methods do
+			if not method isa MMethodDef then nb_attributes += 1
+			if not method isa MMethodDef then continue
+
+			if method.msignature.return_mtype != null and method.return_expr != null and not method.msignature.return_mtype.is_primitive_type then
+				# If the propdef has a preexisting return
+				if method.return_expr.return_preexist.bit_pre then
+					nb_return_preexist += 1
+				else
+					nb_return_nonpreexist += 1
+				end
+			else
+				nb_procedures += 1
+			end
+		end
+
+		var table6 = "preexisting & {nb_return_preexist} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]}\\\\\n"
+		table6 += "non preexisting & {nb_return_nonpreexist} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5] -vm.pstats.matrix[28][3]}\\\\\n"
+		table6 += "total & {nb_return_preexist + nb_return_nonpreexist} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
 		table6 += "\\hline\n"
 
-		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
+		table6 += "preexistence rate & {nb_return_preexist*100/(nb_return_preexist + nb_return_nonpreexist)} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
 
-		table6 += "without return & {vm.pstats.matrix[48][0]} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
+		table6 += "without return & {nb_procedures + nb_attributes} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
 
 		file.write(table6)
 		file.write("\n\n")
