@@ -951,6 +951,8 @@ redef class MOSite
 	# The number of recompilations of this entity
 	var recompilations: Int = 0
 
+	var cached_preexistence_value: Int = -1
+
 	# Count the implementation of the site
 	fun stats(vm: VirtualMachine)
 	do
@@ -961,7 +963,7 @@ redef class MOSite
 		end
 
 		expr_recv.preexist_init
-		site_preexist
+		cached_preexistence_value = site_preexist
 		origin = expr_recv.preexistence_origin
 
 		# Increment statistics on callsites
@@ -1030,7 +1032,7 @@ redef class MOSite
 	fun incr_total
 	do
 		var impl = get_impl(vm)
-		var pre = expr_recv.is_pre
+		var pre = cached_preexistence_value.bit_pre
 
 		vm.pstats.matrix[impl.index_y][index_x] += 1
 		vm.pstats.matrix[impl.index_y][5] += 1
@@ -1050,14 +1052,14 @@ redef class MOSite
 	fun incr_from_site
 	do
 		# Filter the receiver which come from a parameter or a literal
-		if origin == 1 or origin == 8 or is_primitive or is_monomorph then return
+		if origin == 1 or origin == 8 or origin == 16 or is_primitive or is_monomorph then return
 
 		# If the receiver comes only from a new
 		if origin == 2 or origin == 130 then
 			vm.pstats.matrix[23][index_x] += 1
 			vm.pstats.matrix[23][5] += 1
 
-			if expr_recv.is_pre and not disable_preexistence_extensions then
+			if cached_preexistence_value.bit_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[24][index_x] += 1
 				vm.pstats.matrix[24][5] += 1
 			else
@@ -1071,7 +1073,7 @@ redef class MOSite
 			vm.pstats.matrix[26][5] += 1
 
 			# If the receiver is preexisting
-			if expr_recv.is_pre and not disable_preexistence_extensions then
+			if cached_preexistence_value.bit_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[27][index_x] += 1
 				vm.pstats.matrix[27][5] += 1
 			else
@@ -1082,7 +1084,7 @@ redef class MOSite
 			# If the receiver comes only from an attribute read
 			readsite_statistics
 
-			if expr_recv.is_pre and not disable_preexistence_extensions then
+			if cached_preexistence_value.bit_pre and not disable_preexistence_extensions then
 				# Preexisting attribute with concrete types
 				vm.pstats.matrix[31][index_x] += 1
 				vm.pstats.matrix[31][5] += 1
@@ -1095,14 +1097,14 @@ redef class MOSite
 			vm.pstats.matrix[77][index_x] += 1
 			vm.pstats.matrix[77][5] += 1
 
-			if expr_recv.is_pre and not disable_preexistence_extensions then
+			if cached_preexistence_value.bit_pre and not disable_preexistence_extensions then
 				vm.pstats.matrix[78][index_x] += 1
 				vm.pstats.matrix[78][5] += 1
 			else
 				vm.pstats.matrix[79][index_x] += 1
 				vm.pstats.matrix[79][5] += 1
 			end
-		else if expr_recv.is_pre and not disable_preexistence_extensions then
+		else if cached_preexistence_value.bit_pre and not disable_preexistence_extensions then
 			# Other cases, a combination of several origins in extended preexistence (parameters and literals are excluded)
 			# If the site is preexisting
 			vm.pstats.matrix[29][index_x] += 1
@@ -1124,7 +1126,7 @@ redef class MOSite
 			vm.pstats.matrix[3][5] += 1
 
 			# Preexisting and non-preexisting sites with concretes
-			if expr_recv.is_pre then
+			if cached_preexistence_value.bit_pre then
 				vm.pstats.matrix[4][index_x] += 1
 				vm.pstats.matrix[4][5] += 1
 			else
@@ -1204,7 +1206,7 @@ redef class MOSite
 			vm.pstats.matrix[impl.index_y][4] += 1
 			vm.pstats.matrix[impl.compute_index_y(self)][4] += 1
 
-			if expr_recv.is_pre then
+			if cached_preexistence_value.bit_pre then
 				vm.pstats.matrix[1][4] += 1
 			else
 				vm.pstats.matrix[2][4] += 1
@@ -1426,7 +1428,7 @@ redef class Implementation
 	# `mosite` The site which contains the implementation
 	fun compute_index_y(mosite: MOSite): Int
 	do
-		if mosite.expr_recv.is_pre then
+		if mosite.cached_preexistence_value.bit_pre then
 			return index_y + 1
 		else
 			return index_y + 2

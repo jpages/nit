@@ -333,20 +333,28 @@ redef class MOStats
 		var nb_return_preexist = 0
 		var nb_return_nonpreexist = 0
 		var nb_procedures = 0
-		var nb_attributes = 0
 		for method in vm.pstats.compiled_methods do
-			if not method isa MMethodDef then nb_attributes += 1
-			if not method isa MMethodDef then continue
-
-			if method.msignature.return_mtype != null and method.return_expr != null and not method.msignature.return_mtype.is_primitive_type then
-				# If the propdef has a preexisting return
-				if method.return_expr.return_preexist.bit_pre then
-					nb_return_preexist += 1
+			if method isa MAttributeDef then
+				if method.return_expr != null and not method.return_expr.preexistence_origin == 8 and not method.return_expr.preexistence_origin == 16 then
+					if method.return_expr.return_preexist.bit_pre then
+						nb_return_preexist += 1
+					else
+						nb_return_nonpreexist += 1
+					end
 				else
-					nb_return_nonpreexist += 1
+					nb_procedures += 1
 				end
-			else
-				nb_procedures += 1
+			else if method isa MMethodDef then
+				if method.msignature.return_mtype != null and method.return_expr != null and not method.msignature.return_mtype.is_primitive_type then
+					# If the propdef has a preexisting return
+					if method.return_expr.return_preexist.bit_pre then
+						nb_return_preexist += 1
+					else
+						nb_return_nonpreexist += 1
+					end
+				else
+					nb_procedures += 1
+				end
 			end
 		end
 
@@ -357,7 +365,7 @@ redef class MOStats
 
 		table6 += "preexistence rate & {nb_return_preexist*100/(nb_return_preexist + nb_return_nonpreexist)} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
 
-		table6 += "without return & {nb_procedures + nb_attributes} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
+		table6 += "without return & {nb_procedures} & {vm.pstats.matrix[56][0]} & {vm.pstats.matrix[62][0]} & 0\\\\\n"
 
 		file.write(table6)
 		file.write("\n\n")
