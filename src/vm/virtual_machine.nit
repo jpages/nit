@@ -805,6 +805,7 @@ redef class MClass
 			# we try to choose it in first to reduce the number of potential recompilations
 			var prefix = null
 			var max = -1
+
 			for cl in direct_parents do
 				# If we never have visited this class
 				if not res.has(cl) then

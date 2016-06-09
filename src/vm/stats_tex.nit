@@ -282,16 +282,38 @@ redef class MOStats
 		var nonoptimizable_inline = vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0] + vm.pstats.matrix[12][1] + vm.pstats.matrix[12][2] + vm.pstats.matrix[10][2]
 		var total_table4 = optimizable_inline + nonoptimizable_inline
 
-		var total_preexisting = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2]
-		var total_nonpreexisting = vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2]
+		var line1 = new Array[Int].with_capacity(4)
+		line1[0] = vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]
+		line1[1] = vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]
+		line1[2] = vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2]
+		line1[3] = line1[0] + line1[1] + line1[2]
+		var table4 = "preexisting & {line1[0]} & {line1[1]} & {line1[2]} & {line1[3]} & {line1[3]*100/total_table4}\\\\\n"
 
-		var table4 = "preexisting & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2]} & {total_preexisting} & {total_preexisting.to_i*100/total_table4}\\\\\n"
-		table4 += "non preexisting & {vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[8][2]} & {total_nonpreexisting} & {total_nonpreexisting.to_i*100/total_table4}\\\\\n"
+		var line2 = new Array[Int].with_capacity(4)
+		line2[0] = vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]
+		line2[1] = vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]
+		line2[2] = vm.pstats.matrix[8][2]
+		line2[3] = line2[0] + line2[1] + line2[2]
+
+		table4 += "non preexisting & {line2[0]} & {line2[1]} & {line2[2]} & {line2[3]} & {line2[3]*100/total_table4}\\\\\n"
 		table4 += "\\hline\n"
 
-		table4 += "total inlinable & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[17][2]} & {optimizable_inline} & {optimizable_inline*100/total_table4}\\\\\n"
-		table4 += "non-inlinable & {vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[12][1]} & {vm.pstats.matrix[12][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[11][2]} & {nonoptimizable_inline} & {nonoptimizable_inline*100/total_table4}\\\\\\hline\n"
-		table4 += "total & {vm.pstats.matrix[7][0] + vm.pstats.matrix[16][0] + vm.pstats.matrix[8][0] + vm.pstats.matrix[17][0] + vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]} & {vm.pstats.matrix[10][1] + vm.pstats.matrix[16][1] + vm.pstats.matrix[11][1] + vm.pstats.matrix[17][1] + vm.pstats.matrix[12][1]} & {vm.pstats.matrix[7][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[16][2] + vm.pstats.matrix[8][2] + vm.pstats.matrix[11][2] + vm.pstats.matrix[17][2] + vm.pstats.matrix[12][2]} & {total_table4} & 100\\\\\n"
+		var line_inlinable = new Array[Int].with_capacity(4)
+		line_inlinable[0] = line1[0] + line2[0]
+		line_inlinable[1] = line1[1] + line2[1]
+		line_inlinable[2] = line1[2] + line2[2]
+		line_inlinable[3] = line1[3] + line2[3]
+
+		table4 += "total inlinable & {line_inlinable[0]} & {line_inlinable[1]} & {line_inlinable[2]} & {line_inlinable[3]} & {line_inlinable[3]*100/total_table4}\\\\\n"
+
+		var line_noninlinable = new Array[Int].with_capacity(4)
+		line_noninlinable[0] = vm.pstats.matrix[10][0] + vm.pstats.matrix[11][0] + vm.pstats.matrix[12][0]
+		line_noninlinable[1] = vm.pstats.matrix[12][1]
+		line_noninlinable[2] = vm.pstats.matrix[12][2] + vm.pstats.matrix[10][2] + vm.pstats.matrix[11][2]
+		line_noninlinable[3] = line_noninlinable[0] + line_noninlinable[1] + line_noninlinable[2]
+
+		table4 += "non-inlinable & {line_noninlinable[0]} & {line_noninlinable[1]} & {line_noninlinable[2]} & {line_noninlinable[3]} & {line_noninlinable[3]*100/total_table4}\\\\\\hline\n"
+		table4 += "total & {line_inlinable[0] + line_noninlinable[0]} & {line_inlinable[1] + line_noninlinable[1]} & {line_inlinable[2] + line_noninlinable[2]} & {total_table4} & 100\\\\\n"
 
 		file.write(table4)
 		file.write("\n\n")
@@ -310,7 +332,7 @@ redef class MOStats
 
 		var table6 = "preexisting & {vm.pstats.matrix[50][0]} & {vm.pstats.matrix[53][0]} & {vm.pstats.matrix[60][0]} & {vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2]}\\\\\n"
 		table6 += "non preexisting & {vm.pstats.matrix[51][0]} & {vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[61][0]} & {vm.pstats.matrix[28][5] -vm.pstats.matrix[28][3]}\\\\\n"
-		table6 += "total & {vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
+		table6 += "total & {vm.pstats.matrix[49][0]} & {vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0]} & {vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0]} & {vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3]}\\\\\n"
 		table6 += "\\hline\n"
 
 		table6 += "preexistence rate & {vm.pstats.matrix[50][0]*100/(vm.pstats.matrix[50][0] + vm.pstats.matrix[51][0])} & {vm.pstats.matrix[53][0]*100/(vm.pstats.matrix[53][0] + vm.pstats.matrix[54][0] + vm.pstats.matrix[55][0])} & {vm.pstats.matrix[60][0]*100/(vm.pstats.matrix[60][0] + vm.pstats.matrix[61][0])} & {(vm.pstats.matrix[27][0] + vm.pstats.matrix[27][1] + vm.pstats.matrix[27][2])*100/(vm.pstats.matrix[26][5] - vm.pstats.matrix[26][3])}\\\\\n"
