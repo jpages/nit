@@ -21,7 +21,7 @@ import virtual_machine
 import variables_numbering
 import compilation
 
-import model_optimizations
+import runtime_model
 import preexistence
 import vm_optimizations
 import stats

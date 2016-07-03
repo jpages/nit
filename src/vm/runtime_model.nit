@@ -1,5 +1,5 @@
 # Intermediate representation of nit program running inside the VM
-module model_optimizations
+module runtime_model
 
 import concrete_types
 import compilation
@@ -1785,6 +1785,13 @@ redef class APropdef
 		mpropdef.return_expr = returnvar.get_movar(mpropdef.as(not null))
 
 		mpropdef.compile_mo
+
+		return_block = null
+		basic_block = null
+
+		for site in object_sites do
+			site.block = null
+		end
 	end
 end
 

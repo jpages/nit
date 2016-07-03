@@ -14,11 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Single-Static Assignment algorithm from an AST
+# Compute Single-Static Assignment algorithm from an AST
 module ssa
 
 import semantize
 import astbuilder
+
+class TemporaryStructures
+	# The environment is linked to each BasicBlock, it represents the latest versions of variables
+	var environment = new HashMap[Variable, Array[AExpr]]
+
+	# For each original variable, the last version
+	var versions = new HashMap[Variable, Variable]
+
+	# The iterated dominance frontier of this block
+	# i.e. the set of blocks this block dominate directly or indirectly
+	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
+
+	# The variables that are accessed in this block
+	var variables = new Array[Variable] is lazy
+
+	# The PhiFunction this block contains at the beginning
+	var phi_functions = new List[PhiFunction] is lazy
+end
 
 # Represent a sequence of the program
 # A basic block is composed of several instructions without a jump
@@ -38,22 +56,14 @@ class BasicBlock
 	# Parts of AST that contain a variable access (read or write)
 	var variables_sites = new Array[AExpr]
 
-	# The environment is linked to each BasicBlock, it represents the latest versions of variables
-	var environment = new HashMap[Variable, Array[AExpr]]
-
-	# For each original variable, the last version
-	var versions = new HashMap[Variable, Variable]
-
-	# The iterated dominance frontier of this block
-	# i.e. the set of blocks this block dominate directly or indirectly
-	var dominance_frontier: Array[BasicBlock] = new Array[BasicBlock] is lazy
-
 	# The list of BasicBlock which called `compute_environment` for this block,
 	# used to handle circuits and recursions in computation of environments
 	var callers_blocks = new Array[BasicBlock]
 
 	# Indicate if this BasicBlock will always be executed in the program's control flow
 	var is_unconditionnal: Bool = false
+
+	var temp: nullable TemporaryStructures = new TemporaryStructures
 
 	# Compute the environment of the current block
 	fun compute_environment(ssa: SSA)
@@ -78,7 +88,7 @@ class BasicBlock
 		# By default, clone a predecessor environment,
 		# If there is no predecessor, this is the root_block and just initialize it
 		if not predecessors.is_empty then
-			environment = predecessors.first.clone_environment
+			temp.environment = predecessors.first.clone_environment
 		end
 
 		var other_predecessors = new Array[BasicBlock]
@@ -88,20 +98,20 @@ class BasicBlock
 
 		# Handle the PhiFunction
 		for variable in ssa.propdef.variables do
-			if not environment.has_key(variable.original_variable) then
-				environment[variable.original_variable] = new Array[AExpr]
+			if not temp.environment.has_key(variable.original_variable) then
+				temp.environment[variable.original_variable] = new Array[AExpr]
 			end
 
 			# Search and merge the values of the variable
 			for block in predecessors do
-				if block.versions.has_key(variable.original_variable) and not versions.has_key(variable.original_variable) then
-					versions[variable.original_variable] = block.versions[variable.original_variable]
+				if block.temp.versions.has_key(variable.original_variable) and not temp.versions.has_key(variable.original_variable) then
+					temp.versions[variable.original_variable] = block.temp.versions[variable.original_variable]
 				end
 
-				if block.environment.has_key(variable.original_variable) then
-					for expr in block.environment[variable.original_variable] do
-						if not environment[variable.original_variable].has(expr) then
-							environment[variable.original_variable].add(expr)
+				if block.temp.environment.has_key(variable.original_variable) then
+					for expr in block.temp.environment[variable.original_variable] do
+						if not temp.environment[variable.original_variable].has(expr) then
+							temp.environment[variable.original_variable].add(expr)
 						end
 					end
 				end
@@ -109,17 +119,17 @@ class BasicBlock
 		end
 
 		for other in other_predecessors do
-			for key, value in other.environment do
-				if not environment.has_key(key) then
-					environment[key] = new Array[AExpr]
-					environment[key].add_all(value)
+			for key, value in other.temp.environment do
+				if not temp.environment.has_key(key) then
+					temp.environment[key] = new Array[AExpr]
+					temp.environment[key].add_all(value)
 				end
 			end
 
-			for key, value in other.versions do
-				if versions.has_key(key) then
+			for key, value in other.temp.versions do
+				if temp.versions.has_key(key) then
 					# If the two versions differs, we need to create a PhiFunction
-					if value != versions[key] then
+					if value != temp.versions[key] then
 						# Do not re-create a phi-function if there is already one for this variable
 						var phi: nullable PhiFunction = lookup_phi(value.original_variable)
 
@@ -137,26 +147,21 @@ class BasicBlock
 						end
 
 						phi.add_dependences(other, value)
-						phi.add_dependences(self, versions[key])
+						phi.add_dependences(self, temp.versions[key])
 
-						versions[value.original_variable] = phi
+						temp.versions[value.original_variable] = phi
 
-						environment[phi.original_variable].add_all(other.environment[phi.original_variable])
-						phi.dep_exprs = environment[phi.original_variable].clone
+						temp.environment[phi.original_variable].add_all(other.temp.environment[phi.original_variable])
+						phi.dep_exprs = temp.environment[phi.original_variable].clone
 					end
 				else
 					# Add this versions to the current environment if there is no version yet
-					if not versions.has_key(key) then
-						versions[key] = value
+					if not temp.versions.has_key(key) then
+						temp.versions[key] = value
 					end
 				end
 			end
 		end
-
-		# print "\nbefore handling instructions and variables_sites for {self}"
-		# for key, value in environment do print "\tenv {key}-> {value}"
-		# for key,value in versions do print "\tversions {key} -> {value}"
-		# print "\n"
 
 		# Add all new variables to the environment
 		for instruction in instructions do
@@ -166,31 +171,24 @@ class BasicBlock
 
 			for site in variables_sites do
 				if site isa AVarExpr and site.variable == site.variable.original_variable then
-					if not environment.has_key(site.variable.original_variable) then
-						print "Problem in variables_sites with {site.variable.as(not null).original_variable} {instructions}"
+					# Just copy the value inside the environment in the variable
+					if temp.versions.get_or_null(site.variable.original_variable) != null then
+						site.variable = temp.versions[site.variable.original_variable]
+					else
+						print "Problem with {site.variable.original_variable.to_s} in {self} {self.instructions}"
+						print "{temp.environment[site.variable.original_variable]}"
 
-						for key, value in environment do print "\tenv {key}-> {value}"
+						for key, value in temp.versions do
+							print "\t{key} -> {value}"
+						end
+						abort
+					end
+					if not temp.environment.has_key(site.variable.original_variable) then
+						print "erreur in environment {site.variable.as(not null)} {site.variable.original_variable} {site.its_variable.as(not null)}"
+						for key, value in temp.environment do print "\tenv {key}-> {value}"
 						abort
 					else
-						# Just copy the value inside the environment in the variable
-						if versions.get_or_null(site.variable.original_variable) != null then
-							site.variable = versions[site.variable.original_variable]
-						else
-							print "Problem with {site.variable.original_variable.to_s} in {self} {self.instructions}"
-							print "{environment[site.variable.original_variable]}"
-
-							for key,value in versions do
-								print "\t{key} -> {value}"
-							end
-							abort
-						end
-						if not environment.has_key(site.variable.original_variable) then
-							print "erreur in environment {site.variable.as(not null)} {site.variable.original_variable} {site.its_variable.as(not null)}"
-							for key, value in environment do print "\tenv {key}-> {value}"
-							abort
-						else
-							site.variable.dep_exprs = environment[site.variable.original_variable].clone
-						end
+						site.variable.dep_exprs = temp.environment[site.variable.original_variable].clone
 					end
 				end
 			end
@@ -201,22 +199,22 @@ class BasicBlock
 
 				# Replace by the new version in the AST-site
 				instruction.variable = new_version
-				versions[new_version.original_variable] = new_version
+				temp.versions[new_version.original_variable] = new_version
 
-				environment[instruction.variable.original_variable].remove_all
-				environment[instruction.variable.original_variable].add(instruction.n_value)
-				new_version.dep_exprs = environment[instruction.variable.original_variable].clone
+				temp.environment[instruction.variable.original_variable].remove_all
+				temp.environment[instruction.variable.original_variable].add(instruction.n_value)
+				new_version.dep_exprs = temp.environment[instruction.variable.original_variable].clone
 			end
 
 			if instruction isa AVardeclExpr then
 				# Add a new Variable to the environment
-				environment[instruction.variable.as(not null)] = new Array[AExpr]
+				temp.environment[instruction.variable.as(not null)] = new Array[AExpr]
 
 				# If there is an initial value
 				if instruction.n_expr != null then
-					environment[instruction.variable.as(not null).original_variable].add(instruction.n_expr.as(not null))
+					temp.environment[instruction.variable.as(not null).original_variable].add(instruction.n_expr.as(not null))
 				end
-				versions[instruction.variable.original_variable] = instruction.variable.as(not null)
+				temp.versions[instruction.variable.original_variable] = instruction.variable.as(not null)
 			end
 		end
 	end
@@ -227,12 +225,12 @@ class BasicBlock
 		var clone = new HashMap[Variable, Array[AExpr]]
 		var clone_versions = new HashMap[Variable, Variable]
 
-		for variable, values in environment do
+		for variable, values in temp.environment do
 			clone[variable] = new Array[AExpr]
 			clone[variable].add_all(values)
 		end
 
-		for key, value in versions do
+		for key, value in temp.versions do
 			clone_versions[key] = value
 		end
 
@@ -266,7 +264,7 @@ class BasicBlock
 		df_computed = true
 
 		for s in successors do
-			dominance_frontier.add(s)
+			temp.dominance_frontier.add(s)
 
 			if not s.df_computed then s.compute_df
 		end
@@ -281,12 +279,6 @@ class BasicBlock
 	# Indicate if the variables renaming step has been made for this block
 	var is_renaming: Bool = false
 
-	# The variables that are accessed in this block
-	var variables = new Array[Variable] is lazy
-
-	# The PhiFunction this block contains at the beginning
-	var phi_functions = new List[PhiFunction] is lazy
-
 	# The number of times this block was treated by `compute_environment`
 	var nb_treated = 0
 
@@ -294,7 +286,7 @@ class BasicBlock
 	# Return the looked Phi if found, else return null
 	fun lookup_phi(variable: Variable): nullable PhiFunction
 	do
-		for phi in phi_functions do
+		for phi in temp.phi_functions do
 			if phi.original_variable == variable then
 				return phi
 			end
@@ -682,13 +674,13 @@ redef class APropdef
 	var returnvar: Variable = new Variable("returnvar")
 
 	# The basic block of all returns in the method
-	var return_block: BasicBlock = new BasicBlock
+	var return_block: nullable BasicBlock = new BasicBlock
 
 	# Initialize the environment of the root basic block
 	fun init_environment(root_block: BasicBlock)
 	do
 		for v in variables do
-			root_block.environment[v] = new Array[AExpr]
+			root_block.temp.environment[v] = new Array[AExpr]
 		end
 	end
 
@@ -699,7 +691,7 @@ redef class APropdef
 		if is_generated then return
 
 		# The returnvar is the only variable of the return block
-		return_block.variables.add(returnvar)
+		return_block.temp.variables.add(returnvar)
 
 		# The first step is to generate the basic blocks
 		generate_basic_blocks(ssa)
@@ -717,7 +709,7 @@ redef class APropdef
 	fun compute_environment(ssa: SSA)
 	do
 		for v in variables do
-			basic_block.versions[v] = v
+			basic_block.temp.versions[v] = v
 		end
 
 		basic_block.compute_environment(ssa)
@@ -764,14 +756,14 @@ redef class AAttrPropdef
 		# Recursively goes into the nodes
 		if n_block != null then
 			if not n_block isa ABlockExpr then basic_block.instructions.add(n_block.as(not null))
-			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
+			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block.as(not null))
 			is_generated = true
 		end
 
 		# If the attribute just has an initial value
 		if n_expr != null then
 			basic_block.instructions.add(n_expr.as(not null))
-			n_expr.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
+			n_expr.generate_basic_blocks(ssa, basic_block.as(not null), return_block.as(not null))
 			is_generated = true
 		end
 	end
@@ -803,7 +795,7 @@ redef class AMethPropdef
 		# Recursively goes into the nodes
 		if n_block != null then
 			if not n_block isa ABlockExpr then basic_block.instructions.add(n_block.as(not null))
-			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block)
+			n_block.generate_basic_blocks(ssa, basic_block.as(not null), return_block.as(not null))
 			is_generated = true
 		end
 	end
@@ -834,7 +826,7 @@ class BlockDebug
 		# Precise the type and location of the begin and end of current block
 		var s = "block{block.hash.to_s} [shape=record, label="+"\"\{"
 
-		print "Block {block} {block.phi_functions}"
+		print "Block {block} {block.temp.phi_functions}"
 		for instruction in block.instructions do
 			print "\t {instruction}"
 		end
@@ -847,7 +839,7 @@ class BlockDebug
 			s += " | " + block.instructions.first.to_s.escape_to_dot
 
 			# Print phi-functions if any
-			for phi in block.phi_functions do
+			for phi in block.temp.phi_functions do
 				s += " | " + phi.to_s.escape_to_dot + " "
 			end
 
@@ -859,7 +851,7 @@ class BlockDebug
 			s += " | " + "null"
 
 			# Print phi-functions if any
-			for phi in block.phi_functions do
+			for phi in block.temp.phi_functions do
 				s += " | " + phi.to_s.escape_to_dot + " "
 			end
 
@@ -909,7 +901,7 @@ redef class AExpr
 	end
 
 	# The BasicBlock containing this expression
-	var block: nullable BasicBlock
+	var block: nullable BasicBlock is writable
 end
 
 redef class AVarExpr
@@ -969,7 +961,7 @@ redef class AVarReassignExpr
 	redef fun visit_expression(ssa, block)
 	do
 		self.variable.as(not null).assignment_blocks.add(block)
-		block.variables.add(self.variable.as(not null))
+		block.temp.variables.add(self.variable.as(not null))
 
 		# Save this write site in the block
 		block.variables_sites.add(self)
@@ -998,13 +990,6 @@ redef class ABreakExpr
 	end
 end
 
-# redef class AContinueExpr
-# 	redef fun generate_basic_blocks(ssa, old_block)
-# 	do
-# 		return old_block
-# 	end
-# end
-
 redef class AReturnExpr
 	redef fun generate_basic_blocks(ssa, old_block, new_block)
 	do
@@ -1016,7 +1001,7 @@ redef class AReturnExpr
 			n_expr.generate_basic_blocks(ssa, old_block, new_block)
 		end
 
-		old_block.link(ssa.propdef.return_block)
+		old_block.link(ssa.propdef.return_block.as(not null))
 	end
 
 	redef fun visit_expression(ssa, block)

@@ -1,7 +1,7 @@
 # Compute preexistence of each objets sites in alives methods
 module preexistence
 
-import model_optimizations
+import runtime_model
 
 redef class VirtualMachine
 	redef fun load_class(mclass)
