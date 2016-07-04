@@ -262,10 +262,8 @@ redef class MOVar
 end
 
 redef class MOSSAVar
-	var counter = 0
 	redef fun compute_preexist
 	do
-		counter += 1
 		return dependency.expr_preexist
 	end
 
@@ -279,7 +277,7 @@ redef class MOPhiVar
 	var counter = 0
 	redef fun compute_preexist
 	do
-		counter += 1
+		#counter += 1
 		var preval = 0
 		for dep in dependencies do
 			if preval == 0 then

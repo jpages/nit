@@ -471,7 +471,9 @@ redef class Variable
 				current_path.add(self)
 				current.variable.detect_cycle(current_path)
 
+				# Adding the current variable to the path
 				var cycle = current.variable.detect_cycle(current_path)
+				dep_cycles.add(current.variable.as(not null)) # TODO: move thath after the follwing line
 			end
 
 			# Delete current element
