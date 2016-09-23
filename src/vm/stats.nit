@@ -560,6 +560,9 @@ class MOStats
 			stats_array[i] = new Array[Int].filled_with(0,4)
 		end
 
+		# Patterns which have not a unique position between rsc and pic
+		var multiple_positions = new HashSet[MOPropSitePattern]
+
 		for pattern in sys.vm.all_patterns do
 			file.write("{pattern.trace} {pattern}\n")
 			stats_array[0][pattern.index_x] += 1
@@ -580,6 +583,27 @@ class MOStats
 				stats_array[5][pattern.index_x] += 1
 			else
 				stats_array[6][pattern.index_x] += 1
+			end
+
+			# If the pattern has a global property
+			if pattern isa MOCallSitePattern then
+				var position_rsc = pattern.rsc.get_position_methods(pattern.gp.intro_mclassdef.mclass)
+
+				# Go into the loaded subclasses of this one to check is the position is the same
+				for mclass in pattern.rsc.loaded_subclasses do
+					if mclass.get_position_methods(pattern.gp.intro_mclassdef.mclass) != position_rsc then
+						multiple_positions.add(pattern)
+					end
+				end
+			else if pattern isa MOAttrPattern then
+				var position_rsc = pattern.rsc.get_position_attributes(pattern.gp.intro_mclassdef.mclass)
+
+				# Go into the loaded subclasses of this one to check is the position is the same
+				for mclass in pattern.rsc.loaded_subclasses do
+					if mclass.get_position_attributes(pattern.gp.intro_mclassdef.mclass) != position_rsc then
+						multiple_positions.add(pattern)
+					end
+				end
 			end
 		end
 
@@ -605,6 +629,9 @@ class MOStats
 			end
 			csv_file.write("\n")
 		end
+
+		print "multiple_positions {multiple_positions}"
+		print "multiple_positions.length {multiple_positions.length}"
 
 		csv_file.close
 		file.close
