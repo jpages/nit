@@ -141,9 +141,13 @@ redef class ModelBuilder
 
 		for mclass in vm.pstats.loaded_classes do
 			trace_classes.write("{mclass} number of methods {mclass.mmethods.length} number of attributes {mclass.mattributes.length} ")
-			trace_classes.write("nb_instances {mclass.nb_instances} \n")
+			trace_classes.write("nb_instances {mclass.nb_instances} direct_superclasses {mclass.in_hierarchy(sys.vm.mainmodule).direct_greaters.length}\n")
 		end
 
+		print "classes in suffixes {vm.suffixes}"
+		print "nb classes in suffixes {vm.suffixes.length} methods {vm.suffixes_methods.length} attributes {vm.suffixes_attributes.length}"
+
+		print "nb loaded_classes {vm.pstats.loaded_classes.length}"
 		trace_classes.close
 	end
 end
@@ -210,6 +214,15 @@ redef class VirtualMachine
 	var receiver_origin_recursive: Array[Int] is noinit
 
 	var trace_origin: Array[Int] is noinit
+
+	# The set of classes which are in the attributes suffix of a class
+	var suffixes_attributes = new HashSet[MClass]
+
+	# The set of classes which are in the attributes suffix of a class
+	var suffixes_methods = new HashSet[MClass]
+
+	# All classes which are in a suffix (methods or attributes) of a class
+	var suffixes = new HashSet[MClass]
 
 	init
 	do
@@ -1706,6 +1719,24 @@ end
 redef class MClass
 	# The number of instances of this class
 	var nb_instances: Int = 0
+
+	# This method is called when `current_class` class is moved in virtual table of `self`
+	redef fun moved_class_methods(vm, current_class, offset)
+	do
+		super
+
+		vm.suffixes.add(current_class)
+		vm.suffixes_methods.add(current_class)
+	end
+
+	# This method is called when `current_class` class is moved in virtual table of `self`
+	redef fun moved_class_attributes(vm, current_class, offset)
+	do
+		super
+
+		vm.suffixes.add(current_class)
+		vm.suffixes_attributes.add(current_class)
+	end
 end
 
 redef class MMethod
