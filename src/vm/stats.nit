@@ -541,7 +541,7 @@ class MOStats
 		var csv_file = new FileWriter.open("{dir}/patterns-{lbl}.csv")
 
 		# The array to store stats on patterns
-		var stats_array_size = 5
+		var stats_array_size = 7
 		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
 		for i in [0..stats_array_size[ do
 			stats_array[i] = new Array[Int].filled_with(0,4)
@@ -562,6 +562,12 @@ class MOStats
 			else if impl isa NullImpl then
 				stats_array[4][pattern.index_x] += 1
 			end
+
+			if pattern.is_monomorphic then
+				stats_array[5][pattern.index_x] += 1
+			else
+				stats_array[6][pattern.index_x] += 1
+			end
 		end
 
 		# The caption on y axis
@@ -572,6 +578,8 @@ class MOStats
 		caption_y.add("sst,")
 		caption_y.add("ph,")
 		caption_y.add("null,")
+		caption_y.add("monomorphic,")
+		caption_y.add("polymorphic,")
 		caption_y.add("\n,")
 
 		csv_file.write(caption_y[0])
@@ -1371,6 +1379,17 @@ end
 
 redef class MOSitePattern
 	var index_x: Int = 5
+
+	# Return true if all sites in this pattern are monomorphic
+	fun is_monomorphic: Bool
+	do
+		var res = true
+		for site in sites do
+			if not site.is_monomorph then res = false
+		end
+
+		return res
+	end
 
 	# The number of recompilations of this entity
 	var recompilations: Int = 0

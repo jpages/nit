@@ -473,7 +473,7 @@ redef class Variable
 
 				# Adding the current variable to the path
 				var cycle = current.variable.detect_cycle(current_path)
-				dep_cycles.add(current.variable.as(not null)) # TODO: move thath after the follwing line
+				dep_cycles.add(current.variable.as(not null)) # TODO: move that after the follwing line
 			end
 
 			# Delete current element
