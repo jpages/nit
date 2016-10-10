@@ -504,7 +504,7 @@ class MOStats
 		var file = new FileWriter.open("{dir}/picpatterns-{lbl}.csv")
 
 		# The array to store stats on picpatterns
-		var stats_array_size = 4
+		var stats_array_size = 7
 		var stats_array = new Array[Array[Int]].with_capacity(stats_array_size)
 		for i in [0..stats_array_size] do
 			stats_array[i] = new Array[Int].filled_with(0, 2)
@@ -517,6 +517,8 @@ class MOStats
 		caption_y.add("ph,")
 		caption_y.add("null,")
 		caption_y.add("theoritical bound of pic_patterns,")
+		caption_y.add("monomorphic,")
+		caption_y.add("polymorphic,")
 		caption_y.add("\n,")
 
 		for pic_pattern in vm.all_picpatterns do
@@ -529,6 +531,12 @@ class MOStats
 				stats_array[2][pic_pattern.index_x] += 1
 			else if impl isa NullImpl then
 				stats_array[3][pic_pattern.index_x] += 1
+			end
+
+			if pic_pattern.is_monomorphic then
+				stats_array[5][pic_pattern.index_x] += 1
+			else
+				stats_array[6][pic_pattern.index_x] += 1
 			end
 		end
 
@@ -1340,6 +1348,17 @@ redef class PICPattern
 
 		# Each time a picpattern has a change in its implementation, count it
 		recompilations += 1
+	end
+
+	# Return true if all patterns in self are monomorphic
+	fun is_monomorphic: Bool
+	do
+		var res = true
+		for pattern in patterns do
+			if not pattern.as(MOSitePattern).is_monomorphic then res = false
+		end
+
+		return res
 	end
 end
 
