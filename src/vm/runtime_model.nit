@@ -280,7 +280,7 @@ class MOSubtypeSitePattern
 
 	var target_mclass: MClass
 
-	redef fun get_pic(vm) do return target.as(MClassType).mclass
+	redef fun get_pic(vm) do return target_mclass end
 
 	redef fun pic_pattern_factory(rsc, pic)
 	do
@@ -332,7 +332,7 @@ class MOCallSitePattern
 		is_function = function
 
 		if rsc.abstract_loaded then
-			for subclass in rsc.loaded_subclasses do
+			for subclass in rsc.loaded_subclasses_abstract do
 				var lp_rsc = gp.lookup_first_definition(sys.vm.mainmodule, subclass.intro.bound_mtype)
 
 				add_lp(lp_rsc)
@@ -349,7 +349,7 @@ class MOCallSitePattern
 	fun add_lp(mpropdef: LP)
 	do
 		if not gp.living_mpropdefs.has(mpropdef) then
-			gp.living_mpropdefs.add(mpropdef)
+			gp.add_propdef(mpropdef, sys.vm)
 		end
 
 		if not callees.has(mpropdef) then
@@ -1017,9 +1017,8 @@ abstract class MOSubtypeSite
 		ast = node
 		add_entities
 
-		var mclass = target.get_mclass(sys.vm, mpropdef)
-		self.target = mclass.mclass_type
-		self.target_mclass = mclass.as(not null)
+		self.target = target
+		self.target_mclass = target.get_mclass(sys.vm, mpropdef).as(not null)
 	end
 
 	redef fun pretty_print(file)
@@ -1059,6 +1058,7 @@ class MOAsSubtypeSite
 		else
 			# We do not have concrete receivers, so the candidates are all loaded subclasses of the target
 			return null
+			#TODO : fix this
 			# if target_mclass.abstract_loaded then concretes.add(target_mclass)
 
 			# for mclass in target_mclass.loaded_subclasses do
@@ -1195,6 +1195,8 @@ class MOFunctionSite
 		return (new MOCallSitePattern(rst, rsc, gp.as(MMethod), true)).init_abstract
 	end
 
+	var counter_cycles = 0
+
 	# Compute inter-procedural concrete types
 	redef fun compute_concretes(concretes)
 	do
@@ -1203,6 +1205,12 @@ class MOFunctionSite
 
 		var sup = super
 		if sup != null then return sup
+
+		counter_cycles += 1
+		if counter_cycles == 10 then
+			counter_cycles = 0
+			return null
+		end
 
 		# The set of callees of this callsite
 		var callees = new List[MMethodDef]
@@ -1594,6 +1602,15 @@ class ASubtypeExpr
 
 		return cast_site
 	end
+
+	# Remove the anchor of the target type
+	fun unanchor_target(mpropdef: MPropDef, mtype: MType): MType
+	do
+		var anchor: MType = mpropdef.mclassdef.mclass.mclass_type
+		var res = mtype.anchor_to(vm.mainmodule, anchor.as(MClassType))
+
+		return res
+	end
 end
 
 redef class AIsaExpr
@@ -1622,7 +1639,7 @@ end
 redef class AAsCastExpr
 	redef fun copy_site(mpropdef: MPropDef): MOAsSubtypeSite
 	do
-		return new MOAsSubtypeSite(mpropdef, self, n_type.mtype.as(not null))
+		return new MOAsSubtypeSite(mpropdef, self, unanchor_target(mpropdef, n_type.mtype.as(not null)))
 	end
 end
 
@@ -1770,6 +1787,8 @@ redef class APropdef
 	do
 		super
 
+		if mpropdef == null then return
+
 		# Compile all object-mechanisms sites
 		for site in object_sites do
 			site.ast2mo(mpropdef.as(not null))
@@ -1867,6 +1886,9 @@ redef class ASendExpr
 		var is_attribute = called_node_ast isa AAttrPropdef
 
 		if is_attribute and not cs.mproperty.mpropdefs.length > 1 then
+			# Special case where the mpropdef is abstract
+			if called_node_ast.as(AAttrPropdef).mpropdef == null then return sys.monull
+
 			var mo = ast2mo_accessor(mpropdef, called_node_ast.as(AAttrPropdef))
 			return mo
 		else

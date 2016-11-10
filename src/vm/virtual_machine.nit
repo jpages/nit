@@ -264,6 +264,10 @@ class VirtualMachine super NaiveInterpreter
 		# Recursively load superclasses
 		for parent in mclass.in_hierarchy(mainmodule).direct_greaters do load_class_indirect(parent)
 
+		for superclass in mclass.in_hierarchy(mainmodule).greaters do
+			superclass.loaded_subclasses_abstract.add(mclass)
+		end
+
 		mclass.make_vt(self, false)
 
 		#TODO: comment
@@ -517,6 +521,8 @@ redef class MClass
 
 	# The concretes loaded subclasses (direct and indirect) of this class
 	var loaded_subclasses = new Array[MClass]
+
+	var loaded_subclasses_abstract = new Array[MClass]
 
 	# Allocates a VTable for this class and gives it an id
 	# * `vm` The currently executed VirtualMachine

@@ -85,6 +85,8 @@ redef class VirtualMachine
 
 				callsite.mocallsite.ast.dump_tree
 				print stack_trace
+
+				print "callsite.mproperty.living_mpropdefs {callsite.mproperty.living_mpropdefs} {}"
 				return self.call(propdef, args)
 			end
 
@@ -477,6 +479,10 @@ redef class AIsaExpr
 			subtype_res = v.is_subtype(recv.mtype, mtype)
 		end
 
+		#TODO: to remove
+		if mtype isa MGenericType or (not mtype isa MClassType) then return v.bool_instance(subtype_res)
+		if recv.mtype isa MGenericType or (not recv.mtype isa MClassType) then return v.bool_instance(subtype_res)
+
 		if mo_entity != null then
 			var impl = mo_entity.as(MOSubtypeSite).get_impl(vm)
 
@@ -490,10 +496,18 @@ redef class AIsaExpr
 			end
 
 			var exec_res = impl.exec_subtype(recv)
+			if impl isa PHImpl and not recv.mtype isa MGenericType then
+			# TODO: fix this
+				print "impl.id before {impl.id}"
+				var test = v.unanchor_type(mo_entity.as(MOSubtypeSite).target)
+				impl.id = test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp).vtable.id
+				print "impl.id after {impl.id}"
+			end
 
 			if recv.mtype isa MGenericType then
 				if exec_res == false then
 					if not exec_res == subtype_res then
+						print "Exec_res == false"
 						print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
 						print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
 						print "Exec recv {recv.mtype} target {mtype}"
@@ -515,9 +529,10 @@ redef class AIsaExpr
 				end
 			else
 				if exec_res != subtype_res then
-					print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res} recv.mtype {recv.mtype} target_type {mtype}"
+					print "ERROR AIsaExpr {impl} {impl.exec_subtype(recv)} {subtype_res}"
 					print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-					print "Exec recv {recv.mtype} target {mtype}"
+					print "Test recv {recv.mtype} isa {mtype}"
+					print "Test model {mo_entity.as(MOSubtypeSite).rst} isa {mo_entity.as(MOSubtypeSite).target}"
 
 					if mo_entity.as(MOSubtypeSite).concrete_receivers != null then print "Concretes {mo_entity.as(MOSubtypeSite).concrete_receivers.as(not null)}"
 
@@ -1418,9 +1433,6 @@ redef abstract class MOSite
 			if pattern_impl isa FinalImplementation then
 				impl = pattern.as(MOSubtypeSitePattern).final_impl
 			else if pattern_impl isa StaticImpl then
-				# if pattern isa MOAttrPattern then assert get_pic_position(vm, pattern.rsc) > 0
-				# if pattern isa MOCallSitePattern then assert get_pic_position(vm, pattern.rsc) > 0
-
 				impl = static_impl(vm, true)
 			else if pattern_impl isa SSTImpl then
 				impl = sst_impl(vm, true)
@@ -1599,7 +1611,13 @@ end
 redef class MOSubtypeSite
 	redef fun get_offset(vm) do return get_pic(vm).color
 
-	redef fun get_pic(vm) do return target.get_mclass(vm, lp).as(not null)
+	redef fun get_pic(vm)
+	do
+		var anchor: MType = lp.mclassdef.mclass.mclass_type
+		var res = target.anchor_to(vm.mainmodule, anchor.as(MClassType))
+
+		return res.get_mclass(vm, lp).as(not null)
+	end
 
 	redef fun compute_impl_concretes(vm: VirtualMachine)
 	do
@@ -1634,14 +1652,20 @@ redef class MOSubtypeSite
 		end
 	end
 
+	redef fun ph_impl(vm: VirtualMachine, mutable: Bool)
+	do
+		assert get_pic(vm).vtable.id != 0
+		return new PHImpl(self, mutable, get_offset(vm), get_pic(vm).vtable.id)
+	end
+
 	redef fun sst_impl(vm: VirtualMachine, mutable: Bool)
 	do
-		var offset = pattern.rsc.get_position_methods(target_mclass)
+		var offset = pattern.rsc.get_position_methods(get_pic(vm))
 
 		if offset < 1 then
 			var classes = new List[MClass]
 			for mclass in pattern.rsc.loaded_subclasses do
-				if vm.is_subclass(mclass, target_mclass) then
+				if vm.is_subclass(mclass, get_pic(vm)) then
 					classes.add(mclass)
 				end
 			end
@@ -1682,7 +1706,7 @@ redef class MOSubtypeSite
 
 	fun final_impl: Implementation
 	do
-		return new FinalImplementation(self, false, true, target_mclass.vtable.as(not null))
+		return new FinalImplementation(self, false, true, get_pic(vm).vtable.as(not null))
 	end
 end
 
