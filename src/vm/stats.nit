@@ -1399,8 +1399,9 @@ end
 redef class MOFunctionSite
 	redef fun trace
 	do
-		if compute_concretes(null) != null then
-			return super + " returned concretes = {compute_concretes(null).as(not null)}"
+		var conc = compute_concretes(null)
+		if conc != null then
+			return super + " returned concretes = {conc}"
 		else
 			return super
 		end

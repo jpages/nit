@@ -496,12 +496,13 @@ redef class AIsaExpr
 			end
 
 			var exec_res = impl.exec_subtype(recv)
-			if impl isa PHImpl and not recv.mtype isa MGenericType then
-			# TODO: fix this
-				print "impl.id before {impl.id}"
-				var test = v.unanchor_type(mo_entity.as(MOSubtypeSite).target)
-				impl.id = test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp).vtable.id
-				print "impl.id after {impl.id}"
+
+			# TODO: fix this and count these cases
+			var test = v.unanchor_type(mo_entity.as(MOSubtypeSite).target)
+
+			# assert mo_entity.as(MOSubtypeSite).get_pic(vm) == test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp)
+			if mo_entity.as(MOSubtypeSite).get_pic(vm) != test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp) then
+				return v.bool_instance(v.is_subtype(recv.mtype, mtype))
 			end
 
 			if recv.mtype isa MGenericType then
@@ -639,27 +640,35 @@ redef class AAsCastExpr
 
 			var exec_res = impl.exec_subtype(recv)
 
-			if recv.mtype isa MGenericType then
-				if exec_res == false then
-					res = exec_res
-				else
-					# We need to dig into the generic arguments, use the slow path for this
-					res = v.is_subtype(recv.mtype, mtype)
-				end
-			else
-				if exec_res != res then
-					print "ERROR AAsCastExpr {impl} {exec_res} {res} site.rst {mo_entity.as(MOSubtypeSite).rst} site.target {mtype}"
-					print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
-					print "recv {recv.mtype} target {mtype}"
-					print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
+			# TODO: fix this and count these cases
+			var test = v.unanchor_type(mo_entity.as(MOSubtypeSite).target)
 
-					print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
-					print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
-					mo_entity.as(MOSubtypeSite).ast.dump_tree
-					print vm.stack_trace
-					abort
-				end
-			end
+			# assert mo_entity.as(MOSubtypeSite).get_pic(vm) == test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp)
+			# if mo_entity.as(MOSubtypeSite).get_pic(vm) != test.get_mclass(vm, mo_entity.as(MOSubtypeSite).lp) then
+				res = v.is_subtype(recv.mtype, amtype)
+			# end
+
+		# 	if recv.mtype isa MGenericType then
+		# 		if exec_res == false then
+		# 			res = exec_res
+		# 		else
+		# 			# We need to dig into the generic arguments, use the slow path for this
+		# 			res = v.is_subtype(recv.mtype, mtype)
+		# 		end
+		# 	else
+		# 		if exec_res != res then
+		# 			print "ERROR AAsCastExpr {impl} {exec_res} {res} site.rst {mo_entity.as(MOSubtypeSite).rst} site.target {mtype}"
+		# 			print "Pattern.rst {mo_entity.as(MOSubtypeSite).pattern.rst} -> {mo_entity.as(MOSubtypeSite).pattern.target_mclass}"
+		# 			print "recv {recv.mtype} target {mtype}"
+		# 			print "{mo_entity.as(MOSubtypeSite).pattern.get_impl(vm)}"
+		#
+		# 			print "is_monomorph {mo_entity.as(MOSubtypeSite).is_monomorph}"
+		# 			print "Conservative impl of site {mo_entity.as(MOSubtypeSite).conservative_impl.to_s}"
+		# 			mo_entity.as(MOSubtypeSite).ast.dump_tree
+		# 			print vm.stack_trace
+		# 			abort
+		# 		end
+		# 	end
 		end
 
 		if not res then
@@ -1614,9 +1623,8 @@ redef class MOSubtypeSite
 	redef fun get_pic(vm)
 	do
 		var anchor: MType = lp.mclassdef.mclass.mclass_type
-		var res = target.anchor_to(vm.mainmodule, anchor.as(MClassType))
 
-		return res.get_mclass(vm, lp).as(not null)
+		return lp.mclassdef.mclass.mclass_type.get_mclass(vm, lp).as(not null)
 	end
 
 	redef fun compute_impl_concretes(vm: VirtualMachine)
